@@ -1,0 +1,103 @@
+server:
+  port: 9117
+  servlet:
+    context-path: /jhds
+
+spring:
+  datasource:
+    driverClassName: com.mysql.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/jhds?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowMultiQueries=true
+    username: root
+    password: a123456
+    druid:
+      initial-size: 5
+      max-active: 200
+      min-idle: 10
+      max-wait: 60000
+      validation-query: SELECT 1 FROM DUAL
+      test-while-idle: true
+      time-between-eviction-runs-millis: 3600000
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: NON_NULL
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    timeout: 5000
+    jedis:
+      pool:
+        max-active: 200
+        max-idle: 50
+        max-wait: 1000
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.jhds.entity
+  type-handlers-package: com.jhds.handler
+  configuration:
+    map-underscore-to-camel-case: true
+    # 开发环境打印SQL，生产环境请注释掉下一行
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+swagger:
+  enable: true
+  title: jhds 智慧农业云平台
+  description: jhds 智慧农业云平台 API 接口文档
+  version: 1.0
+  base-package: com.jhds.controller
+
+device:
+  mqtt:
+    broker-url: tcp://11046xnld7705.vicp.fun:1883
+    client-id: jhds-iot-client
+    username: mqttuser
+    password: a123456
+    topic:
+      prefix: /iot/jhds/prod
+      command-suffix: command
+      response-suffix: response
+    connection-timeout: 10
+    keepalive-interval: 60
+    enabled: true
+
+custom:
+  redis:
+    key-prefix: "jhds:"
+    command-timeout: 30
+    sensor-data-ttl: 3600
+
+insect:
+  api:
+    base-url: ${INSECT_API_BASE_URL:http://app.wlwapp.cn}
+    username: ${INSECT_API_USERNAME}
+    password: ${INSECT_API_PASSWORD}
+    token-ttl: 7
+
+ys7:
+  app-key: ${YS7_APP_KEY}
+  app-secret: ${YS7_APP_SECRET}
+
+ollama:
+  base-url: http://localhost:11434
+  model: qwen2.5vl:7b
+  options:
+    temperature: 0.1
+    num-predict: 2048
+    num-ctx: 16384
+
+dashscope:
+  api-key: ${DASHSCOPE_API_KEY}
+  base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com}
+  model: kimi-k2.7-code
+  options:
+    temperature: 0.1
+    max-tokens: 2048
+
+patrol:
+  capture-path: ./captures
+
+logging:
+  level:
+    com.jhds: debug

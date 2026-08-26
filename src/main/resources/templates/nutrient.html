@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 营养液配液</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/nutrient.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/header::header('nutrient')"></div>
+
+    <main class="main">
+        <div class="nutrient-layout">
+            <div class="nutrient-sensors">
+                <div class="card">
+                    <div class="card-header"><i class="ri-sensor-line"></i><span>土壤传感器</span><span class="update-time" id="soil-update-time"></span></div>
+                    <div class="sensor-grid">
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤温度</div>
+                            <div><span class="soil-sensor-value" id="soil-temp">--</span><span class="soil-sensor-unit">°C</span></div>
+                            <div class="soil-sensor-trend" id="soil-temp-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤湿度</div>
+                            <div><span class="soil-sensor-value" id="soil-humidity">--</span><span class="soil-sensor-unit">%</span></div>
+                            <div class="soil-sensor-trend" id="soil-humidity-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤EC</div>
+                            <div><span class="soil-sensor-value" id="soil-ec">--</span><span class="soil-sensor-unit">mS/cm</span></div>
+                            <div class="soil-sensor-trend" id="soil-ec-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤PH</div>
+                            <div><span class="soil-sensor-value" id="soil-ph">--</span><span class="soil-sensor-unit">pH</span></div>
+                            <div class="soil-sensor-trend" id="soil-ph-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤盐分</div>
+                            <div><span class="soil-sensor-value" id="soil-salt">--</span><span class="soil-sensor-unit">mg/L</span></div>
+                            <div class="soil-sensor-trend" id="soil-salt-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤氮</div>
+                            <div><span class="soil-sensor-value" id="soil-nitrogen">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div class="soil-sensor-trend" id="soil-nitrogen-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤磷</div>
+                            <div><span class="soil-sensor-value" id="soil-phosphorus">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div class="soil-sensor-trend" id="soil-phosphorus-trend"></div>
+                        </div>
+                        <div class="soil-sensor">
+                            <div class="soil-sensor-name">土壤钾</div>
+                            <div><span class="soil-sensor-value" id="soil-potassium">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div class="soil-sensor-trend" id="soil-potassium-trend"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="card-header" style="border:none; padding:0 0 12px 0;"><i class="ri-line-chart-line"></i><span>过去48小时土壤数据</span></div>
+                    <div class="chart-wrapper"><canvas id="soilChart"></canvas></div>
+                    <div class="chart-legend">
+                        <div class="legend-item" onclick="toggleSoilDataset(0)"><div class="legend-dot" style="background:#ff7a65;"></div>温度</div>
+                        <div class="legend-item" onclick="toggleSoilDataset(1)"><div class="legend-dot" style="background:#30d8f0;"></div>湿度</div>
+                        <div class="legend-item" onclick="toggleSoilDataset(2)"><div class="legend-dot" style="background:#f5c842;"></div>EC</div>
+                        <div class="legend-item" onclick="toggleSoilDataset(3)"><div class="legend-dot" style="background:#c084fc;"></div>PH</div>
+                    </div>
+                </div>
+                <div class="card" style="flex:1;">
+                    <div class="card-header"><i class="ri-history-line"></i><span>灌溉记录</span></div>
+                    <div id="irrigation-stats" style="padding:12px 18px; overflow-y:auto; flex:1;">
+                        <div class="info-row"><span class="info-label">今日灌溉</span><span class="info-value">2 次</span></div>
+                        <div class="info-row"><span class="info-label">累计用水</span><span class="info-value">180 L</span></div>
+                        <div class="info-row"><span class="info-label">营养液A</span><span class="info-value">12 mL</span></div>
+                        <div class="info-row"><span class="info-label">营养液B</span><span class="info-value">8 mL</span></div>
+                        <div class="info-row"><span class="info-label">酸液</span><span class="info-value">3 mL</span></div>
+                        <div class="info-row"><span class="info-label">碱液</span><span class="info-value">0 mL</span></div>
+                        <div style="margin-top:12px; padding:12px; background:rgba(0,200,160,0.08); border-radius:8px; border:1px solid rgba(0,200,160,0.2);">
+                            <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">下次预计灌溉</div>
+                            <div style="font-size:18px; font-weight:700; color:var(--accent-secondary); font-family:var(--font-mono);">14:30</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="nutrient-main">
+                <div class="card">
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" onclick="switchNutrientMode('manual')">手动模式</button>
+                        <button class="mode-tab" onclick="switchNutrientMode('auto')">自动模式</button>
+                        <button class="mode-tab" onclick="switchNutrientMode('ai')">AI 模式</button>
+                    </div>
+                </div>
+                <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                    <div class="mode-panel active" id="panel-manual">
+                        <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">配液泵控制</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">手动控制各泵开关</span></div>
+                        <div class="pump-grid" id="pump-grid"></div>
+                    </div>
+                    <div class="mode-panel" id="panel-auto">
+                        <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">自动灌溉计划</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">设定定时任务</span></div>
+                        <div class="schedule-form">
+                            <div class="time-row">
+                                <div class="form-group"><label class="form-label">灌溉时间 1</label><input type="time" class="form-input" value="08:00"></div>
+                                <div class="form-group"><label class="form-label">单次时长</label><select class="form-select"><option>5 分钟</option><option selected>10 分钟</option><option>15 分钟</option><option>20 分钟</option></select></div>
+                            </div>
+                            <div class="time-row">
+                                <div class="form-group"><label class="form-label">灌溉时间 2</label><input type="time" class="form-input" value="14:00"></div>
+                                <div class="form-group"><label class="form-label">单次时长</label><select class="form-select"><option>5 分钟</option><option selected>10 分钟</option><option>15 分钟</option><option>20 分钟</option></select></div>
+                            </div>
+                            <div class="time-row">
+                                <div class="form-group"><label class="form-label">灌溉时间 3</label><input type="time" class="form-input" value="18:00"></div>
+                                <div class="form-group"><label class="form-label">单次时长</label><select class="form-select"><option>5 分钟</option><option selected>10 分钟</option><option>15 分钟</option><option>20 分钟</option></select></div>
+                            </div>
+                            <div class="form-group" style="margin-top:16px;">
+                                <label class="form-label">灌溉频率</label>
+                                <div class="freq-options">
+                                    <button class="freq-chip active">每天</button>
+                                    <button class="freq-chip">隔天</button>
+                                    <button class="freq-chip">每周一/三/五</button>
+                                    <button class="freq-chip">自定义</button>
+                                </div>
+                            </div>
+                            <div style="margin-top:20px;">
+                                <button class="btn-primary" onclick="saveSchedule()"><i class="ri-save-line"></i> 保存计划</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mode-panel" id="panel-ai">
+                        <div class="ai-status">
+                            <div class="ai-status-icon"><i class="ri-brain-line"></i></div>
+                            <div>
+                                <div class="ai-status-text">AI 决策引擎运行中</div>
+                                <div class="ai-status-sub">根据土壤传感器数据自动判断是否执行灌溉</div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">AI 决策日志</span></div>
+                        <div class="ai-decision-log" id="ai-log">
+                            <div class="log-item">
+                                <div class="log-time">2026-03-30 13:45:02</div>
+                                <div class="log-msg">土壤湿度 <span class="highlight">45%</span> 低于阈值 <span class="highlight">50%</span>，触发灌溉条件</div>
+                            </div>
+                            <div class="log-item">
+                                <div class="log-time">2026-03-30 13:45:05</div>
+                                <div class="log-msg">EC值 <span class="highlight">1.85 mS/cm</span> 正常，无需调整营养液配比</div>
+                            </div>
+                            <div class="log-item">
+                                <div class="log-time">2026-03-30 13:45:08</div>
+                                <div class="log-msg">pH值 <span class="highlight">6.5</span> 处于最佳范围 <span class="highlight">6.0-7.0</span></div>
+                            </div>
+                            <div class="log-item">
+                                <div class="log-time">2026-03-30 13:45:12</div>
+                                <div class="log-msg">综合判定：执行 <span class="highlight">标准灌溉</span>，预计时长 <span class="highlight">10分钟</span></div>
+                            </div>
+                            <div class="log-item">
+                                <div class="log-time">2026-03-30 13:45:15</div>
+                                <div class="log-msg">灌溉任务已下发，预计完成时间 <span class="highlight">13:55</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/nutrient.js}"></script>
+</body>
+</html>

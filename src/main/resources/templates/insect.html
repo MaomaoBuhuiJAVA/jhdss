@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 虫情灯</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/insect.css}">
+</head>
+<body>
+    <div th:replace="fragments/header::header('insect')"></div>
+
+    <main class="main" style="flex-direction: column; gap: 14px;">
+        <div class="insect-layout" style="flex: 1; min-height: 0;">
+            <div class="insect-gallery">
+                <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:8px;"><i class="ri-bug-line"></i><span>虫情图像采集</span></div>
+                        <span style="font-size:11px; color:var(--text-secondary);">今日已采集 <span style="color:var(--accent-primary); font-weight:600;" id="today-count">0</span> 条</span>
+                    </div>
+                    <div class="date-selector" id="device-selector" style="border-bottom-color:rgba(30,60,100,0.15);">
+                        <i class="ri-hardware-line" style="color:var(--text-dim);font-size:14px;"></i>
+                    </div>
+                    <div class="tab-bar">
+                        <button class="insect-tab active" data-tab="records" onclick="switchTab('records')"><i class="ri-gallery-line"></i>本地记录</button>
+                        <button class="insect-tab" data-tab="latest" onclick="switchTab('latest')"><i class="ri-camera-line"></i>最新照片</button>
+                        <button class="insect-tab" data-tab="history" onclick="switchTab('history')"><i class="ri-history-line"></i>历史照片</button>
+                        <button class="insect-tab" data-tab="data-history" onclick="switchTab('data-history')"><i class="ri-bar-chart-2-line"></i>数据历史</button>
+                    </div>
+                    <div id="tab-content-records" class="tab-content" style="display:block;">
+                        <div class="date-selector">
+                            <button class="date-chip" onclick="selectDate(this, '')">全部</button>
+                        </div>
+                        <div id="insect-gallery" class="gallery-grid"></div>
+                    </div>
+                    <div id="tab-content-latest" class="tab-content" style="display:none;">
+                        <div id="history-gallery" class="gallery-grid"></div>
+                    </div>
+                    <div id="tab-content-history" class="tab-content" style="display:none;">
+                        <div id="history-gallery2" class="gallery-grid"></div>
+                    </div>
+                    <div id="tab-content-data-history" class="tab-content" style="display:none;">
+                        <div id="history-gallery3" class="data-history-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="insect-stats">
+                <div class="card">
+                    <div class="card-header"><i class="ri-bar-chart-box-line"></i><span>今日统计</span></div>
+                    <div style="padding:20px; text-align:center;">
+                        <div class="stat-number" id="insect-total">0</div>
+                        <div class="stat-label">虫体总数量</div>
+                    </div>
+                </div>
+                <div class="card" style="flex:1;">
+                    <div class="card-header"><i class="ri-pie-chart-line"></i><span>虫体种类分布</span></div>
+                    <div class="type-list"></div>
+                </div>
+            </div>
+        </div>
+        <div class="control-center">
+            <div class="card" id="control-panel">
+                <div class="card-header"><i class="ri-database-2-line"></i><span>控制中心</span></div>
+                <div id="control-body" style="padding: 16px; text-align:center; color:var(--text-dim); font-size:12px;">
+                    正在加载设备...
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/insect.js}"></script>
+</body>
+</html>

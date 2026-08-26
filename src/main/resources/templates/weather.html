@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 气象站</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/weather.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/header::header('weather')"></div>
+
+    <main class="main">
+        <div class="weather-layout">
+            <div class="weather-sensors">
+                <div class="sensor-card">
+                    <div class="sensor-icon temp"><i class="ri-temp-hot-line"></i></div>
+                    <div class="sensor-name">环境温度</div>
+                    <div><span class="sensor-value" id="w-temp">24.5</span><span class="sensor-unit">°C</span></div>
+                    <div class="sensor-trend" id="w-temp-trend"></div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon humidity"><i class="ri-drop-line"></i></div>
+                    <div class="sensor-name">环境湿度</div>
+                    <div><span class="sensor-value" id="w-humidity">68</span><span class="sensor-unit">%</span></div>
+                    <div class="sensor-trend" id="w-humidity-trend"></div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon wind"><i class="ri-windy-line"></i></div>
+                    <div class="sensor-name">风速</div>
+                    <div><span class="sensor-value" id="w-wind">3.2</span><span class="sensor-unit">m/s</span></div>
+                    <div class="sensor-trend" id="w-wind-trend"></div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon rain"><i class="ri-heavy-showers-line"></i></div>
+                    <div class="sensor-name">降雨量</div>
+                    <div><span class="sensor-value" id="w-rain">0.0</span><span class="sensor-unit">mm</span></div>
+                    <div class="sensor-trend" id="w-rain-trend"></div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon direction"><i class="ri-compass-3-line"></i></div>
+                    <div class="sensor-name">风向</div>
+                    <div><span class="sensor-value" id="w-dir">0</span><span class="sensor-unit">°</span></div>
+                    <div class="sensor-trend" id="w-dir-text">北</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon light"><i class="ri-sun-line"></i></div>
+                    <div class="sensor-name">光照强度</div>
+                    <div><span class="sensor-value" id="w-light">--</span><span class="sensor-unit">Lux</span></div>
+                    <div class="sensor-trend">—</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon uv"><i class="ri-sun-foggy-line"></i></div>
+                    <div class="sensor-name">紫外线强度</div>
+                    <div><span class="sensor-value" id="w-uv">--</span><span class="sensor-unit">uW/cm²</span></div>
+                    <div class="sensor-trend">—</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon uv-index"><i class="ri-contrast-2-line"></i></div>
+                    <div class="sensor-name">紫外线指数</div>
+                    <div><span class="sensor-value" id="w-uv-index">--</span><span class="sensor-unit">UVI</span></div>
+                    <div class="sensor-trend">—</div>
+                </div>
+                <div class="sensor-card threshold-card" id="threshold-card">
+                    <div class="threshold-header" onclick="toggleThresholdPanel()">
+                        <div class="sensor-icon alarm"><i class="ri-alarm-warning-line"></i></div>
+                        <div class="sensor-name" style="margin-bottom:0;">报警阈值设置</div>
+                        <span class="threshold-toggle" id="threshold-toggle"><i class="ri-arrow-down-s-line"></i></span>
+                    </div>
+                    <div class="threshold-body" id="threshold-body">
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-temp-hot-line"></i>温度</span>
+                            <span class="threshold-range">
+                                下限 <input class="threshold-input" id="th-temp-min" type="number" step="0.1">
+                                上限 <input class="threshold-input" id="th-temp-max" type="number" step="0.1"> °C
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-drop-line"></i>湿度</span>
+                            <span class="threshold-range">
+                                下限 <input class="threshold-input" id="th-humidity-min" type="number" step="0.1">
+                                上限 <input class="threshold-input" id="th-humidity-max" type="number" step="0.1"> %
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-windy-line"></i>风速</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-wind-max" type="number" step="0.1"> m/s
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-heavy-showers-line"></i>累计雨量</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-rainfall-max" type="number" step="0.1"> mm
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-drizzle-line"></i>小时雨量</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-hourly-rain-max" type="number" step="0.1"> mm
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-heavy-showers-line"></i>日雨量</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-daily-rain-max" type="number" step="0.1"> mm
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-sun-line"></i>光照</span>
+                            <span class="threshold-range">
+                                下限 <input class="threshold-input" id="th-light-min" type="number">
+                                上限 <input class="threshold-input" id="th-light-max" type="number"> Lux
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-sun-foggy-line"></i>紫外线强度</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-uv-max" type="number" step="0.1"> uW/cm²
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-contrast-2-line"></i>紫外线指数</span>
+                            <span class="threshold-range">
+                                上限 <input class="threshold-input" id="th-uv-index-max" type="number" step="0.1"> UVI
+                            </span>
+                        </div>
+                        <div class="threshold-row">
+                            <span class="threshold-label"><i class="ri-battery-2-line"></i>电量</span>
+                            <span class="threshold-range">
+                                <label class="threshold-switch">
+                                    <input id="th-battery-alarm" type="checkbox" checked>
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label">低电量报警</span>
+                            </span>
+                        </div>
+                        <div class="threshold-actions">
+                            <label class="threshold-switch">
+                                <input id="th-enabled" type="checkbox" checked>
+                                <span class="switch-slider"></span>
+                            </label>
+                            <span class="switch-label">启用阈值报警</span>
+                            <button class="threshold-save-btn" onclick="saveThreshold()">保存设置</button>
+                            <span class="threshold-msg" id="threshold-msg"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon battery"><i class="ri-battery-2-line"></i></div>
+                    <div class="sensor-name">设备电量</div>
+                    <div><span class="sensor-value" id="w-battery">--</span></div>
+                    <div class="sensor-trend" id="w-battery-status">—</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon rain-hour"><i class="ri-drizzle-line"></i></div>
+                    <div class="sensor-name">每小时雨量</div>
+                    <div><span class="sensor-value" id="w-hourly-rain">--</span><span class="sensor-unit">mm</span></div>
+                    <div class="sensor-trend">—</div>
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-icon rain-day"><i class="ri-heavy-showers-line"></i></div>
+                    <div class="sensor-name">每天雨量</div>
+                    <div><span class="sensor-value" id="w-daily-rain">--</span><span class="sensor-unit">mm</span></div>
+                    <div class="sensor-trend">—</div>
+                </div>
+                <div class="sensor-card" id="w-heartbeat-card">
+                    <div class="sensor-icon heartbeat"><i class="ri-signal-tower-line"></i></div>
+                    <div class="sensor-name">设备状态</div>
+                    <div><span class="sensor-value" id="w-heartbeat-status">检测中...</span></div>
+                    <div class="sensor-trend" id="w-heartbeat-time"></div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="card-header" style="border:none; padding:0 0 12px 0;"><i class="ri-line-chart-line"></i><span>过去48小时传感器历史数据</span></div>
+                <div class="chart-wrapper"><canvas id="weatherChart"></canvas></div>
+                <div class="chart-legend">
+                    <div class="legend-item" onclick="toggleDataset(0)"><div class="legend-dot" style="background:#ff7a65;"></div>温度</div>
+                    <div class="legend-item" onclick="toggleDataset(1)"><div class="legend-dot" style="background:#30d8f0;"></div>湿度</div>
+                    <div class="legend-item" onclick="toggleDataset(2)"><div class="legend-dot" style="background:#30e8a0;"></div>风速</div>
+                    <div class="legend-item" onclick="toggleDataset(3)"><div class="legend-dot" style="background:#6b9fff;"></div>降雨量</div>
+                    <div class="legend-item" onclick="toggleDataset(4)"><div class="legend-dot" style="background:#f5c842;"></div>光照</div>
+                    <div class="legend-item" onclick="toggleDataset(5)"><div class="legend-dot" style="background:#c084fc;"></div>紫外线</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/weather.js}"></script>
+</body>
+</html>

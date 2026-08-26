@@ -1,0 +1,516 @@
+获取设备列表
+http://app.wlwapp.cn/api/v2/device
+参数：{}  
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "type": "虫情测报",
+            "create_by": "1",
+            "datetime": "2026-06-24",
+            "mysort": 0,
+            "sim": "898608551024C0215273",
+            "id": "7f9f0c9639c14e3b8b94bfb3b997a56d",
+            "create_date": "2026-06-29 19:19:58",
+            "update_by": "1",
+            "del_flag": "0",
+            "video_json": "",
+            "update_date": "2026-06-29 19:19:58",
+            "name": "ZTCQFXf2b99b04f0990635",
+            "did": "ZTCQFXf2b99b04f0990635",
+            "status": "已连接"
+        }
+    ],
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+获取设备实时数据:http://app.wlwapp.cn/api/v2/data  
+参数{
+    "did": "ZTCQFXf2b99b04f0990635"
+}  
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "datetime": "2026-06-30 13:40:58",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]",
+            "did": "ZTCQFXf2b99b04f0990635"
+        }
+    ],
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+获取设备数据历史记录:https://app.wlwapp.cn/api/v2/dataRecord
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635",
+    "startTime": "2026-06-28 09:54:12",
+    "endTime": "2026-06-30 09:54:12"
+}
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "datetime": "2026-06-30 09:15:49",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 08:15:49",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 07:15:44",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 06:15:25",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 05:14:48",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 04:14:48",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 03:03:49",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"33.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246909\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208152\"}]"
+        },
+        {
+            "datetime": "2026-06-30 01:13:55",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-30 00:13:47",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"36.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 23:13:35",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 22:13:22",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"80.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 21:13:12",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"50.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 20:12:54",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 19:12:35",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 18:12:29",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        },
+        {
+            "datetime": "2026-06-29 17:45:35",
+            "jsonstr": "[{\"unit\":\"\",\"ename\":\"dainfallRegime\",\"name\":\"降雨状态\",\"value\":\"无雨\"},{\"unit\":\"℃\",\"ename\":\"disinsectizingTemp\",\"name\":\"杀虫仓温度\",\"value\":\"34.0\"},{\"unit\":\"\",\"ename\":\"illumination\",\"name\":\"光照度\",\"value\":\"弱\"},{\"unit\":\"\",\"ename\":\"mode\",\"name\":\"运行模式\",\"value\":\"自动模式\"},{\"unit\":\"\",\"ename\":\"log\",\"name\":\"经度\",\"value\":\"120.246938\"},{\"unit\":\"\",\"ename\":\"lad\",\"name\":\"纬度\",\"value\":\"30.208154\"}]"
+        }
+    ],
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+获取最新设备控制状态（不包括视频监控）:http://app.wlwapp.cn/api/v2/opnow
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635"
+}
+返回值：{
+    "msg": "操作成功",
+    "data": {
+        "datetime": "2026-06-30 13:18:45",
+        "did": "ZTCQFXf2b99b04f0990635",
+        "op": [
+            {
+                "groupname": "诱虫灯",
+                "status": "诱虫灯关"
+            },
+            {
+                "groupname": "杀虫仓上挡板",
+                "status": "杀虫上关"
+            },
+            {
+                "groupname": "杀虫仓加热",
+                "status": ""
+            },
+            {
+                "groupname": "杀虫仓下挡板",
+                "status": ""
+            },
+            {
+                "groupname": "清扫",
+                "status": ""
+            },
+            {
+                "groupname": "补光灯",
+                "status": "补光灯关"
+            },
+            {
+                "groupname": "旋转盘",
+                "status": ""
+            },
+            {
+                "groupname": "运行模式3.0",
+                "status": ""
+            },
+            {
+                "groupname": "拍照",
+                "status": "拍照"
+            }
+        ]
+    },
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+获取控制参数：http://app.wlwapp.cn/api/v2/ctrl
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635"
+}
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "ename": "light trap-Android-V1",
+            "list": [
+                {
+                    "opname": "诱虫灯开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMDMwMzAzMDMxMzQzODMwNDE="
+                },
+                {
+                    "opname": "诱虫灯关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMDMwMzAzMDMwMzgzOTQzNDE="
+                }
+            ],
+            "groupname": "诱虫灯"
+        },
+        {
+            "ename": "baffle on the insect-Android-V1",
+            "list": [
+                {
+                    "opname": "杀虫上开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMTMwMzAzMDMxMzEzOTQzNDE="
+                },
+                {
+                    "opname": "杀虫上关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMTMwMzAzMDMwNDQzODMwNDE="
+                }
+            ],
+            "groupname": "杀虫仓上挡板"
+        },
+        {
+            "ename": "heatinginsect-Android-V1",
+            "list": [
+                {
+                    "opname": "加热仓开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMjMwMzAzMDMxNDUzOTQzNDE="
+                },
+                {
+                    "opname": "加热仓关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzMjMwMzAzMDMwMzIzODMwNDE="
+                }
+            ],
+            "groupname": "杀虫仓加热"
+        },
+        {
+            "ename": "baffle on the insect-Android-V1",
+            "list": [
+                {
+                    "opname": "杀虫下开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzNDMwMzAzMDMxMzAzOTQzNDI="
+                },
+                {
+                    "opname": "杀虫下关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzNDMwMzAzMDMwNDMzODMwNDI="
+                }
+            ],
+            "groupname": "杀虫仓下挡板"
+        },
+        {
+            "ename": "cleaning-Android-V1",
+            "list": [
+                {
+                    "opname": "清扫开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzODMwMzAzMDMxNDMzOTQzMzg="
+                },
+                {
+                    "opname": "清扫关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzODMwMzAzMDMwMzAzODMwMzg="
+                }
+            ],
+            "groupname": "清扫"
+        },
+        {
+            "ename": "light compensating lamp-Android-V1",
+            "list": [
+                {
+                    "opname": "补光灯开",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzOTMwMzAzMDMxMzkzODMwMzg="
+                },
+                {
+                    "opname": "补光灯关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzOTMwMzAzMDMwMzUzOTQzMzg="
+                }
+            ],
+            "groupname": "补光灯"
+        },
+        {
+            "ename": "rotating disc-Android-V1",
+            "list": [
+                {
+                    "opname": "旋转盘关",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDMwNDUzODMwMzk="
+                },
+                {
+                    "opname": "旋转盘1",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDMxMzIzOTQzMzk="
+                },
+                {
+                    "opname": "旋转盘2",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDMyMzYzOTQzMzg="
+                },
+                {
+                    "opname": "旋转盘3",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDMzNDEzODMwMzg="
+                },
+                {
+                    "opname": "旋转盘4",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM0NDUzOTQzNDE="
+                },
+                {
+                    "opname": "旋转盘5",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM1MzIzODMwNDE="
+                },
+                {
+                    "opname": "旋转盘6",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM2MzYzODMwNDI="
+                },
+                {
+                    "opname": "旋转盘7",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM3NDEzOTQzNDI="
+                },
+                {
+                    "opname": "旋转盘8",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM4NDUzOTQzNDY="
+                },
+                {
+                    "opname": "旋转盘9",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDM5MzIzODMwNDY="
+                },
+                {
+                    "opname": "旋转复位",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzA0NTMwMzAzMDQxMzYzODMwNDU="
+                }
+            ],
+            "groupname": "旋转盘"
+        },
+        {
+            "ename": "running_mode",
+            "list": [
+                {
+                    "opname": "手动",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsNDY0MTQ2NDI0NjQxMzAzMDMwMzAzMDMwNDY0MQzz"
+                },
+                {
+                    "opname": "自动",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsNDY0MTQ2NDI0NjQxMzAzMDMwMzEzMDMwNDY0MQzz"
+                }
+            ],
+            "groupname": "运行模式3.0"
+        },
+        {
+            "ename": "takePicture",
+            "list": [
+                {
+                    "opname": "拍照",
+                    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzgzMDMwMzAzMjMwMzEzMDMwMzAzNgzz"
+                }
+            ],
+            "groupname": "拍照"
+        }
+    ],
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+发送控制命令：http://app.wlwapp.cn/api/v2/op
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635",
+    "cmd": "M0j5A6yfN6j7A42cMcz9Afx6NDAwMjAsMzAzMTMwMzYzMDMwMzAzOTMwMzAzMDMxMzkzODMwMzg=",
+    "groupname": "变频",
+    "opname": "补光灯开"
+}
+返回值：{
+    "msg": "操作成功",
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+获取最新的(虫情、孢子)照片：http://app.wlwapp.cn/api/v2/picnow
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635"
+}
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "thumb": "https://store.senoiot.cn/upload/20260630/091f64afce300e00acd89ad291164ec4.jpg",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "https://store.senoiot.cn/upload/20260630/185b4e92204162f99542651563f60fd5.jpg",
+            "url": "2026-06",
+            "ai_status": 1.0,
+            "datetime": "2026-06-30 13:18:00",
+            "ai_result": "[]",
+            "ai_result_num": "[]",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782796670833.png",
+            "details": "",
+            "id": 390755.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        }
+    ],
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------
+虫情图片历史记录:http://app.wlwapp.cn/api/v2/picRecord
+参数：{
+    "did": "ZTCQFXf2b99b04f0990635", //设备编号
+    "startTime": "2026-06-28 09:54:12",
+    "endTime": "2026-06-30 09:54:12"
+}
+返回值：{
+    "msg": "操作成功",
+    "data": [
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 21:20:24",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782739163619.png",
+            "details": "暂无详情",
+            "id": 389886.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 21:21:25",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782739224378.png",
+            "details": "暂无详情",
+            "id": 389904.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 21:22:26",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782739285184.png",
+            "details": "暂无详情",
+            "id": 389920.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 22:41:07",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782744006563.png",
+            "details": "暂无详情",
+            "id": 390087.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 22:42:03",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782744062457.png",
+            "details": "暂无详情",
+            "id": 390099.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-29 22:43:03",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782744122650.png",
+            "details": "暂无详情",
+            "id": 390113.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "https://store.senoiot.cn/upload/20260630/94a30e3a15e889b7caf46b2779f7fcd3.jpg",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "https://store.senoiot.cn/upload/20260630/3f7bfc9c46bd8f786d4087ec94455e10.jpg",
+            "url": "2026-06",
+            "ai_status": 1.0,
+            "datetime": "2026-06-30 00:01:30",
+            "ai_result": "[]",
+            "ai_result_num": "[]",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782748840507.png",
+            "details": "",
+            "id": 390204.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-30 00:02:42",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782748900968.png",
+            "details": "暂无详情",
+            "id": 390215.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        },
+        {
+            "thumb": "",
+            "ai_engine": "飞浆V21",
+            "source_thumb": "",
+            "url": "2026-06",
+            "ai_status": 0.0,
+            "datetime": "2026-06-30 00:03:50",
+            "ai_result": "",
+            "ai_result_num": "",
+            "original_image": "https://admin.wlwapp.cn/uploads/2026-06/ZTCQFXf2b99b04f09906351782748961226.png",
+            "details": "暂无详情",
+            "id": 390224.0,
+            "did": "ZTCQFXf2b99b04f0990635"
+        }
+    ],
+    "count": 9.0,
+    "status": 1
+}
+------------------------------------------------分割线------------------------------------------------------------------------------------------

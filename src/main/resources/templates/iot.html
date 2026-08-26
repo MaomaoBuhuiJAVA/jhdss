@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 物联设备</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/iot.css}">
+</head>
+<body>
+    <div th:replace="fragments/header::header('iot')"></div>
+
+    <main class="main">
+        <div class="iot-layout">
+            <div class="card">
+                <div class="card-header"><i class="ri-smartphone-line"></i><span>大棚控制面板</span><span class="update-time" id="iot-update-time"></span></div>
+            </div>
+            <div class="iot-grid" id="iot-grid"></div>
+        </div>
+    </main>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/iot.js}"></script>
+</body>
+</html>

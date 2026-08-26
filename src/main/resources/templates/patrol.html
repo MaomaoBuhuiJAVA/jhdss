@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - AI轨道巡检</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/patrol.css}">
+    <script th:src="@{/js/lib/flv.min.js}"></script>
+</head>
+<body>
+    <div th:replace="fragments/header::header('patrol')"></div>
+
+    <main class="main">
+        <div class="patrol-layout">
+            <div class="patrol-video-area">
+                <div class="patrol-video">
+                    <div class="video-header">
+                        <div class="video-status"><div class="status-dot"></div><span style="font-size:13px; font-weight:500;">轨道巡检摄像头</span><span class="status-badge">LIVE</span></div>
+
+                    </div>
+                    <div class="patrol-video-main">
+                        <div class="patrol-scan-line"></div>
+                        <video id="video-player" class="patrol-video-player" autoplay muted playsinline></video>
+                        <div class="video-placeholder" id="video-placeholder"><i class="ri-camera-lens-line" style="font-size:64px;"></i><p>AI轨道巡检实时画面</p><p style="font-size:11px; margin-top:4px; color:var(--text-dim);">轨道位置: A-12 | 拍摄模式: 自动巡检</p></div>
+                        <button class="ctrl-btn encode" id="btn-encode" onclick="changeEncodeType()"><i class="ri-settings-4-line"></i>设为H.264</button>
+                    </div>
+                    <div class="patrol-controls">
+                        <button class="ctrl-btn" id="btn-left" onclick="setPatrolDir('left')"><i class="ri-arrow-left-line"></i>左移</button>
+                        <button class="ctrl-btn" id="btn-right" onclick="setPatrolDir('right')"><i class="ri-arrow-right-line"></i>右移</button>
+                        <button class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止</button>
+                        <button class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i>AI拍照识别</button>
+                    </div>
+                </div>
+                <div class="card" style="height:180px; flex-shrink:0;">
+                    <div class="card-header"><i class="ri-image-line"></i><span>最近拍摄记录</span></div>
+                    <div id="patrol-records" style="padding:12px 18px; display:flex; gap:12px; overflow-x:auto;">
+                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
+                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
+                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="patrol-sidebar">
+                <div class="card" style="flex:1; display:flex; flex-direction:column;">
+                    <div class="card-header"><i class="ri-list-check-2"></i><span>AI</span></div>
+                    <div class="task-list" id="patrol-tasks">
+                        <div class="task-item">
+                            <div class="task-time">08:00</div>
+                            <div class="task-info"><div class="task-name">晨间全面巡检</div><div class="task-status running">● 执行中</div></div>
+                            <div class="task-action" onclick="deleteTask(this)"><i class="ri-delete-bin-line"></i></div>
+                        </div>
+                        <div class="task-item">
+                            <div class="task-time">12:00</div>
+                            <div class="task-info"><div class="task-name">午间生长监测</div><div class="task-status pending">○ 待执行</div></div>
+                            <div class="task-action" onclick="deleteTask(this)"><i class="ri-delete-bin-line"></i></div>
+                        </div>
+                        <div class="task-item">
+                            <div class="task-time">18:00</div>
+                            <div class="task-info"><div class="task-name">晚间状态巡查</div><div class="task-status pending">○ 待执行</div></div>
+                            <div class="task-action" onclick="deleteTask(this)"><i class="ri-delete-bin-line"></i></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><i class="ri-add-circle-line"></i><span>新增巡逻任务</span></div>
+                    <div style="padding:16px 18px;">
+                        <div class="form-group">
+                            <label class="form-label">任务名称</label>
+                            <input type="text" class="form-input" id="task-name" placeholder="例如：每日生长巡检">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">执行时间</label>
+                            <input type="time" class="form-input" id="task-time" value="09:00">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">巡检范围</label>
+                            <select class="form-select" id="task-range">
+                                <option value="all">全部区域</option>
+                                <option value="zone1">种植架1</option>
+                                <option value="zone2">种植架2</option>
+                                <option value="zone3">种植架3</option>
+                                <option value="zone4">种植架4</option>
+                            </select>
+                        </div>
+                        <button class="btn-primary" onclick="addPatrolTask()"><i class="ri-add-line"></i> 添加任务</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- AI拍照识别结果弹窗 -->
+    <div class="ai-capture-overlay" id="aiCaptureOverlay" style="display:none;">
+        <div class="ai-capture-modal">
+            <div class="ai-capture-header">
+                <div class="ai-capture-header-left"><i class="ri-robot-2-line"></i> AI 拍照识别</div>
+                <button class="ai-capture-close" onclick="closeAiCapture()">&times;</button>
+            </div>
+            <div class="ai-capture-body">
+                <div class="ai-capture-image-area">
+                    <img id="capturePreview" src="" alt="拍摄画面">
+                </div>
+                <div class="ai-capture-result-area">
+                    <div class="ai-capture-result-header"><i class="ri-file-list-3-line"></i> 分析结果</div>
+                    <div class="ai-capture-result-content" id="captureResult">
+                        <div class="ai-capture-thinking">
+                            <div class="thinking-spinner"></div>
+                            <span>AI 正在分析中，请稍候...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-capture-footer">
+                <button class="capture-btn capture-btn-secondary" onclick="closeAiCapture()">关闭</button>
+                <button class="capture-btn capture-btn-primary" id="retryCaptureBtn" onclick="retryAiCapture()" style="display:none;"><i class="ri-refresh-line"></i> 重新识别</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/patrol.js}"></script>
+</body>
+</html>

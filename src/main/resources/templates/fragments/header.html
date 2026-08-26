@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<header class="header" th:fragment="header(activePage)">
+    <div class="logo">
+        <div class="logo-icon"><i class="ri-plant-line"></i></div>
+        <span>智慧樱桃种植</span>
+    </div>
+    <div class="nav-center">
+        <a class="nav-item" th:classappend="${activePage == 'dashboard'} ? 'active' : ''" th:href="@{/dashboard}">
+            <i class="ri-dashboard-line"></i><span>数据大屏</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'patrol'} ? 'active' : ''" th:href="@{/patrol}">
+            <i class="ri-route-line"></i><span>AI轨道巡检</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'iot'} ? 'active' : ''" th:href="@{/iot}">
+            <i class="ri-smartphone-line"></i><span>物联设备</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'weather'} ? 'active' : ''" th:href="@{/weather}">
+            <i class="ri-cloud-windy-line"></i><span>气象站</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'nutrient'} ? 'active' : ''" th:href="@{/nutrient}">
+            <i class="ri-flask-line"></i><span>营养液配液</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'insect'} ? 'active' : ''" th:href="@{/insect}">
+            <i class="ri-bug-line"></i><span>虫情灯</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'alarm'} ? 'active' : ''" th:href="@{/alarm}">
+            <i class="ri-alarm-warning-line"></i><span>报警中心</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'ai'} ? 'active' : ''" th:href="@{/ai}">
+            <i class="ri-robot-2-line"></i><span>AI农业助手</span>
+        </a>
+        <a class="nav-item" th:classappend="${activePage == 'ai-learn'} ? 'active' : ''" th:href="@{/ai-learn}">
+            <i class="ri-graduation-cap-line"></i><span>AI学习</span>
+        </a>
+
+    </div>
+    <div class="header-right" id="clock">
+        <span>--/--/-- --:--:--</span>
+    </div>
+</header>
+</body>
+</html>

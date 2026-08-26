@@ -1,0 +1,103 @@
+# JHDS 智慧农业云平台配置说明
+
+## 1. 运行环境
+
+- JDK 8（`pom.xml` 声明的 Java 版本为 8；JDK 17+ 也包含 JAXB 兼容依赖）
+- Maven 3.6+
+- MySQL 5.7/8.x，默认连接 `127.0.0.1:3306/jhds`
+- Redis 5+，默认连接 `127.0.0.1:6379`、数据库 0
+- 可选外部服务：MQTT、虫情灯云平台、萤石云、Ollama、阿里云百炼 DashScope
+
+## 2. 配置文件位置
+
+主配置文件为 `src/main/resources/application.yml`，打包后位于 JAR 内的 `application.yml`。
+Spring Boot 的环境变量和 JVM 参数会覆盖同名配置，例如：
+
+```bat
+set SPRING_DATASOURCE_PASSWORD=your-password
+set JAVA_OPTS=-Dserver.port=9118
+```
+
+敏感信息建议放在项目根目录的 `.env.local.bat`（该文件不要提交到 Git），启动脚本会自动加载它。
+
+## 3. 环境变量清单
+
+| 变量 | 是否必填 | 默认值 | 作用 |
+|---|---|---|---|
+| `INSECT_API_USERNAME` | 是 | 无 | 虫情灯云平台登录账号 |
+| `INSECT_API_PASSWORD` | 是 | 无 | 虫情灯云平台登录密码 |
+| `INSECT_API_BASE_URL` | 否 | `http://app.wlwapp.cn` | 虫情灯 API 根地址 |
+| `YS7_APP_KEY` | 是 | 无 | 萤石云应用 Key |
+| `YS7_APP_SECRET` | 是 | 无 | 萤石云应用 Secret |
+| `DASHSCOPE_API_KEY` | 是 | 无 | DashScope Bearer Token；当前 YAML 无默认值，缺失会阻止 Spring 启动 |
+| `DASHSCOPE_BASE_URL` | 否 | `https://dashscope.aliyuncs.com` | DashScope API 根地址 |
+
+注意：`application.yml` 中的 `insect.api.username/password`、`ys7.app-key/app-secret`、`dashscope.api-key` 使用无默认值占位符，缺少任意一个都会导致 Spring 启动阶段因无法解析占位符而失败。
+
+## 4. application.yml 关键配置
+
+| 配置项 | 当前默认值 | 说明 |
+|---|---|---|
+| `server.port` | `9117` | HTTP 端口 |
+| `server.servlet.context-path` | `/jhds` | 访问前缀 |
+| `spring.datasource.url` | `jdbc:mysql://127.0.0.1:3306/jhds?...` | MySQL 地址及连接参数 |
+| `spring.datasource.username` | `root` | MySQL 用户名 |
+| `spring.datasource.password` | `a123456` | MySQL 密码；建议改为环境变量覆盖 |
+| `spring.redis.host/port/database` | `127.0.0.1/6379/0` | Redis 连接 |
+| `device.mqtt.enabled` | `true` | 是否连接 MQTT；设为 `false` 可在无物联网现场时启动 |
+| `device.mqtt.broker-url` | `tcp://11046xnld7705.vicp.fun:1883` | MQTT Broker |
+| `device.mqtt.username/password` | `mqttuser`/`a123456` | MQTT 认证 |
+| `device.mqtt.topic.prefix` | `/iot/jhds/prod` | 命令和响应主题前缀 |
+| `ollama.base-url` | `http://localhost:11434` | 本地 Ollama 地址 |
+| `ollama.model` | `qwen2.5vl:7b` | 本地视觉模型 |
+| `dashscope.model` | `kimi-k2.7-code` | 云端模型 |
+| `patrol.capture-path` | `./captures` | 巡逻图片保存目录 |
+| `logging.level.com.jhds` | `debug` | 应用日志级别，生产建议改为 `info` |
+
+可通过 `JAVA_OPTS` 传入任意 Spring 覆盖项，例如 `-Dspring.redis.host=192.168.1.20`、`-Ddevice.mqtt.enabled=false`。
+
+## 5. 数据库初始化
+
+首次启动前执行 `src/main/resources/sql/init.sql`。脚本会创建 `jhds` 数据库及业务表；文件包含 `DROP TABLE IF EXISTS`，重复执行会清空已有业务表，请先备份数据。
+
+示例：
+
+```bat
+mysql -uroot -p < src\main\resources\sql\init.sql
+```
+
+## 6. 本地启动
+
+1. 启动 MySQL 和 Redis。
+2. 初始化数据库。
+3. 创建 `.env.local.bat`，写入上表中的账号和密钥，例如：
+
+```bat
+@echo off
+set "INSECT_API_USERNAME=your-insect-user"
+set "INSECT_API_PASSWORD=your-insect-password"
+set "YS7_APP_KEY=your-ys7-key"
+set "YS7_APP_SECRET=your-ys7-secret"
+set "DASHSCOPE_API_KEY=your-dashscope-key"
+```
+
+4. 双击 `start-jhds.bat`，或在命令行执行它。
+5. 页面地址：`http://localhost:9117/jhds/`；Swagger：`http://localhost:9117/jhds/swagger-ui.html`。
+
+无 MQTT 设备时，可在 `.env.local.bat` 增加：
+
+```bat
+set "JAVA_OPTS=-Ddevice.mqtt.enabled=false"
+```
+
+## 7. 定时任务
+
+应用启用 Spring Scheduling：传感器采集每 15 分钟、虫情灯同步每 5 分钟、自动灌溉和巡逻任务每分钟、告警清理每天 04:00 执行。相关外部服务不可用时，对应功能会报错或跳过，不影响静态页面访问。
+
+## 8. 常见问题
+
+- 启动提示 `Could not resolve placeholder`：检查 `.env.local.bat` 是否存在并包含必填变量。
+- 数据库连接失败：确认 MySQL 已启动、数据库已初始化，并检查 `spring.datasource.*`。
+- Redis 连接失败：确认 Redis 在 `127.0.0.1:6379` 监听，或用 `JAVA_OPTS` 覆盖 `spring.redis.host/port`。
+- AI 本地调用失败：确认 Ollama 已运行并执行 `ollama pull qwen2.5vl:7b`；也可改用 DashScope。
+- MQTT 连接失败：检查网络、Broker 地址和账号；仅做页面开发时可关闭 `device.mqtt.enabled`。

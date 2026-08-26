@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - AI 农业助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/ai.css}">
+</head>
+<body>
+    <div th:replace="fragments/header::header('ai')"></div>
+
+    <main class="main" style="flex-direction:column; padding:0;">
+        <div class="ai-main">
+            <div class="messages" id="messages"></div>
+
+            <div class="input-area">
+                <div class="image-preview" id="imagePreview" style="display:none;">
+                    <img id="previewImg" src="" alt="预览">
+                    <button class="image-preview-remove" id="removeImageBtn" type="button">&times;</button>
+                </div>
+                <div class="input-wrapper">
+                    <button class="upload-btn" id="uploadBtn" title="上传图片">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                    </button>
+                    <input type="file" id="imageInput" accept="image/*" capture="environment" style="display:none;">
+                    <button class="ai-learn-btn" title="AI 学习模块">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                        </svg>
+                    </button>
+                    <textarea class="input-box" id="inputBox" rows="1" placeholder="输入您的问题，按 Enter 发送..."></textarea>
+                    <button class="send-btn" id="sendBtn" title="发送 (Enter)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-hint">
+                    <label class="memory-toggle">
+                        <input type="checkbox" id="memoryToggle">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">记忆</span>
+                    </label>
+                    · Enter 发送 · Shift+Enter 换行 · 点击上传图片 · <span id="newChatBtn" style="cursor:pointer;color:var(--accent-primary);">新对话</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/ai.js}"></script>
+</body>
+</html>

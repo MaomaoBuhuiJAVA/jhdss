@@ -1,0 +1,21 @@
+# Build output and runtime data
+target/
+logs/
+captures/
+
+# Local credentials and machine-specific overrides
+.env.local.bat
+.env
+.env.*
+!.env.local.bat.example
+
+# IDE and operating-system files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary review and preview artifacts
+_docx_review/
+preview/

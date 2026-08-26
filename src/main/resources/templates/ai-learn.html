@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - AI学习</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/ai-learn.css}">
+</head>
+<body>
+<div th:replace="fragments/header::header('ai-learn')"></div>
+
+<main class="main" id="aiLearnMain">
+
+    <!-- 隐藏的 file input，由"选择视频"按钮统一触发 -->
+    <input type="file" id="videoFileInput" accept="video/*" hidden>
+
+    <!-- ============================================== -->
+    <!-- Stage 1: idle（未选视频）                       -->
+    <!-- Stage 2: selected（已选视频，显示封面）          -->
+    <!-- 共用 card 容器                                   -->
+    <!-- ============================================== -->
+    <div class="ai-learn-wrap">
+        <div class="ai-learn-card">
+
+            <!-- 装饰小圆点 -->
+            <div class="ai-learn-dots">
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+            </div>
+
+            <!-- Stage 1 内容：未选视频 -->
+            <div class="ai-stage stage-idle" data-stage="idle">
+                <div class="ai-learn-upload" data-trigger="file" title="选择视频">
+                    <i class="ri-upload-2-line"></i>
+                </div>
+                <div class="ai-learn-tip">支持拖拽视频到此区域，或点击下方按钮选择文件</div>
+            </div>
+
+            <!-- Stage 2 内容：已选视频 -->
+            <div class="ai-stage stage-selected" data-stage="selected" hidden>
+                <div class="ai-cover">
+                    <img class="ai-cover-img" id="coverImg" alt="视频封面">
+                    <div class="ai-cover-mask"></div>
+                    <div class="ai-cover-foot">
+                        <span class="ai-cover-name" id="coverName">video.mp4</span>
+                        <button class="ai-cover-change" data-trigger="file" type="button">更换视频</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 共用下半部分 -->
+            <h1 class="ai-learn-title">上传农事视频进行 AI 分析</h1>
+            <p class="ai-learn-desc">
+                用户可先上传视频文件，系统会自动提取封面，随后基于该视频进行扫描分析。
+            </p>
+
+            <div class="ai-learn-actions">
+                <button class="ai-learn-btn primary" data-trigger="file" type="button">
+                    <i class="ri-upload-2-line"></i>
+                    <span>选择视频</span>
+                </button>
+                <button class="ai-learn-btn secondary" id="scanBtn" type="button" disabled>
+                    <i class="ri-scan-2-line"></i>
+                    <span>开始扫描</span>
+                </button>
+            </div>
+
+            <p class="ai-learn-foot">上传后将自动识别并匹配对应知识卡片</p>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- Stage 3: scanning（全屏扫描）                   -->
+    <!-- ============================================== -->
+    <div class="ai-stage stage-scanning" data-stage="scanning" hidden>
+        <div class="ai-scan-frame">
+            <img class="ai-scan-bg" id="scanBg" alt="">
+            <div class="ai-scan-grid"></div>
+            <div class="ai-scan-line"></div>
+            <div class="ai-scan-corners">
+                <span class="ai-corner tl"></span>
+                <span class="ai-corner tr"></span>
+                <span class="ai-corner bl"></span>
+                <span class="ai-corner br"></span>
+                <div class="ai-scan-center">
+                    <div class="ai-scan-user"></div>
+                </div>
+            </div>
+            <div class="ai-scan-meta">
+                <div class="ai-scan-percent" id="scanPercent">0%</div>
+                <div class="ai-scan-stage-text" id="scanStageText">正在初始化…</div>
+            </div>
+        </div>
+        <div class="ai-scan-bar">
+            <div class="ai-scan-bar-fill" id="scanBarFill"></div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- Stage 4: done（结果展示）                       -->
+    <!-- ============================================== -->
+    <div class="ai-stage stage-done" data-stage="done" hidden>
+        <div class="ai-result-head">
+            <div class="ai-result-title-block">
+                <h1 class="ai-result-title">分析完成：识别到以下知识点</h1>
+                <p class="ai-result-sub">AI 已完成视频技能点识别与知识卡片生成。</p>
+            </div>
+            <button class="ai-result-retry" id="retryBtn" type="button">
+                <i class="ri-restart-line"></i><span>重新分析</span>
+            </button>
+        </div>
+        <div class="ai-result-foot-name" id="resultFileName">1a8c57a7bf8188b6cd860c5234bb58a7.mp4</div>
+
+        <div class="ai-result-grid" id="resultGrid">
+            <!-- JS 渲染卡片 -->
+        </div>
+    </div>
+
+</main>
+
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/ai-learn.js}"></script>
+</body>
+</html>

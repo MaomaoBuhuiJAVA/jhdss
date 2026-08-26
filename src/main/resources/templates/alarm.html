@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 报警中心</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/alarm.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div th:replace="fragments/header::header('alarm')"></div>
+
+    <main class="main">
+        <div class="alarm-layout">
+            <div class="alarm-list-area">
+                <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line"></i><span>报警列表</span></div>
+                        <span style="font-size:11px; color:var(--text-dim);">共 <span style="color:var(--accent-primary)">12</span> 条记录</span>
+                    </div>
+                    <div class="alarm-filter">
+                        <button class="filter-btn active" onclick="filterAlarm(this, 'all')">全部</button>
+                        <button class="filter-btn" onclick="filterAlarm(this, 'urgent')">紧急</button>
+                        <button class="filter-btn" onclick="filterAlarm(this, 'important')">重要</button>
+                        <button class="filter-btn" onclick="filterAlarm(this, 'normal')">一般</button>
+                    </div>
+                    <div class="alarm-scroll" id="alarm-list"></div>
+                </div>
+            </div>
+            <div class="alarm-stats-area">
+                <div class="stat-card urgent">
+                    <div class="stat-number" style="color:var(--accent-warn); text-shadow:0 0 12px rgba(255,77,106,0.3);">2</div>
+                    <div class="stat-label">紧急报警</div>
+                </div>
+                <div class="stat-card important">
+                    <div class="stat-number" style="color:var(--accent-caution); text-shadow:0 0 12px rgba(240,160,64,0.3);">2</div>
+                    <div class="stat-label">重要报警</div>
+                </div>
+                <div class="stat-card normal">
+                    <div class="stat-number" style="color:var(--accent-primary);">8</div>
+                    <div class="stat-label">一般报警</div>
+                </div>
+                <div class="card" style="flex:1;">
+                    <div class="card-header"><i class="ri-pie-chart-line"></i><span>报警来源分布</span></div>
+                    <div class="pie-chart-container"><canvas id="alarmPieChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/alarm.js}"></script>
+</body>
+</html>

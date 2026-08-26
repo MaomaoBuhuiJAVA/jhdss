@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jhds - 数据大屏</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <script th:src="@{/js/lib/flv.min.js}"></script>
+</head>
+<body>
+    <div th:replace="fragments/header::header('dashboard')"></div>
+
+    <main class="main">
+        <aside class="left-sidebar">
+            <div class="card">
+                <div class="card-header"><i class="ri-home-4-line"></i><span>大棚信息</span></div>
+                <div class="greenhouse-info">
+                    <div class="gh-title">
+                        <div class="gh-icon"><i class="ri-home-4-line"></i></div>
+                        <div><div class="gh-name">种植架1</div></div>
+                    </div>
+                    <div class="info-row"><span class="info-label">大棚类型</span><span class="info-value">玻璃体棚</span></div>
+                    <div class="info-row"><span class="info-label">作物名称</span><span class="info-value">樱桃</span></div>
+                    <div class="info-row"><span class="info-label">种植面积</span><span class="info-value">1000 m²</span></div>
+                    <div class="info-row"><span class="info-label">定植株数</span><span class="info-value">1200</span></div>
+                    <div class="info-row"><span class="info-label">定植日期</span><span class="info-value">2026-3-28</span></div>
+                </div>
+            </div>
+            <div class="card" style="flex:1; display:flex; flex-direction:column;">
+                <div class="card-header"><i class="ri-tools-line"></i><span>农事操作</span></div>
+                <div style="flex:1; overflow-y:auto;">
+                    <div class="operation-item"><div class="op-icon blue"><i class="ri-temp-hot-line"></i></div><div class="op-info"><div class="op-name">控温通气</div><div class="op-date">2026-3-28</div></div></div>
+                    <div class="operation-item"><div class="op-icon cyan"><i class="ri-drop-line"></i></div><div class="op-info"><div class="op-name">浇水</div><div class="op-date">2026-3-27</div></div></div>
+                    <div class="operation-item"><div class="op-icon green"><i class="ri-seedling-line"></i></div><div class="op-info"><div class="op-name">施肥</div><div class="op-date">2026-3-27</div></div></div>
+                    <div class="operation-item"><div class="op-icon purple"><i class="ri-bug-line"></i></div><div class="op-info"><div class="op-name">灌根</div><div class="op-date">2026-3-26</div></div></div>
+                    <div style="border-top:1px solid rgba(30,60,100,0.3); margin:0 18px;"></div>
+                    <div style="padding:10px 18px 4px; font-size:12px; font-weight:600; color:var(--accent-primary); letter-spacing:0.04em;"><i class="ri-calendar-check-line" style="margin-right:6px;"></i>待办农事</div>
+                    <div class="todo-table" style="padding-bottom:4px;">
+                        <div class="todo-header"><div class="col-week">时间</div><div class="col-task">农事</div><div class="col-action">操作</div></div>
+                        <div class="todo-row"><div class="col-week">第6周</div><div class="col-task">农事</div><div class="col-action">浇水</div></div>
+                        <div class="todo-row"><div class="col-week">第1周</div><div class="col-task">农事</div><div class="col-action">浇水</div></div>
+                        <div class="todo-row"><div class="col-week">第1周</div><div class="col-task">施肥</div><div class="col-action">植保</div></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <section class="center-area">
+            <div class="tabs-bar">
+                <div class="tab-item active"><div class="tab-name">种植架1</div></div>
+                <div class="tab-item"><div class="tab-name">种植架2</div></div>
+                <div class="tab-item"><div class="tab-name">种植架3</div></div>
+                <div class="tab-item"><div class="tab-name">种植架4</div></div>
+            </div>
+            <div class="video-area">
+                <div class="video-header">
+                    <div class="video-status"><div class="status-dot"></div><span style="font-size:13px; font-weight:500;">主监控</span><span class="status-badge">LIVE</span></div>
+                    <span class="video-time">CH-01 &nbsp; 16:9</span>
+                </div>
+                <div class="video-main">
+                    <video id="dashboard-video-player" class="dashboard-video-player" autoplay muted playsinline></video>
+                    <div class="video-placeholder" id="dashboard-video-placeholder" style="display:none;"><i class="ri-video-line"></i><p>暂无画面，等待信号接入</p></div>
+                </div>
+                <div class="video-footer"><div class="cam-label">次监控</div><span class="video-time">CH-02 &nbsp; 16:9</span></div>
+            </div>
+        </section>
+        <aside class="right-sidebar">
+            <div class="card weather-thumb" onclick="location.href='/jhds/weather'" style="cursor:pointer;">
+                <div class="card-header"><i class="ri-cloud-windy-line"></i><span>气象站</span></div>
+                <div class="wt-grid" id="weather-thumb">
+                    <div class="wt-item"><div class="wt-icon"><i class="ri-temp-hot-line"></i></div><div class="wt-info"><div class="wt-label">温度</div><div class="wt-value" id="wt-temp">--°C</div></div></div>
+                    <div class="wt-item"><div class="wt-icon"><i class="ri-drop-line"></i></div><div class="wt-info"><div class="wt-label">湿度</div><div class="wt-value" id="wt-humidity">--%</div></div></div>
+                    <div class="wt-item"><div class="wt-icon"><i class="ri-wind-line"></i></div><div class="wt-info"><div class="wt-label">风速</div><div class="wt-value" id="wt-wind">--m/s</div></div></div>
+                    <div class="wt-item"><div class="wt-icon"><i class="ri-navigation-line"></i></div><div class="wt-info"><div class="wt-label">风向</div><div class="wt-value" id="wt-wind-dir">--</div></div></div>
+                </div>
+            </div>
+            <div class="card card-alarm">
+                <div class="card-header" style="justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line" style="color:#ff4d6a;text-shadow:0 0 8px rgba(255,77,106,0.5);"></i><span>告警信息</span></div>
+                    <span style="font-size:11px; color:#7b8fa8; cursor:pointer; letter-spacing:0.04em; transition:color 0.3s;" onmouseover="this.style.color='#ff4d6a'" onmouseout="this.style.color='#7b8fa8'"><i class="ri-history-line"></i> 历史记录</span>
+                </div>
+                <div class="alert-item" onclick="location.href='/jhds/alarm'">
+                    <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>发现虫害几棵</span></div><span class="alert-level urgent">紧急</span></div>
+                    <div class="alert-meta"><span class="alert-time">2026-03-30 13:30</span><span class="alert-location">种植架1、种植架2</span></div>
+                </div>
+                <div class="alert-item" onclick="location.href='/jhds/alarm'">
+                    <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line" style="color:#f0a040;"></i><span>植株叶面存在杂点</span></div><span class="alert-level important">重要</span></div>
+                    <div class="alert-meta"><span class="alert-time">2026-03-30 12:45</span><span class="alert-location">A2</span></div>
+                </div>
+            </div>
+            <div class="card" style="flex:1;">
+                <div class="card-header"><i class="ri-wifi-line"></i><span>物联设备</span></div>
+                <div class="device-list" id="device-list"></div>
+            </div>
+        </aside>
+    </main>
+
+    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
+        <i class="ri-robot-2-line"></i>
+        <span>AI 农业管家</span>
+        <span>点击开始对话</span>
+    </div>
+
+    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/dashboard.js}"></script>
+    <script>
+        let dashboardFlvPlayer = null;
+        let dashboardVideoReady = false;
+
+        function destroyDashboardPlayer() {
+            if (dashboardFlvPlayer) {
+                try {
+                    dashboardFlvPlayer.pause();
+                    dashboardFlvPlayer.unload();
+                    dashboardFlvPlayer.detachMediaElement();
+                    dashboardFlvPlayer.destroy();
+                } catch (e) { /* ignore */ }
+                dashboardFlvPlayer = null;
+            }
+            dashboardVideoReady = false;
+        }
+
+        function initDashboardVideo() {
+            const video = document.getElementById('dashboard-video-player');
+            const placeholder = document.getElementById('dashboard-video-placeholder');
+            if (!video) return;
+
+            destroyDashboardPlayer();
+
+            apiGet('/camera/play-url?deviceSerial=BG9980884').then(res => {
+                if (!res || !res.data) {
+                    if (placeholder) placeholder.style.display = 'flex';
+                    return;
+                }
+                try {
+                    if (typeof flvjs === 'undefined') {
+                        if (placeholder) { placeholder.innerHTML = '<i class="ri-video-line"></i><p>播放器组件加载失败</p>'; placeholder.style.display = 'flex'; }
+                        return;
+                    }
+                    if (!flvjs.isSupported()) {
+                        if (placeholder) { placeholder.innerHTML = '<i class="ri-video-line"></i><p>浏览器不支持视频播放</p>'; placeholder.style.display = 'flex'; }
+                        return;
+                    }
+                    destroyDashboardPlayer();
+                    dashboardFlvPlayer = flvjs.createPlayer({ type: 'flv', url: res.data });
+                    dashboardFlvPlayer.attachMediaElement(video);
+                    dashboardFlvPlayer.load();
+                    dashboardFlvPlayer.play();
+                    video.addEventListener('playing', function () {
+                        dashboardVideoReady = true;
+                        if (placeholder) placeholder.style.display = 'none';
+                    });
+                    video.addEventListener('error', function () {
+                        dashboardVideoReady = false;
+                        if (placeholder) placeholder.style.display = 'flex';
+                    });
+                } catch (e) {
+                    console.error('视频初始化失败:', e);
+                    if (placeholder) placeholder.style.display = 'flex';
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', initDashboardVideo);
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) initDashboardVideo();
+        });
+        window.addEventListener('pagehide', destroyDashboardPlayer);
+        window.addEventListener('beforeunload', destroyDashboardPlayer);
+    </script>
+</body>
+</html>
