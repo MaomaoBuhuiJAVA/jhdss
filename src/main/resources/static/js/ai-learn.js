@@ -130,19 +130,27 @@
         }
         const fileMatch = file.name.trim().match(/^视频([123])\.mp4$/i);
         selectedVideoKey = fileMatch ? fileMatch[1] : null;
+        let thumbDataUrl = selectedVideoKey
+            ? resolveImg('/images/demo/' + selectedVideoKey + '-1.png')
+            : '';
         try {
-            const thumbDataUrl = await extractFirstFrame(file);
-            coverImg.src = thumbDataUrl;
-            scanBg.src = thumbDataUrl;
-            coverName.textContent = file.name;
-            resultFileName.textContent = file.name;
-            scanBtn.disabled = false;
-            $$('.ai-learn-btn.primary').forEach(b => b.classList.add('active'));
-            showState(STATE.SELECTED);
+            if (file.size === 0) throw new Error('empty video file');
+            thumbDataUrl = await extractFirstFrame(file);
         } catch (err) {
-            console.error('抽帧失败', err);
-            alert('无法读取该视频文件，请换一个 mp4 试试');
+            if (!selectedVideoKey) {
+                console.error('抽帧失败', err);
+                alert('该视频文件无法读取或格式不受支持，请选择有效的 mp4 文件');
+                return;
+            }
+            console.warn('视频封面不可用，已使用对应资料图片', err);
         }
+        coverImg.src = thumbDataUrl;
+        scanBg.src = thumbDataUrl;
+        coverName.textContent = file.name;
+        resultFileName.textContent = file.name;
+        scanBtn.disabled = false;
+        $$('.ai-learn-btn.primary').forEach(b => b.classList.add('active'));
+        showState(STATE.SELECTED);
     }
 
     /**

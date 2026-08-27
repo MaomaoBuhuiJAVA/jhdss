@@ -46,14 +46,6 @@
                 </div>
             </div>
             <div class="insect-stats">
-                <button class="insect-alert" id="insect-alert" type="button" onclick="openInsectAlert()">
-                    <span class="insect-alert-icon"><i class="ri-alarm-warning-fill"></i></span>
-                    <span class="insect-alert-copy">
-                        <strong>发现害虫！</strong>
-                        <small>点击查看 AI 巡检详情</small>
-                    </span>
-                    <i class="ri-arrow-right-s-line insect-alert-arrow"></i>
-                </button>
                 <div class="card">
                     <div class="card-header"><i class="ri-bar-chart-box-line"></i><span>今日统计</span></div>
                     <div style="padding:20px; text-align:center;">
@@ -63,6 +55,16 @@
                 </div>
                 <div class="card" style="flex:1;">
                     <div class="card-header"><i class="ri-scan-2-line"></i><span>AI识别巡检</span></div>
+                    <div class="insect-alert-wrap">
+                        <button class="insect-alert" id="insect-alert" type="button" onclick="openInsectAlert()">
+                            <span class="insect-alert-icon"><i class="ri-alarm-warning-fill"></i></span>
+                            <span class="insect-alert-copy">
+                                <strong>发现害虫！</strong>
+                                <small>点击查看 AI 巡检详情</small>
+                            </span>
+                            <i class="ri-arrow-right-s-line insect-alert-arrow"></i>
+                        </button>
+                    </div>
                     <div class="type-list"></div>
                 </div>
             </div>
