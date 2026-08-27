@@ -56,4 +56,9 @@ public class PageController {
         return "ai-learn";
     }
 
+    @GetMapping("/archive")
+    public String archive() {
+        return "archive";
+    }
+
 }

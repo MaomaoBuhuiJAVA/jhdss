@@ -114,9 +114,9 @@ async function loadInsectRecords(date) {
 
 function renderDemoInsectGallery(gallery) {
     const demoItems = [
-        { image: '/jhds/images/demo/3-1.png', label: '虫体标本识别', detail: 'AI巡检采集' },
-        { image: '/jhds/images/demo/3-3.png', label: '叶片病斑采样', detail: '人工复核' },
-        { image: '/jhds/images/demo/3-4.png', label: '显微镜诊断', detail: '实验室分析' }
+        { image: '/jhds/images/alerts/fruit-fly-detection.png', label: '果蝇检测', detail: 'AI巡检采集' },
+        { image: '/jhds/images/alerts/red-spider-suspected.png', label: '红蜘蛛疑似病斑', detail: 'AI识别巡检' },
+        { image: '/jhds/images/alerts/longhorn-beetle-detection.png', label: '桃红颈天牛检测', detail: 'AI识别巡检' }
     ];
     gallery.innerHTML = demoItems.map(item =>
         '<div class="insect-card demo-insect-card">' +

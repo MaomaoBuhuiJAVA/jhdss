@@ -13,8 +13,8 @@ const DASHBOARD_MODAL_CONTENT = {
   alert: {
     title: '嫁接苗异常告警',
     html: '<div class="dashboard-modal-images">' +
-      '<img src="/jhds/images/demo/1-3.png" alt="嫁接苗根系异常特征">' +
-      '<img src="/jhds/images/demo/1-4.png" alt="嫁接苗植株异常特征">' +
+      '<img src="/jhds/images/alerts/graft-union-anomaly.png" alt="嫁接苗嫁接口异常特征">' +
+      '<img src="/jhds/images/alerts/graft-cut-anomaly.png" alt="嫁接苗切口异常特征">' +
       '</div><p class="dashboard-alert-message">⚠️嫁接苗存在异常特征，请及时处理！</p>'
   },
   market: {

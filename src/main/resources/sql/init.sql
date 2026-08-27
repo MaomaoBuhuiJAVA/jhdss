@@ -237,3 +237,115 @@ INSERT INTO irrigation_schedule (schedule_time, duration, frequency, enabled) VA
 ('08:00', 10, 'daily', 1),
 ('14:00', 10, 'daily', 1),
 ('18:00', 10, 'daily', 1);
+
+-- ============================================================
+-- 植株历年档案模块
+-- 这些表使用 IF NOT EXISTS，重复执行初始化脚本不会清空已有档案。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS plant_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_name VARCHAR(100) NOT NULL COMMENT '植株名称',
+    scientific_name VARCHAR(150) DEFAULT NULL COMMENT '学名',
+    family_genus VARCHAR(100) DEFAULT NULL COMMENT '科属',
+    variety VARCHAR(100) DEFAULT NULL COMMENT '品种',
+    source_type VARCHAR(50) DEFAULT NULL COMMENT '来源类型',
+    source_channel VARCHAR(200) DEFAULT NULL COMMENT '来源渠道',
+    plant_date DATE DEFAULT NULL COMMENT '定植日期',
+    plant_location VARCHAR(100) DEFAULT NULL COMMENT '种植位置',
+    soil_type VARCHAR(100) DEFAULT NULL COMMENT '土壤类型',
+    substrate_ratio VARCHAR(200) DEFAULT NULL COMMENT '基质配比',
+    light_env VARCHAR(200) DEFAULT NULL COMMENT '光照环境',
+    planting_spec VARCHAR(200) DEFAULT NULL COMMENT '种植规格',
+    main_photo VARCHAR(500) DEFAULT NULL COMMENT '主图片',
+    remark TEXT DEFAULT NULL COMMENT '备注',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    INDEX idx_plant_info_name (plant_name),
+    INDEX idx_plant_info_variety (variety)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株基础档案';
+
+CREATE TABLE IF NOT EXISTS plant_year_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_id BIGINT NOT NULL COMMENT '植株ID',
+    year INT NOT NULL COMMENT '年度',
+    growth_grade VARCHAR(30) DEFAULT NULL COMMENT '生长评级',
+    annual_summary TEXT DEFAULT NULL COMMENT '年度总结',
+    problem_review TEXT DEFAULT NULL COMMENT '问题复盘',
+    improvement_suggestion TEXT DEFAULT NULL COMMENT '改进建议',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    UNIQUE KEY uk_plant_year (plant_id, year),
+    INDEX idx_year_record_plant (plant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株年度档案';
+
+CREATE TABLE IF NOT EXISTS plant_phenology (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_id BIGINT NOT NULL COMMENT '植株ID',
+    year INT NOT NULL COMMENT '年度',
+    stage VARCHAR(50) DEFAULT NULL COMMENT '物候阶段',
+    phase VARCHAR(100) DEFAULT NULL COMMENT '阶段名称',
+    event_date DATE DEFAULT NULL COMMENT '发生日期',
+    description TEXT DEFAULT NULL COMMENT '描述',
+    photo_url VARCHAR(500) DEFAULT NULL COMMENT '图片',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    INDEX idx_phenology_plant_year (plant_id, year),
+    INDEX idx_phenology_event_date (event_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株物候记录';
+
+CREATE TABLE IF NOT EXISTS plant_cultivation (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_id BIGINT NOT NULL COMMENT '植株ID',
+    year INT NOT NULL COMMENT '年度',
+    month TINYINT NOT NULL COMMENT '月份',
+    water_frequency VARCHAR(100) DEFAULT NULL COMMENT '浇水频次',
+    fertilize VARCHAR(255) DEFAULT NULL COMMENT '施肥',
+    pruning VARCHAR(255) DEFAULT NULL COMMENT '修剪',
+    trellis VARCHAR(255) DEFAULT NULL COMMENT '搭架/绑蔓',
+    weeding VARCHAR(255) DEFAULT NULL COMMENT '除草',
+    repot VARCHAR(255) DEFAULT NULL COMMENT '换盆/移栽',
+    other VARCHAR(255) DEFAULT NULL COMMENT '其他操作',
+    remark TEXT DEFAULT NULL COMMENT '备注',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    UNIQUE KEY uk_cultivation_plant_year_month (plant_id, year, month),
+    INDEX idx_cultivation_plant_year (plant_id, year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株栽培管理记录';
+
+CREATE TABLE IF NOT EXISTS plant_pest_disease (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_id BIGINT NOT NULL COMMENT '植株ID',
+    year INT NOT NULL COMMENT '年度',
+    record_type VARCHAR(50) DEFAULT NULL COMMENT '记录类型',
+    pest_name VARCHAR(100) DEFAULT NULL COMMENT '病虫害名称',
+    occur_date DATE DEFAULT NULL COMMENT '发生日期',
+    symptom TEXT DEFAULT NULL COMMENT '症状',
+    severity VARCHAR(30) DEFAULT NULL COMMENT '严重程度',
+    measure_type VARCHAR(50) DEFAULT NULL COMMENT '措施类型',
+    measure TEXT DEFAULT NULL COMMENT '处理措施',
+    effect TEXT DEFAULT NULL COMMENT '处理效果',
+    photo_url VARCHAR(500) DEFAULT NULL COMMENT '图片',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    INDEX idx_pest_plant_year (plant_id, year),
+    INDEX idx_pest_occur_date (occur_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株病虫害与逆境记录';
+
+CREATE TABLE IF NOT EXISTS plant_growth_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    plant_id BIGINT NOT NULL COMMENT '植株ID',
+    year INT NOT NULL COMMENT '年度',
+    record_date DATE DEFAULT NULL COMMENT '观测日期',
+    height_cm DECIMAL(8,2) DEFAULT NULL COMMENT '株高厘米',
+    crown_width_cm DECIMAL(8,2) DEFAULT NULL COMMENT '冠幅厘米',
+    leaf_count INT DEFAULT NULL COMMENT '叶片数',
+    flower_count INT DEFAULT NULL COMMENT '花朵数',
+    fruit_count INT DEFAULT NULL COMMENT '果实数',
+    photo_url VARCHAR(500) DEFAULT NULL COMMENT '图片',
+    photo_no VARCHAR(100) DEFAULT NULL COMMENT '图片编号',
+    remark TEXT DEFAULT NULL COMMENT '备注',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT NULL COMMENT '更新时间',
+    INDEX idx_growth_plant_year (plant_id, year),
+    INDEX idx_growth_record_date (record_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植株生长观测记录';
