@@ -15,6 +15,16 @@ if not exist "pom.xml" (
     exit /b 1
 )
 
+if exist ".env.local.bat" (
+    echo [INFO] Loading .env.local.bat
+    call ".env.local.bat"
+) else (
+    echo [WARN] .env.local.bat was not found. Required external-service variables may be missing.
+)
+
+if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
+if defined MAVEN_HOME set "PATH=%MAVEN_HOME%\bin;%PATH%"
+
 where java >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Java was not found in PATH.
@@ -37,7 +47,11 @@ call mvn -version
 echo.
 
 set "MYSQL_SERVICE="
-for /f "usebackq delims=" %%S in (`powershell -NoProfile -Command "Get-Service ^| Where-Object { $_.Name -match 'mysql' -or $_.DisplayName -match 'mysql' } ^| Select-Object -First 1 -ExpandProperty Name"`) do set "MYSQL_SERVICE=%%S"
+sc query MySQL80 >nul 2>&1
+if not errorlevel 1 set "MYSQL_SERVICE=MySQL80"
+if not defined MYSQL_SERVICE (
+    for /f "usebackq delims=" %%S in (`powershell -NoProfile -Command "$service = (Get-Service -ErrorAction SilentlyContinue).Where({ $_.Name -match 'mysql' -or $_.DisplayName -match 'mysql' }, 'First'); if ($null -ne $service) { $service.Name }"`) do set "MYSQL_SERVICE=%%S"
+)
 if not defined MYSQL_SERVICE (
     echo [ERROR] No MySQL Windows service was found.
     echo         Open services.msc and confirm that MySQL is installed and running.
@@ -45,8 +59,14 @@ if not defined MYSQL_SERVICE (
     exit /b 1
 )
 echo [INFO] Detected MySQL service: !MYSQL_SERVICE!
-call :ensure_service !MYSQL_SERVICE! "MySQL"
-if errorlevel 1 goto :failed
+sc query "!MYSQL_SERVICE!" | find /I "RUNNING" >nul
+if errorlevel 1 (
+    echo [INFO] Starting MySQL service ^(!MYSQL_SERVICE!^)...
+    net start "!MYSQL_SERVICE!"
+    if errorlevel 1 goto :failed
+) else (
+    echo [OK] MySQL service is already running.
+)
 
 set "REDIS_SERVICE="
 sc query Redis >nul 2>&1
@@ -60,8 +80,14 @@ if not defined REDIS_SERVICE (
     pause
     exit /b 1
 )
-call :ensure_service !REDIS_SERVICE! "Redis"
-if errorlevel 1 goto :failed
+sc query "!REDIS_SERVICE!" | find /I "RUNNING" >nul
+if errorlevel 1 (
+    echo [INFO] Starting Redis service ^(!REDIS_SERVICE!^)...
+    net start "!REDIS_SERVICE!"
+    if errorlevel 1 goto :failed
+) else (
+    echo [OK] Redis service is already running.
+)
 
 echo [INFO] Checking MySQL port 3306...
 powershell -NoProfile -Command "if ((Test-NetConnection 127.0.0.1 -Port 3306 -InformationLevel Quiet) -ne $true) { exit 1 }" >nul 2>&1
@@ -77,13 +103,6 @@ if errorlevel 1 (
     echo [ERROR] Redis is not accepting connections on 127.0.0.1:6379.
     pause
     exit /b 1
-)
-
-if exist ".env.local.bat" (
-    echo [INFO] Loading .env.local.bat
-    call ".env.local.bat"
-) else (
-    echo [WARN] .env.local.bat was not found. Required external-service variables may be missing.
 )
 
 echo.
@@ -102,24 +121,8 @@ echo [INFO] Spring Boot stopped with exit code !APP_EXIT!.
 pause
 exit /b !APP_EXIT!
 
-:ensure_service
-set "SERVICE_NAME=%~1"
-set "SERVICE_LABEL=%~2"
-sc query "%SERVICE_NAME%" | find /I "RUNNING" >nul
-if not errorlevel 1 (
-    echo [OK] !SERVICE_LABEL! service is already running.
-    exit /b 0
-)
-echo [INFO] Starting !SERVICE_LABEL! service (!SERVICE_NAME!)...
-net start "%SERVICE_NAME%"
-if errorlevel 1 (
-    echo [ERROR] Could not start !SERVICE_LABEL!. Run this script as Administrator.
-    exit /b 1
-)
-exit /b 0
-
 :failed
 echo.
-echo [ERROR] Startup checks failed.
+echo [ERROR] Startup checks failed. Run this script as Administrator if a dependency service could not be started.
 pause
 exit /b 1

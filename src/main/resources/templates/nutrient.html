@@ -20,17 +20,17 @@
                     <div class="sensor-grid">
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤温度</div>
-                            <div><span class="soil-sensor-value" id="soil-temp">--</span><span class="soil-sensor-unit">°C</span></div>
+                            <div><span class="soil-sensor-value" id="soil-temp">23.6</span><span class="soil-sensor-unit">°C</span></div>
                             <div class="soil-sensor-trend" id="soil-temp-trend"></div>
                         </div>
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤湿度</div>
-                            <div><span class="soil-sensor-value" id="soil-humidity">--</span><span class="soil-sensor-unit">%</span></div>
+                            <div><span class="soil-sensor-value" id="soil-humidity">47</span><span class="soil-sensor-unit">%</span></div>
                             <div class="soil-sensor-trend" id="soil-humidity-trend"></div>
                         </div>
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤EC</div>
-                            <div><span class="soil-sensor-value" id="soil-ec">--</span><span class="soil-sensor-unit">mS/cm</span></div>
+                            <div><span class="soil-sensor-value" id="soil-ec">0.40</span><span class="soil-sensor-unit">mS/cm</span></div>
                             <div class="soil-sensor-trend" id="soil-ec-trend"></div>
                         </div>
                         <div class="soil-sensor">
@@ -40,22 +40,22 @@
                         </div>
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤盐分</div>
-                            <div><span class="soil-sensor-value" id="soil-salt">--</span><span class="soil-sensor-unit">mg/L</span></div>
+                            <div><span class="soil-sensor-value" id="soil-salt">0.079</span><span class="soil-sensor-unit">%</span></div>
                             <div class="soil-sensor-trend" id="soil-salt-trend"></div>
                         </div>
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤氮</div>
-                            <div><span class="soil-sensor-value" id="soil-nitrogen">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div><span class="soil-sensor-value" id="soil-nitrogen">101</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-nitrogen-trend"></div>
                         </div>
                         <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤磷</div>
-                            <div><span class="soil-sensor-value" id="soil-phosphorus">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div class="soil-sensor-name">土壤速效磷</div>
+                            <div><span class="soil-sensor-value" id="soil-phosphorus">13</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-phosphorus-trend"></div>
                         </div>
                         <div class="soil-sensor">
                             <div class="soil-sensor-name">土壤钾</div>
-                            <div><span class="soil-sensor-value" id="soil-potassium">--</span><span class="soil-sensor-unit">mg/kg</span></div>
+                            <div><span class="soil-sensor-value" id="soil-potassium">167</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-potassium-trend"></div>
                         </div>
                     </div>
@@ -97,7 +97,26 @@
                 <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
                     <div class="mode-panel active" id="panel-manual">
                         <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">配液泵控制</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">手动控制各泵开关</span></div>
-                        <div class="pump-grid" id="pump-grid"></div>
+                        <div class="pump-grid" id="pump-grid">
+                            <div class="pump-card demo-pump-card">
+                                <div class="pump-icon"><i class="ri-cloud-line"></i></div>
+                                <div class="pump-name">二氧化碳气肥</div>
+                                <label class="toggle-switch"><input type="checkbox" class="demo-pump" aria-label="二氧化碳气肥开关"><span class="toggle-slider"></span></label>
+                                <div class="pump-status">已关闭</div>
+                            </div>
+                            <div class="pump-card demo-pump-card">
+                                <div class="pump-icon"><i class="ri-loop-right-line"></i></div>
+                                <div class="pump-name">灌溉循环泵</div>
+                                <label class="toggle-switch"><input type="checkbox" class="demo-pump" aria-label="灌溉循环泵开关"><span class="toggle-slider"></span></label>
+                                <div class="pump-status">已关闭</div>
+                            </div>
+                            <div class="pump-card demo-pump-card">
+                                <div class="pump-icon"><i class="ri-contrast-drop-2-line"></i></div>
+                                <div class="pump-name">氯化钙叶面肥</div>
+                                <label class="toggle-switch"><input type="checkbox" class="demo-pump" aria-label="氯化钙叶面肥开关"><span class="toggle-slider"></span></label>
+                                <div class="pump-status">已关闭</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mode-panel" id="panel-auto">
                         <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">自动灌溉计划</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">设定定时任务</span></div>

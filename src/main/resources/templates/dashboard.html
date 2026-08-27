@@ -75,26 +75,45 @@
                     <div class="wt-item"><div class="wt-icon"><i class="ri-navigation-line"></i></div><div class="wt-info"><div class="wt-label">风向</div><div class="wt-value" id="wt-wind-dir">--</div></div></div>
                 </div>
             </div>
-            <div class="card card-alarm">
+            <div class="card card-alarm dashboard-reveal-card" id="dashboard-alert-card" hidden>
                 <div class="card-header" style="justify-content:space-between;">
                     <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line" style="color:#ff4d6a;text-shadow:0 0 8px rgba(255,77,106,0.5);"></i><span>告警信息</span></div>
                     <span style="font-size:11px; color:#7b8fa8; cursor:pointer; letter-spacing:0.04em; transition:color 0.3s;" onmouseover="this.style.color='#ff4d6a'" onmouseout="this.style.color='#7b8fa8'"><i class="ri-history-line"></i> 历史记录</span>
                 </div>
-                <div class="alert-item" onclick="location.href='/jhds/alarm'">
+                <div class="alert-item" role="button" tabindex="0" onclick="openDashboardModal('alert')">
                     <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>发现虫害几棵</span></div><span class="alert-level urgent">紧急</span></div>
                     <div class="alert-meta"><span class="alert-time">2026-03-30 13:30</span><span class="alert-location">种植架1、种植架2</span></div>
                 </div>
-                <div class="alert-item" onclick="location.href='/jhds/alarm'">
+                <div class="alert-item" role="button" tabindex="0" onclick="openDashboardModal('alert')">
                     <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line" style="color:#f0a040;"></i><span>植株叶面存在杂点</span></div><span class="alert-level important">重要</span></div>
                     <div class="alert-meta"><span class="alert-time">2026-03-30 12:45</span><span class="alert-location">A2</span></div>
                 </div>
             </div>
-            <div class="card" style="flex:1;">
-                <div class="card-header"><i class="ri-wifi-line"></i><span>物联设备</span></div>
-                <div class="device-list" id="device-list"></div>
+            <div class="card market-feedback-card" style="flex:1;">
+                <div class="card-header"><i class="ri-message-3-line"></i><span>市场反馈</span></div>
+                <div class="market-feedback-list">
+                    <button class="market-feedback-item" type="button" onclick="openDashboardModal('market')">
+                        <span class="market-feedback-icon"><i class="ri-notification-3-line"></i></span>
+                        <span class="market-feedback-copy">
+                            <strong>2025第四批次樱桃市场评价中等</strong>
+                            <small>消费者评价数据已更新</small>
+                        </span>
+                        <i class="ri-arrow-right-s-line"></i>
+                    </button>
+                </div>
             </div>
         </aside>
     </main>
+
+    <div class="dashboard-modal-overlay" id="dashboard-modal" hidden>
+        <section class="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-modal-title">
+            <header class="dashboard-modal-header">
+                <h2 id="dashboard-modal-title"></h2>
+                <button class="dashboard-modal-close" type="button" onclick="closeDashboardModal()" aria-label="关闭"><i class="ri-close-line"></i></button>
+            </header>
+            <div class="dashboard-modal-body" id="dashboard-modal-body"></div>
+        </section>
+    </div>
 
     <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
         <i class="ri-robot-2-line"></i>

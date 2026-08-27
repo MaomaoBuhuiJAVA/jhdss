@@ -44,7 +44,12 @@
             </div>
             <div class="patrol-sidebar">
                 <div class="card" style="flex:1; display:flex; flex-direction:column;">
-                    <div class="card-header"><i class="ri-list-check-2"></i><span>AI</span></div>
+                    <div class="card-header"><i class="ri-list-check-2"></i><span>AI巡检提示</span></div>
+                    <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
+                        <i class="ri-alarm-warning-line"></i>
+                        <span>⚠️花朵数量严重超标！</span>
+                        <i class="ri-arrow-right-s-line"></i>
+                    </button>
                     <div class="task-list" id="patrol-tasks">
                         <div class="task-item">
                             <div class="task-time">08:00</div>
@@ -117,6 +122,19 @@
                 <button class="capture-btn capture-btn-primary" id="retryCaptureBtn" onclick="retryAiCapture()" style="display:none;"><i class="ri-refresh-line"></i> 重新识别</button>
             </div>
         </div>
+    </div>
+
+    <div class="patrol-warning-overlay" id="patrolWarningOverlay" hidden>
+        <section class="patrol-warning-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-warning-title">
+            <header class="patrol-warning-header">
+                <h2 id="patrol-warning-title"><i class="ri-alarm-warning-line"></i> 花朵数量严重超标</h2>
+                <button type="button" onclick="closePatrolWarning()" aria-label="关闭"><i class="ri-close-line"></i></button>
+            </header>
+            <div class="patrol-warning-images">
+                <img th:src="@{/images/demo/2-1.png}" alt="花朵数量巡检画面一">
+                <img th:src="@{/images/demo/2-3.png}" alt="花朵数量巡检画面二">
+            </div>
+        </section>
     </div>
 
     <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">

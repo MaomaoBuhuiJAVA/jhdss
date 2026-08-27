@@ -2,6 +2,8 @@
 target/
 logs/
 captures/
+work/
+photo/
 
 # Local credentials and machine-specific overrides
 .env.local.bat

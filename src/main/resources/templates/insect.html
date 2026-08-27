@@ -46,6 +46,14 @@
                 </div>
             </div>
             <div class="insect-stats">
+                <button class="insect-alert" id="insect-alert" type="button" onclick="openInsectAlert()">
+                    <span class="insect-alert-icon"><i class="ri-alarm-warning-fill"></i></span>
+                    <span class="insect-alert-copy">
+                        <strong>发现害虫！</strong>
+                        <small>点击查看 AI 巡检详情</small>
+                    </span>
+                    <i class="ri-arrow-right-s-line insect-alert-arrow"></i>
+                </button>
                 <div class="card">
                     <div class="card-header"><i class="ri-bar-chart-box-line"></i><span>今日统计</span></div>
                     <div style="padding:20px; text-align:center;">
@@ -54,7 +62,7 @@
                     </div>
                 </div>
                 <div class="card" style="flex:1;">
-                    <div class="card-header"><i class="ri-pie-chart-line"></i><span>虫体种类分布</span></div>
+                    <div class="card-header"><i class="ri-scan-2-line"></i><span>AI识别巡检</span></div>
                     <div class="type-list"></div>
                 </div>
             </div>
@@ -68,6 +76,28 @@
             </div>
         </div>
     </main>
+
+    <div class="insect-alert-overlay" id="insect-alert-overlay" hidden>
+        <section class="insect-alert-modal" role="dialog" aria-modal="true" aria-labelledby="insect-alert-title">
+            <header class="insect-alert-modal-header">
+                <div>
+                    <span class="insect-alert-kicker">AI 识别巡检告警</span>
+                    <h2 id="insect-alert-title">发现害虫！</h2>
+                </div>
+                <button class="insect-alert-close" type="button" onclick="closeInsectAlert()" aria-label="关闭告警详情">
+                    <i class="ri-close-line"></i>
+                </button>
+            </header>
+            <div class="insect-alert-modal-body">
+                <p class="insect-alert-description">发现5只果蝇、1只桃红颈天牛，同时部分害虫无法捕获，叶面有失绿斑，且有部分红色斑点，疑似红蜘蛛</p>
+                <div class="insect-alert-images">
+                    <figure><img src="/jhds/images/demo/3-1.png" alt="果蝇检测图"><figcaption>果蝇检测</figcaption></figure>
+                    <figure><img src="/jhds/images/demo/3-3.png" alt="红蜘蛛疑似病斑检测图"><figcaption>红蜘蛛疑似病斑</figcaption></figure>
+                    <figure><img src="/jhds/images/demo/3-4.png" alt="桃红颈天牛检测图"><figcaption>桃红颈天牛检测</figcaption></figure>
+                </div>
+            </div>
+        </section>
+    </div>
 
 
     <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">

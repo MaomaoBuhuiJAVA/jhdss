@@ -3,6 +3,37 @@ let deviceList = [];
 let selectedDevice = '';
 let controlParamsMap = {};
 
+function openInsectAlert() {
+    const overlay = document.getElementById('insect-alert-overlay');
+    if (!overlay) return;
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const closeButton = overlay.querySelector('.insect-alert-close');
+    if (closeButton) closeButton.focus();
+}
+
+function closeInsectAlert() {
+    const overlay = document.getElementById('insect-alert-overlay');
+    if (!overlay) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    const alertButton = document.getElementById('insect-alert');
+    if (alertButton) alertButton.focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('insect-alert-overlay');
+    if (overlay) {
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay) closeInsectAlert();
+        });
+    }
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeInsectAlert();
+});
+
 async function initPage() {
     await loadDevices();
     if (deviceList.length > 0) {
@@ -71,7 +102,7 @@ async function loadInsectRecords(date) {
             gallery.appendChild(div);
         });
     } else {
-        gallery.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-dim);"><i class="ri-inbox-line" style="font-size:32px;display:block;margin-bottom:8px;"></i>暂无数据</div>';
+        renderDemoInsectGallery(gallery);
     }
     const totalRes = await apiGet('/insect/stats/today');
     if (totalRes && totalRes.data) {
@@ -79,6 +110,21 @@ async function loadInsectRecords(date) {
     }
     const typesRes = await apiGet('/insect/stats/types' + (d ? '?date=' + d : ''));
     renderTypeStats(typesRes);
+}
+
+function renderDemoInsectGallery(gallery) {
+    const demoItems = [
+        { image: '/jhds/images/demo/3-1.png', label: '虫体标本识别', detail: 'AI巡检采集' },
+        { image: '/jhds/images/demo/3-3.png', label: '叶片病斑采样', detail: '人工复核' },
+        { image: '/jhds/images/demo/3-4.png', label: '显微镜诊断', detail: '实验室分析' }
+    ];
+    gallery.innerHTML = demoItems.map(item =>
+        '<div class="insect-card demo-insect-card">' +
+            '<div class="insect-img"><img src="' + item.image + '" alt="' + item.label + '"></div>' +
+            '<div class="insect-info"><div class="insect-date">' + item.detail + '</div>' +
+            '<div class="insect-type">' + item.label + '</div></div>' +
+        '</div>'
+    ).join('');
 }
 
 function renderTypeStats(res) {

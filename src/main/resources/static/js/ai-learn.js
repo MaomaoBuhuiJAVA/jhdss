@@ -6,6 +6,7 @@
 (function () {
     const STATE = { IDLE: 'idle', SELECTED: 'selected', SCANNING: 'scanning', DONE: 'done' };
     let currentState = STATE.IDLE;
+    let selectedVideoKey = null;
 
     const $ = (sel, root) => (root || document).querySelector(sel);
     const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -127,6 +128,8 @@
             alert('请选择视频文件（mp4 / webm / mov 等）');
             return;
         }
+        const fileMatch = file.name.trim().match(/^视频([123])\.mp4$/i);
+        selectedVideoKey = fileMatch ? fileMatch[1] : null;
         try {
             const thumbDataUrl = await extractFirstFrame(file);
             coverImg.src = thumbDataUrl;
@@ -206,6 +209,10 @@
     /* ---------------- 扫描 ---------------- */
     scanBtn.addEventListener('click', async () => {
         if (currentState !== STATE.SELECTED) return;
+        if (!selectedVideoKey) {
+            alert('未找到该视频对应的分析资料，请选择视频1.MP4、视频2.MP4或视频3.MP4');
+            return;
+        }
         showState(STATE.SCANNING);
 
         // 进度 0 → 100，约 3.4 秒
@@ -223,14 +230,7 @@
             tick();
         });
 
-        // 拉取结果（这一步才请求后端）
-        try {
-            const data = await fetchResult();
-            renderCards(data);
-        } catch (err) {
-            console.warn('接口请求失败，使用前端 fallback 数据', err);
-            renderCards(getMockData());
-        }
+        renderCards(getVideoResult(selectedVideoKey));
         showState(STATE.DONE);
     });
 
@@ -251,6 +251,38 @@
         const json = await resp.json();
         if (json && json.code === 200 && Array.isArray(json.data)) return json.data;
         throw new Error('bad payload');
+    }
+
+    function getVideoResult(key) {
+        const datasets = {
+            '1': [{
+                group: '樱桃苗木培育与定植',
+                items: [
+                    { image: '/images/demo/1-1.png', title: '苗木筛选与质量把控', desc: '对照标准测量苗高（≥0.8m），检查主干粗细均匀度、侧根数量与健壮程度，剔除偏细、弯曲、根系稀疏或发黑的苗木。' },
+                    { image: '/images/demo/1-2.png', title: '接穗处理与嫁接操作', desc: '选取健壮嫩梢削取带少量木质部的盾形芽片；砧木斜切形成嵌合切口，将芽片嵌入并对齐形成层，用嫁接膜密封固定；另有劈接方式：砧木劈开2–3cm，接穗削成楔形插入并对准形成层后固定。' },
+                    { image: '/images/demo/1-3.png', title: '根系修剪与无土栽培准备', desc: '剪除细弱须根和交叉缠绕根，保留健壮主根与侧根，将剪口修成45°斜面；依次用多菌灵浸泡30分钟杀菌、生根粉溶液促根；同时配制均匀无分层的混合基质。' },
+                    { image: '/images/demo/1-4.png', title: '定植、定干与促枝处理', desc: '种植袋底部铺珍珠岩，苗木根系自然舒展后填充基质并压实，确保根颈露出基质±1cm；在主干70cm处定干，选芽刻伤并涂抹发枝素促枝；插入竹竿固定苗木，浇透定根水（分两次浇灌）。' }
+                ]
+            }],
+            '2': [{
+                group: '缺素诊断与仪器操作',
+                items: [
+                    { image: '/images/demo/2-1.png', title: '叶色诊断与症状记录', desc: '叶色诊断法：通过叶片颜色变化初步判断缺素类型；叶片褪绿、叶脉间呈现褪绿条纹时，初步判断为缺镁。\n\n症状记录与数据更新：发现异常症状时及时拍照记录，并上传至AI数据库，用于后续识别模型训练。' },
+                    { image: '/images/demo/2-2.png', title: '光合作用与土壤测定', desc: '快捷光合作用速率仪：掌握仪器使用方法并测定植株光合速率，该指标可用于判断植物生理状态。\n\n土壤测定仪：测定土壤速效氮、磷、钾及中微量元素；Mg含量低于0.49%即为缺镁，并准确记录各项测定数值。' },
+                    { image: '/images/demo/2-3.png', title: '环境判断与缺素矫正', desc: '环境参数异常判断：掌握樱桃适宜生长环境参数范围；CO₂浓度180ppm过低时进行通风处理。\n\n缺素矫正方案制定：根据诊断结果制定针对性施肥方案；缺镁时配制0.3%镁肥进行叶面喷施。' }
+                ]
+            }],
+            '3': [{
+                group: '病虫害预警与防治',
+                items: [
+                    { image: '/images/demo/3-1.png', title: 'AI巡检全域拍摄采集', desc: '基于温室内温度、湿度等环境参数，利用系统模型预测病虫害风险；操作AI摄像头搭载高光谱摄像头规划巡检航线，采集图像并生成报告，提取病虫害种类、位置、严重程度等信息。' },
+                    { image: '/images/demo/3-2.png', title: '人工采样与实验室诊断', desc: '当AI无法精准识别时，启动人工采样：在病叶健康交界处刮取病灶，通过载玻片制片后使用光学显微镜观察病原形态，完成确诊。' },
+                    { image: '/images/demo/3-3.png', title: '药剂配制与精准施药', desc: '根据诊断结果选择对症药剂，利用植保无人机进行精准变量施药；同时掌握蜂卡悬挂技术，辅助生物防治。' },
+                    { image: '/images/demo/3-4.png', title: '标本制作与资源库建设', desc: '采用针插法制作害虫标本，使用标准扎网框固定；采集病叶制作病害标本。标本用于培训、科普、科研及AI模型训练，丰富教学与识别资源。' }
+                ]
+            }]
+        };
+        return datasets[key] || [];
     }
 
     /**

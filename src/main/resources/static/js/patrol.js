@@ -1,6 +1,25 @@
 let currentDir = 'stop';
 let isAiCapturing = false;
 
+function openPatrolWarning() {
+    const overlay = document.getElementById('patrolWarningOverlay');
+    if (!overlay) return;
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    overlay.querySelector('button').focus();
+}
+
+function closePatrolWarning() {
+    const overlay = document.getElementById('patrolWarningOverlay');
+    if (!overlay) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+}
+
+function patrolKeyTargetIsEditable(target) {
+    return target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+}
+
 async function setPatrolDir(dir) {
     currentDir = dir;
     document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
@@ -344,6 +363,23 @@ window.addEventListener('DOMContentLoaded', function() {
     var aiBtn = document.getElementById('btn-ai-capture');
     if (aiBtn) {
         aiBtn.addEventListener('click', triggerAiCapture);
+    }
+    var warningOverlay = document.getElementById('patrolWarningOverlay');
+    if (warningOverlay) {
+        warningOverlay.addEventListener('click', function(event) {
+            if (event.target === warningOverlay) closePatrolWarning();
+        });
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closePatrolWarning();
+        return;
+    }
+    if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
+        var warning = document.getElementById('patrol-warning');
+        if (warning) warning.hidden = false;
     }
 });
 

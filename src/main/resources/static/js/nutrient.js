@@ -1,4 +1,13 @@
 let soilChartInstance = null;
+const DEMO_SOIL_VALUES = {
+    soilTemp: '23.6',
+    soilHumidity: '47',
+    soilEc: '0.40',
+    soilSalt: '0.079',
+    soilNitrogen: '101',
+    soilPhosphorus: '13',
+    soilPotassium: '167'
+};
 
 function switchNutrientMode(mode) {
     document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -10,16 +19,17 @@ function switchNutrientMode(mode) {
 
 async function loadSoilData() {
     const res = await apiGet('/nutrient/soil');
+    Object.entries(DEMO_SOIL_VALUES).forEach(([key, value]) => {
+        const id = {
+            soilTemp: 'soil-temp', soilHumidity: 'soil-humidity', soilEc: 'soil-ec',
+            soilSalt: 'soil-salt', soilNitrogen: 'soil-nitrogen',
+            soilPhosphorus: 'soil-phosphorus', soilPotassium: 'soil-potassium'
+        }[key];
+        document.getElementById(id).textContent = value;
+    });
     if (res && res.data) {
         const d = res.data;
-        document.getElementById('soil-temp').textContent = d.soilTemp ?? '--';
-        document.getElementById('soil-humidity').textContent = d.soilHumidity ?? '--';
-        document.getElementById('soil-ec').textContent = d.soilEc ?? '--';
         document.getElementById('soil-ph').textContent = d.soilPh ?? '--';
-        document.getElementById('soil-salt').textContent = d.soilSalt ?? '--';
-        document.getElementById('soil-nitrogen').textContent = d.soilNitrogen ?? '--';
-        document.getElementById('soil-phosphorus').textContent = d.soilPhosphorus ?? '--';
-        document.getElementById('soil-potassium').textContent = d.soilPotassium ?? '--';
 
         if (d.recordTime) {
             const t = new Date(d.recordTime);
@@ -28,7 +38,7 @@ async function loadSoilData() {
                 pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
         }
 
-        loadSoilCompare(d);
+        loadSoilCompare(Object.assign({}, d, DEMO_SOIL_VALUES));
     }
 }
 
@@ -142,17 +152,19 @@ async function loadPumpStatus() {
     if (!res || !res.data) return;
     const grid = document.getElementById('pump-grid');
     const pumps = res.data.filter(e => e.alias && e.alias.startsWith('PUMP_'));
-    grid.innerHTML = pumps.map(pump => {
+    grid.querySelectorAll('[data-api-pump]').forEach(card => card.remove());
+    const apiCards = pumps.map(pump => {
         const suffix = pump.alias.replace('PUMP_', '').toLowerCase();
         const icon = getPumpIcon(suffix);
         const checked = pump.status === 1;
-        return '<div class="pump-card">'
+        return '<div class="pump-card" data-api-pump>'
             + '<div class="pump-icon"><i class="' + icon + '"></i></div>'
             + '<div class="pump-name">' + pump.name + '</div>'
             + '<label class="toggle-switch"><input type="checkbox" data-alias="' + pump.alias + '"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
             + '<div class="pump-status" id="status-' + suffix + '" style="color:' + (checked ? 'var(--accent-secondary)' : 'var(--text-secondary)') + '">' + (checked ? '运行中...' : '已关闭') + '</div>'
             + '</div>';
     }).join('');
+    grid.insertAdjacentHTML('beforeend', apiCards);
 }
 
 async function controlPump(alias, checked) {
@@ -167,8 +179,16 @@ async function controlPump(alias, checked) {
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('pump-grid').addEventListener('change', function(e) {
         const input = e.target.closest('.toggle-switch input[data-alias]');
-        if (!input) return;
-        controlPump(input.dataset.alias, input.checked);
+        if (input) {
+            controlPump(input.dataset.alias, input.checked);
+            return;
+        }
+        const demoInput = e.target.closest('.demo-pump');
+        if (demoInput) {
+            const statusEl = demoInput.closest('.pump-card').querySelector('.pump-status');
+            statusEl.textContent = demoInput.checked ? '运行中...' : '已关闭';
+            statusEl.style.color = demoInput.checked ? 'var(--accent-secondary)' : 'var(--text-secondary)';
+        }
     });
     document.querySelectorAll('.freq-chip').forEach(chip => {
         chip.addEventListener('click', function() {
