@@ -16,6 +16,7 @@
     var eventSource = null;
     var pendingImage = null;
     var memoryEnabled = false;
+    var welcomeTimer = null;
 
     var API_BASE = window.location.origin + '/jhds/api/ai';
 
@@ -250,8 +251,57 @@
     }
 
     function clearMessages() {
+        if (welcomeTimer) {
+            window.clearTimeout(welcomeTimer);
+            welcomeTimer = null;
+        }
         messages.innerHTML = '';
         addWelcomeMessage();
+    }
+
+    function createWelcomeSuggestions() {
+        var suggestions = [
+            { label: '樱桃种植注意事项', question: '樱桃种植需要注意什么' },
+            { label: '病虫害防治', question: '常见病虫害防治方法' },
+            { label: '温室管理', question: '温室大棚温湿度管理' },
+            { label: '智慧农业应用', question: '智慧农业有哪些应用' }
+        ];
+        var container = document.createElement('div');
+        container.className = 'welcome-suggestions welcome-suggestions-enter';
+        suggestions.forEach(function(item) {
+            var button = document.createElement('button');
+            button.className = 'welcome-suggestion';
+            button.type = 'button';
+            button.textContent = item.label;
+            button.addEventListener('click', function() {
+                inputBox.value = item.question;
+                autoResizeTextarea();
+                inputBox.focus();
+            });
+            container.appendChild(button);
+        });
+        return container;
+    }
+
+    function streamWelcomeText(target, text, onComplete) {
+        var index = 0;
+        target.classList.add('welcome-streaming');
+
+        function writeNext() {
+            if (!target.isConnected) return;
+            index += 1;
+            target.textContent = text.slice(0, index);
+            scrollToBottom();
+            if (index < text.length) {
+                welcomeTimer = window.setTimeout(writeNext, /[，。！？]/.test(text.charAt(index - 1)) ? 110 : 32);
+                return;
+            }
+            welcomeTimer = null;
+            target.classList.remove('welcome-streaming');
+            onComplete();
+        }
+
+        writeNext();
     }
 
     function addWelcomeMessage() {
@@ -271,13 +321,8 @@
 
         var textDiv = document.createElement('div');
         textDiv.className = 'message-text';
-        textDiv.innerHTML = '<p>您好！我是jhds智慧农业AI助手，您可以问我任何农业相关问题，我会为您智能解答。</p>'
-            + '<div class="welcome-suggestions">'
-            + '<span class="welcome-suggestion" onclick="document.getElementById(\'inputBox\').value=\'樱桃种植需要注意什么\'; autoResizeTextarea();">樱桃种植注意事项</span>'
-            + '<span class="welcome-suggestion" onclick="document.getElementById(\'inputBox\').value=\'常见病虫害防治方法\'; autoResizeTextarea();">病虫害防治</span>'
-            + '<span class="welcome-suggestion" onclick="document.getElementById(\'inputBox\').value=\'温室大棚温湿度管理\'; autoResizeTextarea();">温室管理</span>'
-            + '<span class="welcome-suggestion" onclick="document.getElementById(\'inputBox\').value=\'智慧农业有哪些应用\'; autoResizeTextarea();">智慧农业应用</span>'
-            + '</div>';
+        var welcomeText = document.createElement('p');
+        textDiv.appendChild(welcomeText);
 
         content.appendChild(sender);
         content.appendChild(textDiv);
@@ -285,6 +330,14 @@
         div.appendChild(content);
         messages.appendChild(div);
         scrollToBottom();
+        streamWelcomeText(
+            welcomeText,
+            '您好！我是jhds智慧农业AI助手，您可以问我任何农业相关问题，我会为您智能解答。',
+            function() {
+                textDiv.appendChild(createWelcomeSuggestions());
+                scrollToBottom();
+            }
+        );
     }
 
     /* ========== Image Upload ========== */
