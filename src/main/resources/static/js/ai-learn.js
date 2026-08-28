@@ -55,10 +55,14 @@
         if (pname.indexOf('/preview/') === 0) {
             return '/src/main/resources' + p.replace(/^\/images\//, '/image/temp/');
         }
-        // 真实环境：取 /ai-learn 之前的路径段作为 context path（/jhds/ai-learn → /jhds）
+        // 真实环境：取 /ai-learn 之前的路径段作为 context path（/jhds/ai-learn → /jhds）。
+        // 数据库中的旧记录可能已经保存了带 context path 的地址（/jhds/...），
+        // 新记录则保存不带 context path 的应用内地址（/...）；两种格式都要兼容，
+        // 否则会把地址拼成 /jhds/jhds/...，浏览器会得到 404。
         const idx = pname.indexOf('/ai-learn');
         const ctx = idx > 0 ? pname.substring(0, idx) : '';
-        return ctx + p;
+        if (ctx && (p === ctx || p.indexOf(ctx + '/') === 0)) return p;
+        return ctx + (p.charAt(0) === '/' ? p : '/' + p);
     }
 
     function showState(state) {

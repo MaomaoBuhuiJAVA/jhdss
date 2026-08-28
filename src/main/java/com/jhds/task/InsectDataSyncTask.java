@@ -19,7 +19,23 @@ public class InsectDataSyncTask {
             log.debug("Insect data sync task started");
             insectService.syncLatestPhotos();
         } catch (Exception e) {
-            log.error("Insect data sync error", e);
+            if (isRedisFailure(e)) {
+                log.warn("Redis unavailable, skip insect data sync: {}", e.getMessage());
+            } else {
+                log.error("Insect data sync error", e);
+            }
         }
+    }
+
+    private boolean isRedisFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String name = current.getClass().getName();
+            if (name.contains("RedisConnection") || name.contains("RedisSystem")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

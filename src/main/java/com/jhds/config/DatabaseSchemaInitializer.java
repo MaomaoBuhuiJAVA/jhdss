@@ -596,8 +596,10 @@ public class DatabaseSchemaInitializer {
                 String fileName = images.get(i).getFileName().toString();
                 String title = "第" + (i + 1) + "项学习要点";
                 String description = i < descriptions.size() ? descriptions.get(i) : "视频对应的农业学习资料。";
+                // Store an application-relative URL. The browser adds the configured
+                // context path, so this remains valid when deployed under another path.
                 jdbcTemplate.update("INSERT INTO ai_learn_card (video_id, image_url, card_title, description, enabled, sort_order) VALUES (?, ?, ?, ?, 1, ?)",
-                        videoId, "/jhds/ai-learn-media/" + folderKey + "/" + fileName, title, description, i + 1);
+                        videoId, "/ai-learn-media/" + folderKey + "/" + fileName, title, description, i + 1);
             }
         } catch (IOException e) {
             // Ignore one malformed folder and keep other learning materials available.

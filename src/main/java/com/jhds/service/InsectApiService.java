@@ -47,9 +47,14 @@ public class InsectApiService {
             JSONObject resp = post("/api/v2/login", null, body);
             if (resp != null && resp.getIntValue("status") == 1) {
                 String token = resp.getJSONObject("data").getString("token");
-                redisTemplate.opsForValue().set(REDIS_TOKEN_KEY, token,
-                        TOKEN_REFRESH_THRESHOLD, TimeUnit.SECONDS);
-                log.info("Insect API login success, token cached");
+                try {
+                    redisTemplate.opsForValue().set(REDIS_TOKEN_KEY, token,
+                            TOKEN_REFRESH_THRESHOLD, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    // The external API can still be used when Redis is temporarily down.
+                    log.warn("Redis unavailable, skip insect token cache write: {}", e.getMessage());
+                }
+                log.info("Insect API login success");
                 return token;
             }
             log.warn("Insect API login failed: {}", resp);
@@ -86,7 +91,11 @@ public class InsectApiService {
         if (resp != null && resp.getIntValue("status") == 0
                 && resp.getString("msg") != null
                 && resp.getString("msg").contains("登录超时")) {
-            redisTemplate.delete(REDIS_TOKEN_KEY);
+            try {
+                redisTemplate.delete(REDIS_TOKEN_KEY);
+            } catch (Exception e) {
+                log.warn("Redis unavailable, skip insect token cache delete: {}", e.getMessage());
+            }
             token = login();
             if (token != null) {
                 resp = post(path, token, body);
