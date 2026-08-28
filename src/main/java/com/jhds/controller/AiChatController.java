@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.jhds.common.ContextOverflowException;
 import com.jhds.common.Result;
 import com.jhds.service.AiChatContextService;
+import com.jhds.service.AiKnowledgeService;
 import com.jhds.service.DashScopeApiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,20 @@ public class AiChatController {
     @Autowired
     private AiChatContextService contextService;
 
+    @Autowired
+    private AiKnowledgeService aiKnowledgeService;
+
+    @GetMapping("/knowledge")
+    public Result<String> knowledge(@RequestParam String query) {
+        String answer = aiKnowledgeService.findAnswer(query);
+        return Result.ok(answer);
+    }
+
+    @GetMapping("/knowledge/list")
+    public Result<List<Map<String, Object>>> knowledgeList() {
+        return Result.ok(aiKnowledgeService.listEntries());
+    }
+
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String sessionId = request.getSession().getId();
@@ -54,6 +69,22 @@ public class AiChatController {
 
         executor.execute(() -> {
             try {
+                // The editable keyword catalogue is checked before the remote model.
+                // This keeps configured agricultural answers deterministic and available
+                // even when the external AI service is unavailable.
+                if (finalImage == null || finalImage.trim().isEmpty()) {
+                    String knowledgeAnswer = aiKnowledgeService.findAnswer(finalMsg);
+                    if (knowledgeAnswer != null && !knowledgeAnswer.trim().isEmpty()) {
+                        if (memory) {
+                            contextService.addUserMessage(sessionId, finalMsg);
+                        }
+                        streamKnowledgeAnswer(knowledgeAnswer, emitter);
+                        if (memory) {
+                            contextService.addAssistantMessage(sessionId, knowledgeAnswer);
+                        }
+                        return;
+                    }
+                }
                 if (memory) {
                     doStreamChatWithMemory(sessionId, finalMsg, finalImage, emitter);
                 } else {
@@ -73,6 +104,20 @@ public class AiChatController {
         });
 
         return emitter;
+    }
+
+    private void streamKnowledgeAnswer(String answer, SseEmitter emitter) {
+        try {
+            int chunkSize = 10;
+            for (int i = 0; i < answer.length(); i += chunkSize) {
+                int end = Math.min(answer.length(), i + chunkSize);
+                emitter.send(SseEmitter.event().name("message").data(answer.substring(i, end)));
+            }
+            emitter.send(SseEmitter.event().name("done").data("[DONE]"));
+            emitter.complete();
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
     }
 
     private void doStreamChatWithMemory(String sessionId, String msg, String image, SseEmitter emitter) {

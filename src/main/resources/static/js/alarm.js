@@ -1,127 +1,285 @@
 let alarmPieInstance = null;
-const STORAGE_STATUS = 'alarm_status';
-const STORAGE_MEMO = 'alarm_memo';
 
-const fakeAlarms = [
-  { id: 1, title: '发现虫害几棵', description: 'AI图像识别检测到种植架1、2出现蚜虫聚集，建议立即进行植保处理', level: 'urgent', module: '虫情灯模块', time: '2026-03-30 13:30' },
-  { id: 2, title: '植株叶面存在杂点', description: '轨道巡检摄像头检测到A2区域植株叶面出现不明杂点，疑似病害早期', level: 'important', module: 'AI轨道巡检', time: '2026-03-30 12:45' },
-  { id: 3, title: '土壤湿度偏低', description: '土壤湿度传感器显示当前湿度45%，略低于设定阈值50%', level: 'normal', module: '营养液配液', time: '2026-03-30 11:20' },
-  { id: 4, title: '风速超过3级', description: '气象站监测到当前风速3.2m/s，建议检查大棚通风口', level: 'normal', module: '气象站', time: '2026-03-30 10:15' },
-  { id: 5, title: '营养液EC值异常', description: '土壤EC值达到2.1mS/cm，超出正常范围1.5-2.0，需调整配液比例', level: 'important', module: '营养液配液', time: '2026-03-30 09:30' },
-  { id: 6, title: '轨道巡检设备离线', description: 'AI轨道巡检模块通信中断，已持续5分钟，请检查网络连接', level: 'urgent', module: 'AI轨道巡检', time: '2026-03-30 08:45' },
-  { id: 7, title: '大棚温度过高', description: '大棚1温度达到38°C，超过预警阈值35°C，建议开启通风降温', level: 'important', module: '物联设备', time: '2026-03-30 14:10' },
-  { id: 8, title: '二氧化碳浓度偏低', description: '大棚2内CO\u2082浓度降至280ppm，低于光合作用适宜值，建议增施CO\u2082', level: 'normal', module: '物联设备', time: '2026-03-30 13:50' },
-  { id: 9, title: '光照强度不足', description: '连续阴天导致大棚内光照强度仅8000lux，建议开启补光灯', level: 'normal', module: '物联设备', time: '2026-03-30 07:30' },
-  { id: 10, title: '水泵异常停机', description: '灌溉系统B水泵电流异常自动停机，需检查电机和电路', level: 'urgent', module: '营养液配液', time: '2026-03-30 06:15' },
-];
+const ALARM_PAGE_SIZE = 500;
+const alarmState = {
+  records: [],
+  stats: null,
+  filter: 'all',
+  memoTimers: new Map(),
+  memoSaveChains: new Map()
+};
 
-function getFromStorage(key, id) {
-  const data = JSON.parse(localStorage.getItem(key) || '{}');
-  return data[id];
+const levelText = { urgent: '紧急', important: '重要', normal: '一般' };
+const sourceText = {
+  insect: '虫情灯模块',
+  patrol: 'AI轨道巡检',
+  nutrient: '营养液配液',
+  weather: '气象站',
+  iot: '物联设备'
+};
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function setToStorage(key, id, val) {
-  const data = JSON.parse(localStorage.getItem(key) || '{}');
-  data[id] = val;
-  localStorage.setItem(key, JSON.stringify(data));
+function alarmStatus(status) {
+  switch (Number(status)) {
+    case 2: return 'processing';
+    case 1: return 'resolved';
+    default: return 'pending';
+  }
 }
 
-function loadAlarmList() {
+function formatAlarmTime(value) {
+  if (!value) return '--';
+  if (typeof value === 'string') return value.replace('T', ' ').slice(0, 16);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0') + ' ' + String(date.getHours()).padStart(2, '0') + ':' +
+    String(date.getMinutes()).padStart(2, '0');
+}
+
+function resultData(response, fallback) {
+  return response && (response.code === 200 || response.code === 0) && response.data != null
+    ? response.data
+    : fallback;
+}
+
+function showAlarmMessage(message, isError) {
+  const messageBox = document.getElementById('alarm-message');
+  if (!messageBox) return;
+  messageBox.textContent = message || '';
+  messageBox.className = isError ? 'alarm-message error' : 'alarm-message';
+  if (!message) return;
+  window.clearTimeout(messageBox._timer);
+  messageBox._timer = window.setTimeout(function () {
+    messageBox.textContent = '';
+    messageBox.className = 'alarm-message';
+  }, 3500);
+}
+
+function renderAlarmList() {
   const container = document.getElementById('alarm-list');
-  container.innerHTML = '';
-  fakeAlarms.forEach(r => {
-    const status = getFromStorage(STORAGE_STATUS, r.id) || 'pending';
-    const memo = getFromStorage(STORAGE_MEMO, r.id) || '';
-    const levelText = { urgent: '紧急', important: '重要', normal: '一般' }[r.level];
-    const div = document.createElement('div');
-    div.className = 'alarm-row ' + r.level;
-    div.innerHTML =
-      '<div class="alarm-severity ' + r.level + '"></div>' +
+  if (!container) return;
+  const records = alarmState.filter === 'all'
+    ? alarmState.records
+    : alarmState.records.filter(function (record) { return record.level === alarmState.filter; });
+
+  if (!records.length) {
+    container.innerHTML = '<div class="alarm-empty"><i class="ri-inbox-line"></i><span>' +
+      (alarmState.records.length ? '当前筛选条件下暂无告警' : '暂无告警记录') + '</span></div>';
+    return;
+  }
+
+  container.innerHTML = records.map(function (record) {
+    const level = levelText[record.level] ? record.level : 'normal';
+    const status = alarmStatus(record.status);
+    const source = sourceText[record.sourceModule] || record.sourceModule || '未分类';
+    const location = record.location ? '<span class="alarm-location">' + escapeHtml(record.location) + '</span>' : '';
+    return '<div class="alarm-row ' + level + '" data-id="' + record.id + '">' +
+      '<div class="alarm-severity ' + level + '"></div>' +
       '<div class="alarm-content">' +
-        '<div class="alarm-title-row">' +
-          '<span class="alarm-title-text">' + r.title + '</span>' +
-          '<span class="alarm-badge ' + r.level + '">' + levelText + '</span>' +
-        '</div>' +
-        '<div class="alarm-desc">' + r.description + '</div>' +
-        '<div class="alarm-detail">' +
-          '<div class="alarm-detail-row">' +
-            '<span class="alarm-status-label">状态</span>' +
-            '<select class="alarm-status-select ' + status + '" data-id="' + r.id + '">' +
-              '<option value="pending"' + (status === 'pending' ? ' selected' : '') + '>待解决</option>' +
-              '<option value="processing"' + (status === 'processing' ? ' selected' : '') + '>处理中</option>' +
-              '<option value="resolved"' + (status === 'resolved' ? ' selected' : '') + '>已解决</option>' +
-            '</select>' +
-          '</div>' +
-          '<textarea class="alarm-memo" data-id="' + r.id + '" placeholder="记录处置说明...">' + memo + '</textarea>' +
-        '</div>' +
+      '<div class="alarm-title-row">' +
+      '<span class="alarm-title-text">' + escapeHtml(record.title || '未命名告警') + '</span>' +
+      '<span class="alarm-badge ' + level + '">' + levelText[level] + '</span>' +
       '</div>' +
-      '<div class="alarm-meta"><div class="alarm-time">' + r.time + '</div><div class="alarm-module">' + r.module + '</div></div>';
-    div.addEventListener('click', function (e) {
-      if (e.target.closest('.alarm-status-select') || e.target.closest('.alarm-memo')) return;
-      this.classList.toggle('expanded');
-    });
-    container.appendChild(div);
-  });
-  updateCount();
+      '<div class="alarm-desc">' + escapeHtml(record.description || '暂无描述') + '</div>' +
+      '<div class="alarm-detail">' +
+      '<div class="alarm-detail-row">' +
+      '<label class="alarm-status-label" for="alarm-status-' + record.id + '">状态</label>' +
+      '<select id="alarm-status-' + record.id + '" class="alarm-status-select ' + status + '" data-id="' + record.id + '">' +
+      '<option value="pending"' + (status === 'pending' ? ' selected' : '') + '>待处理</option>' +
+      '<option value="processing"' + (status === 'processing' ? ' selected' : '') + '>处理中</option>' +
+      '<option value="resolved"' + (status === 'resolved' ? ' selected' : '') + '>已解决</option>' +
+      '</select>' +
+      '</div>' +
+      '<label class="alarm-memo-label" for="alarm-memo-' + record.id + '">处置说明</label>' +
+      '<textarea id="alarm-memo-' + record.id + '" class="alarm-memo" data-id="' + record.id + '" placeholder="记录处置说明...">' +
+      escapeHtml(record.handlingMemo || '') + '</textarea>' +
+      '</div>' +
+      '</div>' +
+      '<div class="alarm-meta"><div class="alarm-time">' + formatAlarmTime(record.createdAt) + '</div>' +
+      '<div class="alarm-module">' + escapeHtml(source) + location + '</div></div>' +
+      '</div>';
+  }).join('');
+
   bindAlarmEvents();
 }
 
-function updateCount() {
-  const counts = { urgent: 0, important: 0, normal: 0 };
-  fakeAlarms.forEach(r => { counts[r.level]++; });
-  document.querySelector('.stat-card.urgent .stat-number').textContent = counts.urgent;
-  document.querySelector('.stat-card.important .stat-number').textContent = counts.important;
-  document.querySelector('.stat-card.normal .stat-number').textContent = counts.normal;
+function syncRecord(updated) {
+  if (!updated || updated.id == null) return;
+  alarmState.records = alarmState.records.map(function (record) {
+    return record.id === updated.id ? updated : record;
+  });
+}
+
+async function saveAlarm(id, changes) {
+  const response = await apiPut('/alarm/' + encodeURIComponent(id), changes);
+  if (!response || (response.code !== 200 && response.code !== 0)) {
+    showAlarmMessage((response && response.msg) || '保存失败，请检查数据库连接后重试', true);
+    return null;
+  }
+  syncRecord(response.data);
+  return response.data;
+}
+
+function queueMemoSave(id, value) {
+  const previous = alarmState.memoSaveChains.get(id) || Promise.resolve();
+  const next = previous.catch(function () { return null; }).then(function () {
+    return saveAlarm(id, { handlingMemo: value });
+  });
+  alarmState.memoSaveChains.set(id, next);
+  return next;
 }
 
 function bindAlarmEvents() {
-  document.querySelectorAll('.alarm-status-select').forEach(sel => {
-    sel.addEventListener('change', function () {
-      setToStorage(STORAGE_STATUS, this.dataset.id, this.value);
-      this.className = 'alarm-status-select ' + this.value;
+  document.querySelectorAll('.alarm-row').forEach(function (row) {
+    row.addEventListener('click', function (event) {
+      if (event.target.closest('.alarm-status-select') || event.target.closest('.alarm-memo')) return;
+      row.classList.toggle('expanded');
     });
   });
-  document.querySelectorAll('.alarm-memo').forEach(ta => {
-    ta.addEventListener('input', function () {
-      setToStorage(STORAGE_MEMO, this.dataset.id, this.value);
+
+  document.querySelectorAll('.alarm-status-select').forEach(function (select) {
+    select.addEventListener('change', async function () {
+      const original = alarmState.records.find(function (record) { return record.id === Number(select.dataset.id); });
+      const previous = original ? alarmStatus(original.status) : 'pending';
+      select.disabled = true;
+      const updated = await saveAlarm(select.dataset.id, { status: select.value });
+      select.disabled = false;
+      if (!updated) {
+        select.value = previous;
+        select.className = 'alarm-status-select ' + previous;
+        return;
+      }
+      const status = alarmStatus(updated.status);
+      select.value = status;
+      select.className = 'alarm-status-select ' + status;
+      showAlarmMessage('告警状态已同步到数据库');
+    });
+  });
+
+  document.querySelectorAll('.alarm-memo').forEach(function (textarea) {
+    textarea.addEventListener('input', function () {
+      const id = textarea.dataset.id;
+      window.clearTimeout(alarmState.memoTimers.get(id));
+      alarmState.memoTimers.set(id, window.setTimeout(async function () {
+        alarmState.memoTimers.delete(id);
+        const updated = await queueMemoSave(id, textarea.value);
+        if (updated) showAlarmMessage('处置说明已同步到数据库');
+      }, 600));
+    });
+    textarea.addEventListener('blur', function () {
+      const id = textarea.dataset.id;
+      const timer = alarmState.memoTimers.get(id);
+      if (!timer) return;
+      window.clearTimeout(timer);
+      alarmState.memoTimers.delete(id);
+      queueMemoSave(id, textarea.value).then(function (updated) {
+        if (updated) showAlarmMessage('处置说明已同步到数据库');
+      });
     });
   });
 }
 
-async function initAlarmPieChart() {
-  const ctx = document.getElementById('alarmPieChart');
-  if (!ctx) return;
-  if (alarmPieInstance) alarmPieInstance.destroy();
-  const moduleCount = {};
-  fakeAlarms.forEach(r => {
-    moduleCount[r.module] = (moduleCount[r.module] || 0) + 1;
+function getCount(stats, level) {
+  const rows = stats && Array.isArray(stats.byLevel) ? stats.byLevel : [];
+  const row = rows.find(function (item) { return item.level === level; });
+  return row
+    ? Number(row.count || 0)
+    : alarmState.records.filter(function (record) { return record.level === level; }).length;
+}
+
+function getSourceStats() {
+  if (alarmState.stats && Array.isArray(alarmState.stats.bySource)) {
+    return alarmState.stats.bySource;
+  }
+  const counts = {};
+  alarmState.records.forEach(function (record) {
+    const sourceModule = record.sourceModule || 'unknown';
+    counts[sourceModule] = (counts[sourceModule] || 0) + 1;
   });
-  const labels = Object.keys(moduleCount);
-  const data = Object.values(moduleCount);
+  return Object.keys(counts).map(function (sourceModule) {
+    return { sourceModule: sourceModule, count: counts[sourceModule] };
+  });
+}
+
+function updateStats() {
+  const stats = alarmState.stats;
+  const total = stats && stats.total != null ? Number(stats.total) : alarmState.records.length;
+  const totalNode = document.getElementById('alarm-total-count');
+  if (totalNode) totalNode.textContent = total;
+  const urgent = document.querySelector('.stat-card.urgent .stat-number');
+  const important = document.querySelector('.stat-card.important .stat-number');
+  const normal = document.querySelector('.stat-card.normal .stat-number');
+  if (urgent) urgent.textContent = getCount(stats, 'urgent');
+  if (important) important.textContent = getCount(stats, 'important');
+  if (normal) normal.textContent = getCount(stats, 'normal');
+}
+
+function renderPieChart() {
+  const ctx = document.getElementById('alarmPieChart');
+  if (!ctx || typeof Chart === 'undefined') return;
+  if (alarmPieInstance) alarmPieInstance.destroy();
+  const sourceStats = getSourceStats();
+  const labels = sourceStats.map(function (item) { return sourceText[item.sourceModule] || item.sourceModule || '未分类'; });
+  const data = sourceStats.map(function (item) { return Number(item.count || 0); });
   const colors = ['#00c6f0', '#00e887', '#ff4d6a', '#f0a040', '#c084fc', '#f472b6'];
   alarmPieInstance = new Chart(ctx, {
     type: 'doughnut',
-    data: {
-      labels: labels,
-      datasets: [{ data: data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }]
-    },
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: '#7b8fa8', font: { size: 11 }, padding: 15 } } },
       cutout: '60%'
     }
   });
 }
 
-function filterAlarm(el, type) {
-  el.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  document.querySelectorAll('.alarm-row').forEach(row => {
-    row.style.display = (type === 'all' || row.classList.contains(type)) ? 'flex' : 'none';
-  });
+async function loadAlarmPage() {
+  const container = document.getElementById('alarm-list');
+  if (container) container.innerHTML = '<div class="alarm-empty"><i class="ri-loader-4-line alarm-loading"></i><span>正在加载告警记录...</span></div>';
+  const results = await Promise.all([
+    apiGet('/alarm/list?page=1&size=' + ALARM_PAGE_SIZE),
+    apiGet('/alarm/stats')
+  ]);
+  const listResponse = results[0];
+  const statsResponse = results[1];
+  const page = resultData(listResponse, null);
+  if (!page) {
+    alarmState.records = [];
+    alarmState.stats = null;
+    renderAlarmList();
+    showAlarmMessage((listResponse && listResponse.msg) || '告警数据加载失败，请检查数据库是否已迁移', true);
+    return;
+  }
+  alarmState.records = Array.isArray(page.records) ? page.records : [];
+  alarmState.stats = resultData(statsResponse, null);
+  renderAlarmList();
+  updateStats();
+  renderPieChart();
 }
 
+function filterAlarm(element, type) {
+  alarmState.filter = type;
+  document.querySelectorAll('.filter-btn').forEach(function (button) { button.classList.remove('active'); });
+  if (element) element.classList.add('active');
+  renderAlarmList();
+}
+
+window.filterAlarm = filterAlarm;
 window.addEventListener('DOMContentLoaded', function () {
-  loadAlarmList();
-  initAlarmPieChart();
+  loadAlarmPage();
+  window.setInterval(function () {
+    const focused = document.activeElement;
+    const editing = focused && (focused.matches('.alarm-memo') || focused.matches('.alarm-status-select'));
+    if (!editing && alarmState.memoTimers.size === 0) loadAlarmPage();
+  }, 30000);
 });

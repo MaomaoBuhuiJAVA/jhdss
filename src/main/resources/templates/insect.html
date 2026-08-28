@@ -59,8 +59,8 @@
                         <button class="insect-alert" id="insect-alert" type="button" onclick="openInsectAlert()">
                             <span class="insect-alert-icon"><i class="ri-alarm-warning-fill"></i></span>
                             <span class="insect-alert-copy">
-                                <strong>发现害虫！</strong>
-                                <small>点击查看 AI 巡检详情</small>
+                                <strong id="insect-alert-title-text">发现害虫！</strong>
+                                <small id="insect-alert-summary">点击查看 AI 巡检详情</small>
                             </span>
                             <i class="ri-arrow-right-s-line insect-alert-arrow"></i>
                         </button>
@@ -91,8 +91,8 @@
                 </button>
             </header>
             <div class="insect-alert-modal-body">
-                <p class="insect-alert-description">发现5只果蝇、1只桃红颈天牛，同时部分害虫无法捕获，叶面有失绿斑，且有部分红色斑点，疑似红蜘蛛</p>
-                <div class="insect-alert-images">
+                <p class="insect-alert-description" id="insect-alert-description">发现5只果蝇、1只桃红颈天牛，同时部分害虫无法捕获，叶面有失绿斑，且有部分红色斑点，疑似红蜘蛛</p>
+                <div class="insect-alert-images" id="insect-alert-images">
                     <figure><img src="/jhds/images/alerts/fruit-fly-detection.png" alt="果蝇检测图"><figcaption>果蝇检测</figcaption></figure>
                     <figure><img src="/jhds/images/alerts/red-spider-suspected.png" alt="红蜘蛛疑似病斑检测图"><figcaption>红蜘蛛疑似病斑</figcaption></figure>
                     <figure><img src="/jhds/images/alerts/longhorn-beetle-detection.png" alt="桃红颈天牛检测图"><figcaption>桃红颈天牛检测</figcaption></figure>

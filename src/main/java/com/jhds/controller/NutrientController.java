@@ -63,6 +63,13 @@ public class NutrientController {
         return Result.ok();
     }
 
+    @ApiOperation("删除灌溉计划")
+    @DeleteMapping("/schedule/{id}")
+    public Result<Void> deleteSchedule(@PathVariable Long id) {
+        nutrientService.deleteSchedule(id);
+        return Result.ok();
+    }
+
     @ApiOperation("获取灌溉计划列表")
     @GetMapping("/schedules")
     public Result<List<IrrigationSchedule>> getSchedules() {

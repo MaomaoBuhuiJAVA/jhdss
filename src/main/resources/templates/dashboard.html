@@ -19,29 +19,24 @@
                 <div class="greenhouse-info">
                     <div class="gh-title">
                         <div class="gh-icon"><i class="ri-home-4-line"></i></div>
-                        <div><div class="gh-name">种植架1</div></div>
+                        <div><div class="gh-name" id="dashboard-greenhouse-name">--</div></div>
                     </div>
-                    <div class="info-row"><span class="info-label">大棚类型</span><span class="info-value">玻璃体棚</span></div>
-                    <div class="info-row"><span class="info-label">作物名称</span><span class="info-value">樱桃</span></div>
-                    <div class="info-row"><span class="info-label">种植面积</span><span class="info-value">1000 m²</span></div>
-                    <div class="info-row"><span class="info-label">定植株数</span><span class="info-value">1200</span></div>
-                    <div class="info-row"><span class="info-label">定植日期</span><span class="info-value">2026-3-28</span></div>
+                    <div class="info-row"><span class="info-label">大棚类型</span><span class="info-value" id="dashboard-greenhouse-type">--</span></div>
+                    <div class="info-row"><span class="info-label">作物名称</span><span class="info-value" id="dashboard-greenhouse-crop">--</span></div>
+                    <div class="info-row"><span class="info-label">种植面积</span><span class="info-value" id="dashboard-greenhouse-area">--</span></div>
+                    <div class="info-row"><span class="info-label">定植株数</span><span class="info-value" id="dashboard-greenhouse-plant-count">--</span></div>
+                    <div class="info-row"><span class="info-label">定植日期</span><span class="info-value" id="dashboard-greenhouse-planting-date">--</span></div>
                 </div>
             </div>
             <div class="card" style="flex:1; display:flex; flex-direction:column;">
                 <div class="card-header"><i class="ri-tools-line"></i><span>农事操作</span></div>
                 <div style="flex:1; overflow-y:auto;">
-                    <div class="operation-item"><div class="op-icon blue"><i class="ri-temp-hot-line"></i></div><div class="op-info"><div class="op-name">控温通气</div><div class="op-date">2026-3-28</div></div></div>
-                    <div class="operation-item"><div class="op-icon cyan"><i class="ri-drop-line"></i></div><div class="op-info"><div class="op-name">浇水</div><div class="op-date">2026-3-27</div></div></div>
-                    <div class="operation-item"><div class="op-icon green"><i class="ri-seedling-line"></i></div><div class="op-info"><div class="op-name">施肥</div><div class="op-date">2026-3-27</div></div></div>
-                    <div class="operation-item"><div class="op-icon purple"><i class="ri-bug-line"></i></div><div class="op-info"><div class="op-name">灌根</div><div class="op-date">2026-3-26</div></div></div>
+                    <div id="dashboard-operation-list"></div>
                     <div style="border-top:1px solid rgba(30,60,100,0.3); margin:0 18px;"></div>
                     <div style="padding:10px 18px 4px; font-size:12px; font-weight:600; color:var(--accent-primary); letter-spacing:0.04em;"><i class="ri-calendar-check-line" style="margin-right:6px;"></i>待办农事</div>
                     <div class="todo-table" style="padding-bottom:4px;">
                         <div class="todo-header"><div class="col-week">时间</div><div class="col-task">农事</div><div class="col-action">操作</div></div>
-                        <div class="todo-row"><div class="col-week">第6周</div><div class="col-task">农事</div><div class="col-action">浇水</div></div>
-                        <div class="todo-row"><div class="col-week">第1周</div><div class="col-task">农事</div><div class="col-action">浇水</div></div>
-                        <div class="todo-row"><div class="col-week">第1周</div><div class="col-task">施肥</div><div class="col-action">植保</div></div>
+                        <div id="dashboard-todo-list"></div>
                     </div>
                 </div>
             </div>
@@ -80,27 +75,11 @@
                     <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line" style="color:#ff4d6a;text-shadow:0 0 8px rgba(255,77,106,0.5);"></i><span>告警信息</span></div>
                     <span style="font-size:11px; color:#7b8fa8; cursor:pointer; letter-spacing:0.04em; transition:color 0.3s;" onmouseover="this.style.color='#ff4d6a'" onmouseout="this.style.color='#7b8fa8'"><i class="ri-history-line"></i> 历史记录</span>
                 </div>
-                <div class="alert-item" role="button" tabindex="0" onclick="openDashboardModal('alert')">
-                    <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>发现虫害几棵</span></div><span class="alert-level urgent">紧急</span></div>
-                    <div class="alert-meta"><span class="alert-time">2026-03-30 13:30</span><span class="alert-location">种植架1、种植架2</span></div>
-                </div>
-                <div class="alert-item" role="button" tabindex="0" onclick="openDashboardModal('alert')">
-                    <div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line" style="color:#f0a040;"></i><span>植株叶面存在杂点</span></div><span class="alert-level important">重要</span></div>
-                    <div class="alert-meta"><span class="alert-time">2026-03-30 12:45</span><span class="alert-location">A2</span></div>
-                </div>
+                <div id="dashboard-alarm-list"></div>
             </div>
             <div class="card market-feedback-card" style="flex:1;">
                 <div class="card-header"><i class="ri-message-3-line"></i><span>市场反馈</span></div>
-                <div class="market-feedback-list">
-                    <button class="market-feedback-item" type="button" onclick="openDashboardModal('market')">
-                        <span class="market-feedback-icon"><i class="ri-notification-3-line"></i></span>
-                        <span class="market-feedback-copy">
-                            <strong>2025第四批次樱桃市场评价中等</strong>
-                            <small>消费者评价数据已更新</small>
-                        </span>
-                        <i class="ri-arrow-right-s-line"></i>
-                    </button>
-                </div>
+                <div class="market-feedback-list" id="dashboard-market-feedback-list"></div>
             </div>
         </aside>
     </main>

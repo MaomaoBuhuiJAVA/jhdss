@@ -25,7 +25,27 @@ public class IotService {
     }
 
     public String controlDevice(String alias, Integer status) {
+        if (alias == null || alias.trim().isEmpty() || status == null || (status != 0 && status != 1)) {
+            throw new IllegalArgumentException("设备或开关状态无效");
+        }
+        Equipment equipment = equipmentMapper.selectByAlias(alias);
+        if (equipment == null) {
+            throw new IllegalArgumentException("设备不存在");
+        }
         String value = status == 1 ? "open" : "close";
-        return mqttService.sendCommand(alias, value, false);
+        String response = mqttService.sendCommand(alias, value, false);
+
+        // A local/demo equipment row may intentionally have no MQTT command
+        // code. Persist its desired state so it survives a page refresh.
+        if (response == null && (equipment.getOpenCode() == null || equipment.getOpenCode().trim().isEmpty())
+                && (equipment.getCloseCode() == null || equipment.getCloseCode().trim().isEmpty())) {
+            equipment.setStatus(status);
+            equipmentMapper.updateById(equipment);
+            return "LOCAL_SAVED";
+        }
+        if (response == null) {
+            throw new IllegalStateException("设备未响应，数据库状态未修改");
+        }
+        return response;
     }
 }

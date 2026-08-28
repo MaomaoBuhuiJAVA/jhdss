@@ -4,11 +4,17 @@ server:
     context-path: /jhds
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/jhds?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
     username: root
-    password: a123456
+    # Read the local password from .env.local.bat; keep the original value as
+    # a fallback for installations that still use the default credentials.
+    password: ${SPRING_DATASOURCE_PASSWORD:a123456}
     druid:
       initial-size: 5
       max-active: 200
@@ -97,6 +103,9 @@ dashscope:
 
 patrol:
   capture-path: ./captures
+
+archive:
+  upload-path: ./uploads/archive
 
 logging:
   level:

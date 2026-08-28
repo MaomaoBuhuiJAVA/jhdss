@@ -1,5 +1,9 @@
 const DIRS_16 = ["北","北北东","东北","东北东","东","东南东","东南","南南东","南","南南西","西南","西南西","西","西北西","西北","北北西"];
 
+function displayValue(value) {
+    return value === null || value === undefined || value === '' ? '--' : value;
+}
+
 function angleToText(angle) {
     const idx = Math.round(angle / 22.5) % 16;
     return DIRS_16[idx];
@@ -64,10 +68,10 @@ async function loadWeatherCurrent() {
     const res = await apiGet('/weather/current');
     if (res && res.data) {
         const d = res.data;
-        document.getElementById('w-temp').textContent = d.temperature || '--';
-        document.getElementById('w-humidity').textContent = d.humidity || '--';
-        document.getElementById('w-wind').textContent = d.windSpeed || '--';
-        document.getElementById('w-rain').textContent = d.rainfall || '--';
+        document.getElementById('w-temp').textContent = displayValue(d.temperature);
+        document.getElementById('w-humidity').textContent = displayValue(d.humidity);
+        document.getElementById('w-wind').textContent = displayValue(d.windSpeed);
+        document.getElementById('w-rain').textContent = displayValue(d.rainfall);
 
         const dir = parseFloat(d.windDirection);
         if (!isNaN(dir)) {
@@ -78,9 +82,9 @@ async function loadWeatherCurrent() {
             document.getElementById('w-dir-text').textContent = '—';
         }
 
-        document.getElementById('w-light').textContent = d.lightIntensity || '--';
-        document.getElementById('w-uv').textContent = d.uvIntensity || '--';
-        document.getElementById('w-uv-index').textContent = d.uvIndex || '--';
+        document.getElementById('w-light').textContent = displayValue(d.lightIntensity);
+        document.getElementById('w-uv').textContent = displayValue(d.uvIntensity);
+        document.getElementById('w-uv-index').textContent = displayValue(d.uvIndex);
 
         const battery = d.batteryStatus;
         if (battery === 0) {
@@ -94,8 +98,8 @@ async function loadWeatherCurrent() {
             document.getElementById('w-battery-status').textContent = '—';
         }
 
-        document.getElementById('w-hourly-rain').textContent = d.hourlyRainfall || '--';
-        document.getElementById('w-daily-rain').textContent = d.dailyRainfall || '--';
+        document.getElementById('w-hourly-rain').textContent = displayValue(d.hourlyRainfall);
+        document.getElementById('w-daily-rain').textContent = displayValue(d.dailyRainfall);
 
         loadWeatherCompare(d);
         applyThresholdWarnings(d);
@@ -280,7 +284,9 @@ function applyThresholdWarnings(d) {
 
 window.addEventListener('DOMContentLoaded', function() {
     initWeatherChart();
+    loadWeatherCurrent();
     loadHeartbeat();
     loadThreshold();
+    setInterval(loadWeatherCurrent, 30000);
     setInterval(loadHeartbeat, 15000);
 });

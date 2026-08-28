@@ -20,7 +20,7 @@
 
     var API_BASE = window.location.origin + '/jhds/api/ai';
 
-    var LOCAL_KNOWLEDGE = [
+    var LOCAL_KNOWLEDGE_FALLBACK = [
         {
             keywords: ['调整三号种植区c1角落区', '调整c1角落区', '调整', '硬件'],
             answer: '3号种植区C1角落区目前需要降低大气湿度，建议在硬件方面进行调整，提高3号种植区C1角落区的通风透气条件，调高天窗角度，提速内循环机，为该区域提供较优通风条件。'
@@ -108,11 +108,37 @@
             answer: '警告！二号种植区疑似光合速率较低！传感器数据显示：二号种植区目前大气温度：23.70℃，大气湿度69.82%，土壤温度18.49℃，土壤湿度26.42%，光照强度31332.70 lux，二氧化碳浓度167.46 ppm，二氧化碳浓度过低，可能影响植株光合速率，请及时前往检查！'
         }
     ];
+    // The database catalogue is the source of truth. The embedded catalogue is
+    // retained only for a local preview where no Spring API is available.
+    var LOCAL_KNOWLEDGE = [];
+
+    function loadKnowledgeCatalogue() {
+        fetch(API_BASE + '/knowledge/list')
+            .then(function(response) {
+                if (!response.ok) throw new Error('HTTP error: ' + response.status);
+                return response.json();
+            })
+            .then(function(payload) {
+                var rows = payload && payload.code === 200 && Array.isArray(payload.data) ? payload.data : [];
+                LOCAL_KNOWLEDGE = rows.map(function(row) {
+                    return {
+                        keywords: String(row.keywords || '').split(/[,\\n|]/).map(function(item) { return item.trim(); }).filter(Boolean),
+                        answer: String(row.answer || '')
+                    };
+                }).filter(function(row) { return row.keywords.length && row.answer; });
+            })
+            .catch(function() {
+                // The server-side catalogue remains authoritative. A later
+                // chat request will query it again through the streaming API.
+                LOCAL_KNOWLEDGE = [];
+            });
+    }
 
     function findLocalAnswer(text) {
+        var catalogue = LOCAL_KNOWLEDGE;
         var normalized = text.toLowerCase().replace(/\s+/g, '');
-        for (var i = 0; i < LOCAL_KNOWLEDGE.length; i++) {
-            var entry = LOCAL_KNOWLEDGE[i];
+        for (var i = 0; i < catalogue.length; i++) {
+            var entry = catalogue[i];
             for (var j = 0; j < entry.keywords.length; j++) {
                 if (normalized.indexOf(entry.keywords[j].toLowerCase()) !== -1) {
                     return entry.answer;
@@ -545,5 +571,6 @@
     }
 
     autoResizeTextarea();
+    loadKnowledgeCatalogue();
     addWelcomeMessage();
 })();

@@ -13,12 +13,13 @@
     <div th:replace="fragments/header::header('alarm')"></div>
 
     <main class="main">
+        <div id="alarm-message" class="alarm-message" role="status" aria-live="polite"></div>
         <div class="alarm-layout">
             <div class="alarm-list-area">
                 <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
                     <div class="card-header" style="justify-content:space-between;">
                         <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line"></i><span>报警列表</span></div>
-                        <span style="font-size:11px; color:var(--text-dim);">共 <span style="color:var(--accent-primary)">12</span> 条记录</span>
+                        <span style="font-size:11px; color:var(--text-dim);">共 <span id="alarm-total-count" style="color:var(--accent-primary)">--</span> 条记录</span>
                     </div>
                     <div class="alarm-filter">
                         <button class="filter-btn active" onclick="filterAlarm(this, 'all')">全部</button>
@@ -31,15 +32,15 @@
             </div>
             <div class="alarm-stats-area">
                 <div class="stat-card urgent">
-                    <div class="stat-number" style="color:var(--accent-warn); text-shadow:0 0 12px rgba(255,77,106,0.3);">2</div>
+                    <div class="stat-number" style="color:var(--accent-warn); text-shadow:0 0 12px rgba(255,77,106,0.3);">--</div>
                     <div class="stat-label">紧急报警</div>
                 </div>
                 <div class="stat-card important">
-                    <div class="stat-number" style="color:var(--accent-caution); text-shadow:0 0 12px rgba(240,160,64,0.3);">2</div>
+                    <div class="stat-number" style="color:var(--accent-caution); text-shadow:0 0 12px rgba(240,160,64,0.3);">--</div>
                     <div class="stat-label">重要报警</div>
                 </div>
                 <div class="stat-card normal">
-                    <div class="stat-number" style="color:var(--accent-primary);">8</div>
+                    <div class="stat-number" style="color:var(--accent-primary);">--</div>
                     <div class="stat-label">一般报警</div>
                 </div>
                 <div class="card" style="flex:1;">

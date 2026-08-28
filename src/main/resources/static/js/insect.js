@@ -2,6 +2,62 @@ let currentInsectDate = '';
 let deviceList = [];
 let selectedDevice = '';
 let controlParamsMap = {};
+let insectPageAlert = null;
+
+const INSECT_ALERT_FALLBACK = {
+    title: '发现害虫！',
+    summary: '点击查看 AI 巡检详情',
+    modalTitle: '发现害虫！',
+    description: '发现5只果蝇、1只桃红颈天牛，同时部分害虫无法捕获，叶面有失绿斑，且有部分红色斑点，疑似红蜘蛛',
+    imagesJson: '["/jhds/images/alerts/fruit-fly-detection.png","/jhds/images/alerts/red-spider-suspected.png","/jhds/images/alerts/longhorn-beetle-detection.png"]'
+};
+
+function insectAlertImages(content) {
+    const source = content && content.imagesJson ? content.imagesJson : INSECT_ALERT_FALLBACK.imagesJson;
+    try {
+        const images = JSON.parse(source);
+        return Array.isArray(images) ? images.map(image => {
+            if (typeof image === 'string') return { url: image, caption: '' };
+            return image && typeof image === 'object' ? { url: image.url || image.imageUrl || '', caption: image.caption || '' } : null;
+        }).filter(image => image && image.url) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function loadInsectPageAlert() {
+    const res = await apiGet('/page-alerts/insect-pest');
+    if (res && res.data) {
+        insectPageAlert = res.data;
+        const content = res.data;
+        const title = document.getElementById('insect-alert-title-text');
+        const summary = document.getElementById('insect-alert-summary');
+        const modalTitle = document.getElementById('insect-alert-title');
+        const description = document.getElementById('insect-alert-description');
+        if (title) title.textContent = content.title || INSECT_ALERT_FALLBACK.title;
+        if (summary) summary.textContent = content.summary || INSECT_ALERT_FALLBACK.summary;
+        if (modalTitle) modalTitle.textContent = content.modalTitle || content.title || INSECT_ALERT_FALLBACK.modalTitle;
+        if (description) description.textContent = content.description || content.summary || INSECT_ALERT_FALLBACK.description;
+        const gallery = document.getElementById('insect-alert-images');
+        const images = insectAlertImages(content);
+        if (gallery) {
+            gallery.innerHTML = '';
+            images.forEach((imageInfo, index) => {
+                const figure = document.createElement('figure');
+                const image = document.createElement('img');
+                const caption = document.createElement('figcaption');
+                image.src = imageInfo.url;
+                image.alt = imageInfo.caption || (content.title || INSECT_ALERT_FALLBACK.title) + ' 图片' + (index + 1);
+                caption.textContent = imageInfo.caption || 'AI 识别图 ' + (index + 1);
+                figure.appendChild(image);
+                figure.appendChild(caption);
+                gallery.appendChild(figure);
+            });
+        }
+        const alertButton = document.getElementById('insect-alert');
+        if (alertButton) alertButton.hidden = Number(content.enabled) === 0;
+    }
+}
 
 function openInsectAlert() {
     const overlay = document.getElementById('insect-alert-overlay');
@@ -35,6 +91,8 @@ document.addEventListener('keydown', event => {
 });
 
 async function initPage() {
+    await loadInsectPageAlert();
+    window.setInterval(loadInsectPageAlert, 60000);
     await loadDevices();
     if (deviceList.length > 0) {
         selectedDevice = deviceList[0].did;
@@ -42,6 +100,10 @@ async function initPage() {
     }
     loadInsectRecords();
     if (selectedDevice) loadControlPanel(selectedDevice);
+    window.setInterval(function () {
+        loadInsectRecords(currentInsectDate);
+        if (selectedDevice) loadControlPanel(selectedDevice);
+    }, 30000);
 }
 
 async function loadDevices() {

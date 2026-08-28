@@ -2,6 +2,7 @@
 .center-area { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .right-sidebar { width: 305px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; }
 .dashboard-reveal-card[hidden], .dashboard-modal-overlay[hidden] { display: none; }
+.dashboard-empty { padding: 14px 18px; color: var(--text-secondary); font-size: 12px; }
 
 .greenhouse-info { padding: 16px 18px; position: relative; z-index: 1; }
 .gh-title { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }

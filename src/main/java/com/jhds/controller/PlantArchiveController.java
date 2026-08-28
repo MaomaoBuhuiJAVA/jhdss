@@ -2,12 +2,19 @@ package com.jhds.controller;
 
 import com.jhds.common.Result;
 import com.jhds.entity.*;
+import com.jhds.service.PlantArchiveImageStorageService;
 import com.jhds.service.PlantArchiveService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -16,10 +23,28 @@ import java.util.Map;
 @RequestMapping("/api/plant-archive")
 public class PlantArchiveController {
 
+    private static final Logger log = LoggerFactory.getLogger(PlantArchiveController.class);
+
     @Autowired
     private PlantArchiveService plantArchiveService;
+    @Autowired
+    private PlantArchiveImageStorageService plantArchiveImageStorageService;
 
     /* ============ 植株档案 ============ */
+
+    @ApiOperation("上传植株历年档案图片")
+    @PostMapping(value = {"/uploads/image", "/uploads/main-photo"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<String> uploadArchiveImage(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+        try {
+            String fileName = plantArchiveImageStorageService.store(file);
+            return Result.ok(request.getContextPath() + "/archive-uploads/" + fileName);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (IOException e) {
+            log.error("Failed to store plant archive image", e);
+            return Result.error("图片上传失败，请稍后重试");
+        }
+    }
 
     @ApiOperation("档案列表（含覆盖年份、最新评级）")
     @GetMapping("/plants")
@@ -123,7 +148,7 @@ public class PlantArchiveController {
         return Result.ok(plantArchiveService.listCultivation(plantId, year));
     }
 
-    @ApiOperation("新增/修改栽培记录（同月 upsert）")
+    @ApiOperation("新增/修改栽培记录（带 id 为修改；同月可保存多条）")
     @PostMapping("/cultivation")
     public Result<String> saveCultivation(@RequestBody PlantCultivation e) {
         plantArchiveService.saveCultivation(e);

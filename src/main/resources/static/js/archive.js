@@ -18,7 +18,7 @@
             title: '物候记录', endpoint: '/phenology', listKey: 'phenology', deleteEndpoint: '/phenology',
             fields: [
                 ['stage', '生育阶段', 'text'], ['phase', '物候期', 'text'], ['eventDate', '发生日期', 'date'],
-                ['description', '观察描述', 'textarea'], ['photoUrl', '图片地址', 'url']
+                ['description', '观察描述', 'textarea'], ['photoUrl', '图片', 'image']
             ]
         },
         cult: {
@@ -34,7 +34,7 @@
             fields: [
                 ['recordType', '记录类型', 'text'], ['pestName', '病虫害名称', 'text'], ['occurDate', '发生日期', 'date'],
                 ['symptom', '症状/表现', 'textarea'], ['severity', '严重程度', 'text'], ['measureType', '措施类型', 'text'],
-                ['measure', '处理措施', 'textarea'], ['effect', '处理效果', 'textarea'], ['photoUrl', '图片地址', 'url']
+                ['measure', '处理措施', 'textarea'], ['effect', '处理效果', 'textarea'], ['photoUrl', '图片', 'image']
             ]
         },
         growth: {
@@ -42,7 +42,7 @@
             fields: [
                 ['recordDate', '观测日期', 'date'], ['heightCm', '株高（cm）', 'number'], ['crownWidthCm', '冠幅（cm）', 'number'],
                 ['leafCount', '叶片数', 'number'], ['flowerCount', '花朵数', 'number'], ['fruitCount', '果实数', 'number'],
-                ['photoUrl', '图片地址', 'url'], ['photoNo', '照片编号', 'text'], ['remark', '备注', 'textarea']
+                ['photoUrl', '图片', 'image'], ['photoNo', '照片编号', 'text'], ['remark', '备注', 'textarea']
             ]
         }
     };
@@ -302,8 +302,130 @@
 
     function fieldHtml(field, value) {
         var name = field[0], label = field[1], type = field[2], val = type === 'date' ? dateValue(value) : text(value, '');
+        if (type === 'image') return imageUploadFieldHtml(name, label, value);
         if (type === 'textarea') return '<label class="form-group full"><span class="form-label">' + esc(label) + '</span><textarea class="form-input" name="' + esc(name) + '" rows="3">' + esc(val) + '</textarea></label>';
         return '<label class="form-group"><span class="form-label">' + esc(label) + '</span><input class="form-input" name="' + esc(name) + '" type="' + esc(type) + '" value="' + esc(val) + '"' + (type === 'number' ? ' step="any"' : '') + '></label>';
+    }
+
+    function imageUploadFieldHtml(name, label, value) {
+        var photoUrl = text(value, '');
+        var hasPhoto = !!photoUrl;
+        return '<section class="form-group full archive-image-field" data-image-picker data-image-field="' + esc(name) + '">' +
+            '<span class="form-label">' + esc(label) + '</span>' +
+            '<input type="hidden" name="' + esc(name) + '" value="' + esc(photoUrl) + '" data-image-value>' +
+            '<input type="file" class="archive-image-file" accept="image/jpeg,image/png,image/gif" data-image-file>' +
+            '<div class="archive-image-preview' + (hasPhoto ? ' has-image' : '') + '" data-image-preview>' +
+                '<img' + (hasPhoto ? ' src="' + esc(photoUrl) + '"' : '') + ' alt="' + esc(label) + '预览" data-image-preview-image>' +
+                '<span class="archive-image-empty" data-image-empty' + (hasPhoto ? ' hidden' : '') + '><i class="ri-image-add-line"></i>未选择图片</span>' +
+                '<span class="archive-image-status" data-image-status></span>' +
+            '</div>' +
+            '<div class="archive-image-actions">' +
+                '<button class="btn-outline" type="button" data-image-select><i class="ri-upload-2-line"></i>选择图片</button>' +
+                '<button class="btn-ghost" type="button" data-image-clear' + (hasPhoto ? '' : ' disabled') + '><i class="ri-delete-bin-line"></i>移除</button>' +
+            '</div>' +
+            '<p class="archive-image-tip">支持 JPG、PNG、GIF，文件不超过 10 MB。</p>' +
+        '</section>';
+    }
+
+    function plantFormHtml(plant) {
+        var fields = [
+            ['plantName', '植物名称', 'text'], ['scientificName', '学名', 'text'], ['familyGenus', '科属', 'text'], ['variety', '品种', 'text'],
+            ['sourceType', '来源类型', 'text'], ['sourceChannel', '来源渠道', 'text'], ['plantDate', '定植日期', 'date'], ['plantLocation', '种植位置', 'text'],
+            ['soilType', '土壤类型', 'text'], ['substrateRatio', '基质比例', 'text'], ['lightEnv', '光照环境', 'text'], ['plantingSpec', '种植规格', 'text']
+        ];
+        return '<div class="form-grid">' + fields.map(function (field) { return fieldHtml(field, plant && plant[field[0]]); }).join('') +
+            imageUploadFieldHtml('mainPhoto', '主图', plant && plant.mainPhoto) + fieldHtml(['remark', '备注', 'textarea'], plant && plant.remark) + '</div>';
+    }
+
+    function imageElements(picker) {
+        return {
+            input: picker.querySelector('[data-image-file]'),
+            value: picker.querySelector('[data-image-value]'),
+            preview: picker.querySelector('[data-image-preview]'),
+            image: picker.querySelector('[data-image-preview-image]'),
+            empty: picker.querySelector('[data-image-empty]'),
+            status: picker.querySelector('[data-image-status]'),
+            select: picker.querySelector('[data-image-select]'),
+            clear: picker.querySelector('[data-image-clear]')
+        };
+    }
+
+    function setImagePreview(picker, photoUrl) {
+        var elements = imageElements(picker);
+        var hasPhoto = !!photoUrl;
+        if (elements.value) elements.value.value = photoUrl || '';
+        if (elements.image) {
+            if (hasPhoto) elements.image.src = photoUrl;
+            else elements.image.removeAttribute('src');
+        }
+        if (elements.preview) elements.preview.classList.toggle('has-image', hasPhoto);
+        if (elements.empty) elements.empty.hidden = hasPhoto;
+        if (elements.clear) elements.clear.disabled = !hasPhoto;
+    }
+
+    function setImageUploadState(picker, uploading, message) {
+        var elements = imageElements(picker);
+        if (elements.select) elements.select.disabled = uploading;
+        if (elements.clear) elements.clear.disabled = uploading || !(elements.value && elements.value.value);
+        if (elements.status) {
+            elements.status.textContent = message || '';
+            elements.status.classList.toggle('show', !!message);
+        }
+    }
+
+    async function uploadArchiveImage(file, picker) {
+        if (!file) return;
+        var acceptedName = /\.(jpe?g|png|gif)$/i.test(file.name || '');
+        if (!/^image\/(jpeg|png|gif)$/i.test(file.type || '') && !acceptedName) {
+            notify('请选择 JPG、PNG 或 GIF 图片', true);
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            notify('图片不能超过 10 MB', true);
+            return;
+        }
+        var uploadModal = state.modal;
+        if (uploadModal) uploadModal.imageUploadCount = (uploadModal.imageUploadCount || 0) + 1;
+        setImageUploadState(picker, true, '图片上传中…');
+        try {
+            var formData = new FormData();
+            formData.append('file', file);
+            var response = await fetch(API_BASE + '/plant-archive/uploads/image', { method: 'POST', body: formData });
+            var result = await response.json();
+            if (state.modal !== uploadModal) return;
+            if (!isOk(result) || !result.data) {
+                notify((result && result.msg) || '图片上传失败', true);
+                return;
+            }
+            setImagePreview(picker, result.data);
+            notify('图片已上传');
+        } catch (error) {
+            console.warn('Plant archive image upload failed:', error);
+            if (state.modal === uploadModal) notify('图片上传失败，请检查服务后重试', true);
+        } finally {
+            if (state.modal === uploadModal) {
+                uploadModal.imageUploadCount = Math.max(0, (uploadModal.imageUploadCount || 1) - 1);
+                if (document.body.contains(picker)) setImageUploadState(picker, false, '');
+            }
+        }
+    }
+
+    function bindImagePickers() {
+        var body = document.getElementById('modal-body');
+        if (!body) return;
+        body.querySelectorAll('[data-image-picker]').forEach(function (picker) {
+            var elements = imageElements(picker);
+            if (elements.select && elements.input) elements.select.addEventListener('click', function () { elements.input.click(); });
+            if (elements.input) elements.input.addEventListener('change', function () {
+                var file = elements.input.files && elements.input.files[0];
+                uploadArchiveImage(file, picker);
+            });
+            if (elements.clear) elements.clear.addEventListener('click', function () {
+                if (state.modal && state.modal.imageUploadCount) return;
+                if (elements.input) elements.input.value = '';
+                setImagePreview(picker, '');
+            });
+        });
     }
 
     function openModal(title, html, modal) {
@@ -312,6 +434,7 @@
         state.modal = modal;
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').innerHTML = html;
+        bindImagePickers();
         overlay.hidden = false;
         document.body.style.overflow = 'hidden';
         var first = overlay.querySelector('input,textarea,select'); if (first) setTimeout(function () { first.focus(); }, 20);
@@ -324,25 +447,13 @@
     }
 
     function openCreatePlant() {
-        var fields = [
-            ['plantName', '植物名称', 'text'], ['scientificName', '学名', 'text'], ['familyGenus', '科属', 'text'], ['variety', '品种', 'text'],
-            ['sourceType', '来源类型', 'text'], ['sourceChannel', '来源渠道', 'text'], ['plantDate', '定植日期', 'date'], ['plantLocation', '种植位置', 'text'],
-            ['soilType', '土壤类型', 'text'], ['substrateRatio', '基质比例', 'text'], ['lightEnv', '光照环境', 'text'], ['plantingSpec', '种植规格', 'text'],
-            ['mainPhoto', '主图地址', 'url'], ['remark', '备注', 'textarea']
-        ];
-        openModal('新建植株档案', '<div class="form-grid">' + fields.map(function (f) { return fieldHtml(f, ''); }).join('') + '</div>', { type: 'plant-create' });
+        openModal('新建植株档案', plantFormHtml({}), { type: 'plant-create' });
     }
 
     function openEditPlant() {
         if (!state.selectedPlant) return notify('请先选择植株档案', true);
         var p = state.selectedPlant;
-        var fields = [
-            ['plantName', '植物名称', 'text'], ['scientificName', '学名', 'text'], ['familyGenus', '科属', 'text'], ['variety', '品种', 'text'],
-            ['sourceType', '来源类型', 'text'], ['sourceChannel', '来源渠道', 'text'], ['plantDate', '定植日期', 'date'], ['plantLocation', '种植位置', 'text'],
-            ['soilType', '土壤类型', 'text'], ['substrateRatio', '基质比例', 'text'], ['lightEnv', '光照环境', 'text'], ['plantingSpec', '种植规格', 'text'],
-            ['mainPhoto', '主图地址', 'url'], ['remark', '备注', 'textarea']
-        ];
-        openModal('编辑基础档案', '<div class="form-grid">' + fields.map(function (f) { return fieldHtml(f, p[f[0]]); }).join('') + '</div>', { type: 'plant-edit', id: p.id });
+        openModal('编辑基础档案', plantFormHtml(p), { type: 'plant-edit', id: p.id });
     }
 
     function openCreateYear() {
@@ -372,6 +483,7 @@
         body.querySelectorAll('[name]').forEach(function (el) {
             var value = el.value.trim();
             if (el.type === 'number') data[el.name] = value === '' ? null : Number(value);
+            else if (el.hasAttribute('data-image-value')) data[el.name] = value;
             else data[el.name] = value === '' ? null : value;
         });
         return data;
@@ -379,6 +491,7 @@
 
     async function modalOnOk() {
         if (!state.modal) return;
+        if (state.modal.imageUploadCount) return notify('图片正在上传，请稍候', true);
         var okButton = document.getElementById('modal-ok');
         if (okButton) okButton.disabled = true;
         var m = state.modal, data = collectForm(), res;
@@ -436,6 +549,11 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         loadPlants();
+        window.setInterval(function () {
+            var focused = document.activeElement;
+            var searching = focused && focused.id === 'search-input';
+            if (!state.modal && !searching) loadPlants();
+        }, 30000);
         var input = document.getElementById('search-input');
         if (input) input.addEventListener('input', function () {
             var clear = document.getElementById('search-clear'); if (clear) clear.hidden = !input.value.trim();

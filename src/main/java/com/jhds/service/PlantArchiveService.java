@@ -168,20 +168,13 @@ public class PlantArchiveService {
                 .eq(year != null, PlantCultivation::getYear, year)
                 .orderByAsc(PlantCultivation::getMonth));
     }
+    /**
+     * A month can contain multiple cultivation operations. New records must
+     * always be inserted; edits are identified explicitly by their id.
+     */
     public void saveCultivation(PlantCultivation record) {
-        if (record.getId() != null) {
-            plantCultivationMapper.updateById(record);
-            return;
-        }
-        PlantCultivation old = plantCultivationMapper.selectOne(new LambdaQueryWrapper<PlantCultivation>()
-                .eq(PlantCultivation::getPlantId, record.getPlantId())
-                .eq(PlantCultivation::getYear, record.getYear())
-                .eq(PlantCultivation::getMonth, record.getMonth()));
-        if (old == null) plantCultivationMapper.insert(record);
-        else {
-            record.setId(old.getId());
-            plantCultivationMapper.updateById(record);
-        }
+        if (record.getId() == null) plantCultivationMapper.insert(record);
+        else plantCultivationMapper.updateById(record);
     }
     public void deleteCultivation(Long id) { plantCultivationMapper.deleteById(id); }
 

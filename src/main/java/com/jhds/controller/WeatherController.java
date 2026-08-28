@@ -61,6 +61,9 @@ public class WeatherController {
             cfg.setUvIndexMax(new java.math.BigDecimal("8.0"));
             cfg.setBatteryAlarm(1);
             cfg.setEnabled(1);
+            cfg.setId(1L);
+            cfg.setUpdatedAt(new Date());
+            thresholdConfigMapper.insert(cfg);
         }
         return Result.ok(cfg);
     }

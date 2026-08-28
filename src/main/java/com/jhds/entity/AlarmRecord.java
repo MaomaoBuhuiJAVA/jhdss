@@ -15,6 +15,7 @@ public class AlarmRecord {
     private String sourceModule;
     private String location;
     private Integer status;
+    private String handlingMemo;
     @TableField(fill = FieldFill.INSERT)
     private Date createdAt;
     private Date handledAt;

@@ -1,5 +1,49 @@
 let currentDir = 'stop';
 let isAiCapturing = false;
+let patrolPageAlert = null;
+
+const PATROL_ALERT_FALLBACK = {
+    title: '⚠️花朵数量严重超标！',
+    modalTitle: '花朵数量严重超标',
+    imagesJson: '["/jhds/images/alerts/flower-overload-c2.png","/jhds/images/alerts/flower-overload-c1.png"]'
+};
+
+function patrolAlertImages(content) {
+    const source = content && content.imagesJson ? content.imagesJson : PATROL_ALERT_FALLBACK.imagesJson;
+    try {
+        const images = JSON.parse(source);
+        return Array.isArray(images) ? images.map(image => {
+            if (typeof image === 'string') return { url: image, caption: '' };
+            return image && typeof image === 'object' ? { url: image.url || image.imageUrl || '', caption: image.caption || '' } : null;
+        }).filter(image => image && image.url) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function loadPatrolPageAlert() {
+    const res = await apiGet('/page-alerts/patrol-flower');
+    if (!res || !res.data) return;
+    patrolPageAlert = res.data;
+    const content = res.data;
+    const warningText = document.getElementById('patrol-warning-text');
+    const modalTitle = document.getElementById('patrol-warning-modal-title');
+    if (warningText) warningText.textContent = content.title || PATROL_ALERT_FALLBACK.title;
+    if (modalTitle) modalTitle.textContent = content.modalTitle || content.title || PATROL_ALERT_FALLBACK.modalTitle;
+    const gallery = document.getElementById('patrol-warning-images');
+    const images = patrolAlertImages(content);
+    if (gallery) {
+        gallery.innerHTML = '';
+        images.forEach((imageInfo, index) => {
+            const image = document.createElement('img');
+            image.src = imageInfo.url;
+            image.alt = imageInfo.caption || (content.title || PATROL_ALERT_FALLBACK.title) + ' 图片' + (index + 1);
+            gallery.appendChild(image);
+        });
+    }
+    const warning = document.getElementById('patrol-warning');
+    if (warning && Number(content.enabled) === 0) warning.hidden = true;
+}
 
 function openPatrolWarning() {
     const overlay = document.getElementById('patrolWarningOverlay');
@@ -45,14 +89,19 @@ async function loadPatrolTasks() {
     const res = await apiGet('/patrol/tasks');
     if (!res || !res.data) return;
     const container = document.getElementById('patrol-tasks');
+    if (!container) return;
     container.innerHTML = '';
+    if (!res.data.length) {
+        container.innerHTML = '<div class="empty-state">暂无巡检任务</div>';
+        return;
+    }
     res.data.forEach(task => {
         const statusMap = {0:'○ 待执行',1:'● 执行中',2:'● 已完成',3:'○ 已停用'};
         const statusClass = {0:'pending',1:'running',2:'completed',3:'pending'};
         const div = document.createElement('div');
         div.className = 'task-item';
-        div.innerHTML = '<div class="task-time">' + task.executeTime.slice(0,5) + '</div>' +
-            '<div class="task-info"><div class="task-name">' + task.taskName + '</div><div class="task-status ' + statusClass[task.status] + '">' + statusMap[task.status] + '</div></div>' +
+        div.innerHTML = '<div class="task-time">' + escapeHtml(String(task.executeTime || '').slice(0, 5)) + '</div>' +
+            '<div class="task-info"><div class="task-name">' + escapeHtml(task.taskName || '') + '</div><div class="task-status ' + statusClass[task.status] + '">' + statusMap[task.status] + '</div></div>' +
             '<div class="task-action" onclick="deletePatrolTask(' + task.id + ')"><i class="ri-delete-bin-line"></i></div>';
         container.appendChild(div);
     });
@@ -357,9 +406,13 @@ async function changeEncodeType() {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+    loadPatrolPageAlert();
+    window.setInterval(loadPatrolPageAlert, 60000);
     initCamera();
     loadPatrolTasks();
     loadPatrolRecords();
+    window.setInterval(loadPatrolTasks, 30000);
+    window.setInterval(loadPatrolRecords, 30000);
     var aiBtn = document.getElementById('btn-ai-capture');
     if (aiBtn) {
         aiBtn.addEventListener('click', triggerAiCapture);
@@ -379,7 +432,7 @@ document.addEventListener('keydown', function(event) {
     }
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
         var warning = document.getElementById('patrol-warning');
-        if (warning) warning.hidden = false;
+        if (warning && (!patrolPageAlert || Number(patrolPageAlert.enabled) !== 0)) warning.hidden = false;
     }
 });
 

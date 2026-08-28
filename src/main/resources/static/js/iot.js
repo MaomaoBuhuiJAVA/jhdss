@@ -55,7 +55,7 @@ async function loadDevices() {
                 return '<div class="device-card">'
                     + '<div class="device-icon"><i class="' + icon + '"></i></div>'
                     + '<div class="device-name">' + d.name + '</div>'
-                    + '<label class="iot-toggle"><input type="checkbox" data-alias="' + d.alias + '"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
+                    + '<label class="iot-toggle"><input type="checkbox" data-alias="' + d.alias + '" data-status="' + (checked ? '1' : '0') + '"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
                     + '<div class="device-status" id="iot-status-' + d.alias.replace(/[^a-zA-Z0-9]/g, '_') + '" style="color:' + (checked ? 'var(--accent-secondary)' : 'var(--text-secondary)') + '">' + (checked ? '运行中' : '已关闭') + '</div>'
                     + '</div>';
             }).join('')
@@ -64,20 +64,36 @@ async function loadDevices() {
     }).join('');
 }
 
-async function controlDevice(alias, checked) {
-    const status = checked ? 1 : 0;
+function renderDeviceStatus(alias, checked) {
     const safeAlias = alias.replace(/[^a-zA-Z0-9]/g, '_');
     const statusEl = document.getElementById('iot-status-' + safeAlias);
+    if (!statusEl) return;
     statusEl.textContent = checked ? '运行中' : '已关闭';
     statusEl.style.color = checked ? 'var(--accent-secondary)' : 'var(--text-secondary)';
-    await apiPut('/iot/device/' + alias, { status: status });
+}
+
+async function controlDevice(input) {
+    const alias = input.dataset.alias;
+    const status = input.checked ? 1 : 0;
+    const previous = input.dataset.status === '1';
+    input.disabled = true;
+    renderDeviceStatus(alias, input.checked);
+    const res = await apiPut('/iot/device/' + encodeURIComponent(alias), { status: status });
+    input.disabled = false;
+    if (!res || res.code !== 200) {
+        input.checked = previous;
+        renderDeviceStatus(alias, previous);
+        window.alert((res && res.msg) || '设备状态未保存，请检查设备连接后重试');
+        return;
+    }
+    input.dataset.status = String(status);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('iot-grid').addEventListener('change', function(e) {
         const input = e.target.closest('.iot-toggle input[data-alias]');
         if (!input) return;
-        controlDevice(input.dataset.alias, input.checked);
+        controlDevice(input);
     });
     loadDevices();
     setInterval(loadDevices, 30000);

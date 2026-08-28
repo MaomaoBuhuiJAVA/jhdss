@@ -7,6 +7,7 @@
     const STATE = { IDLE: 'idle', SELECTED: 'selected', SCANNING: 'scanning', DONE: 'done' };
     let currentState = STATE.IDLE;
     let selectedVideoKey = null;
+    let selectedVideoName = null;
 
     const $ = (sel, root) => (root || document).querySelector(sel);
     const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -130,6 +131,7 @@
         }
         const fileMatch = file.name.trim().match(/^视频([123])\.mp4$/i);
         selectedVideoKey = fileMatch ? fileMatch[1] : null;
+        selectedVideoName = file.name.trim();
         let thumbDataUrl = selectedVideoKey
             ? resolveImg('/images/demo/' + selectedVideoKey + '-1.png')
             : '';
@@ -217,10 +219,6 @@
     /* ---------------- 扫描 ---------------- */
     scanBtn.addEventListener('click', async () => {
         if (currentState !== STATE.SELECTED) return;
-        if (!selectedVideoKey) {
-            alert('未找到该视频对应的分析资料，请选择视频1.MP4、视频2.MP4或视频3.MP4');
-            return;
-        }
         showState(STATE.SCANNING);
 
         // 进度 0 → 100，约 3.4 秒
@@ -238,8 +236,18 @@
             tick();
         });
 
-        renderCards(getVideoResult(selectedVideoKey));
-        showState(STATE.DONE);
+        try {
+            const groups = await fetchResult(selectedVideoName);
+            if (!groups || !groups.length) {
+                throw new Error('未找到该视频对应的分析资料');
+            }
+            renderCards(groups);
+            showState(STATE.DONE);
+        } catch (error) {
+            console.error('加载视频资料失败', error);
+            alert('未找到该视频对应的分析资料，请选择已配置的视频文件');
+            showState(STATE.SELECTED);
+        }
     });
 
     function updateProgress(pct) {
@@ -253,8 +261,9 @@
         scanStageText.textContent = stageText;
     }
 
-    async function fetchResult() {
-        const resp = await fetch('api/ai-learn/analyze', { method: 'GET' });
+    async function fetchResult(videoName) {
+        const query = videoName ? '?videoName=' + encodeURIComponent(videoName) : '';
+        const resp = await fetch('api/ai-learn/analyze' + query, { method: 'GET' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const json = await resp.json();
         if (json && json.code === 200 && Array.isArray(json.data)) return json.data;
