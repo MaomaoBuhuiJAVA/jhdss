@@ -29,6 +29,9 @@ set JAVA_OPTS=-Dserver.port=9118
 | `INSECT_API_BASE_URL` | 否 | `http://app.wlwapp.cn` | 虫情灯 API 根地址 |
 | `YS7_APP_KEY` | 是 | 无 | 萤石云应用 Key |
 | `YS7_APP_SECRET` | 是 | 无 | 萤石云应用 Secret |
+| `YS7_VERIFY_CODE` | 视频加密开启时必填 | 无 | 摄像头验证码，仅保存在本机环境变量 |
+| `YS7_DEVICE_SERIAL` | 否 | `BG9980884` | 巡检页默认萤石摄像头序列号 |
+| `YS7_CHANNEL_NO` | 否 | `1` | 摄像头通道号 |
 | `DASHSCOPE_API_KEY` | 是 | 无 | DashScope Bearer Token；当前 YAML 无默认值，缺失会阻止 Spring 启动 |
 | `DASHSCOPE_BASE_URL` | 否 | `https://dashscope.aliyuncs.com` | DashScope API 根地址 |
 
@@ -78,6 +81,9 @@ set "INSECT_API_USERNAME=your-insect-user"
 set "INSECT_API_PASSWORD=your-insect-password"
 set "YS7_APP_KEY=your-ys7-key"
 set "YS7_APP_SECRET=your-ys7-secret"
+set "YS7_VERIFY_CODE=your-device-verification-code"
+set "YS7_DEVICE_SERIAL=BG9980884"
+set "YS7_CHANNEL_NO=1"
 set "DASHSCOPE_API_KEY=your-dashscope-key"
 ```
 

@@ -495,7 +495,8 @@ public class DatabaseSchemaInitializer {
                 + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='页面：AI农业助手；区域：关键词问答；数据：关键词、回答和启用状态。'");
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS ai_learn_video ("
                 + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',"
-                + "video_name VARCHAR(255) NOT NULL UNIQUE COMMENT '上传视频文件名',"
+                // 191 utf8mb4 characters = 764 bytes, within MySQL 5.7's 767-byte index limit.
+                + "video_name VARCHAR(191) NOT NULL UNIQUE COMMENT '上传视频文件名',"
                 + "folder_key VARCHAR(50) NOT NULL COMMENT '资料目录标识',"
                 + "group_title VARCHAR(200) NOT NULL COMMENT '知识卡片分组标题',"
                 + "enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用 0否1是',"

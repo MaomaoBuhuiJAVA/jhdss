@@ -344,25 +344,61 @@ function destroyCameraPlayer() {
     patrolVideoReady = false;
 }
 
+function setCameraStatus(state, message) {
+    var badge = document.getElementById('camera-status-badge');
+    var label = document.getElementById('camera-connection-status');
+    var labels = { checking: '检查中', loading: '加载中', ready: 'LIVE', error: '离线' };
+    if (badge) {
+        badge.className = 'status-badge camera-status-badge ' + state;
+        badge.textContent = labels[state] || labels.checking;
+    }
+    if (label) {
+        label.className = 'camera-connection-status ' + state;
+        label.textContent = message || '';
+    }
+}
+
+function showCameraPlaceholder(message) {
+    var placeholder = document.getElementById('video-placeholder');
+    var detail = document.getElementById('video-placeholder-message');
+    if (detail && message) detail.textContent = message;
+    if (placeholder) placeholder.style.display = 'flex';
+}
+
 async function initCamera() {
     const video = document.getElementById('video-player');
-    const placeholder = document.getElementById('video-placeholder');
     if (!video) return;
 
     destroyCameraPlayer();
+    setCameraStatus('checking', '正在检查萤石连接');
+    showCameraPlaceholder('正在检查萤石摄像头连接');
 
     try {
-        const res = await apiGet('/camera/play-url?deviceSerial=BG9980884');
+        const diagnostic = await apiGet('/camera/stream-check');
+        const status = diagnostic && diagnostic.data;
+        if (!diagnostic || diagnostic.code !== 200 || !status || !status.ready) {
+            const message = (status && status.message) || (diagnostic && diagnostic.msg) || '无法连接萤石摄像头';
+            setCameraStatus('error', message);
+            showCameraPlaceholder(message);
+            return;
+        }
+
+        setCameraStatus('loading', '正在加载实时画面');
+        const res = await apiGet('/camera/play-url');
         if (!res || !res.data) {
-            if (placeholder) placeholder.style.display = 'flex';
+            const message = (res && res.msg) || '未获取到萤石播放地址';
+            setCameraStatus('error', message);
+            showCameraPlaceholder(message);
             return;
         }
         if (typeof flvjs === 'undefined') {
-            if (placeholder) { placeholder.innerHTML = '<i class="ri-camera-lens-line"></i><p>播放器组件加载失败</p>'; placeholder.style.display = 'flex'; }
+            setCameraStatus('error', '播放器组件加载失败');
+            showCameraPlaceholder('播放器组件加载失败');
             return;
         }
         if (!flvjs.isSupported()) {
-            if (placeholder) { placeholder.innerHTML = '<i class="ri-camera-lens-line"></i><p>浏览器不支持视频播放</p>'; placeholder.style.display = 'flex'; }
+            setCameraStatus('error', '当前浏览器不支持 FLV 播放');
+            showCameraPlaceholder('当前浏览器不支持 FLV 播放');
             return;
         }
         destroyCameraPlayer();
@@ -372,15 +408,19 @@ async function initCamera() {
         __flvPlayer.play();
         video.addEventListener('playing', function() {
             patrolVideoReady = true;
+            setCameraStatus('ready', '萤石实时画面已连接');
+            var placeholder = document.getElementById('video-placeholder');
             if (placeholder) placeholder.style.display = 'none';
         });
         video.addEventListener('error', function() {
             patrolVideoReady = false;
-            if (placeholder) placeholder.style.display = 'flex';
+            setCameraStatus('error', '视频流播放失败，请检查摄像头编码');
+            showCameraPlaceholder('视频流播放失败，请尝试设为 H.264');
         });
     } catch (e) {
         console.error('摄像头初始化失败:', e);
-        if (placeholder) placeholder.style.display = 'flex';
+        setCameraStatus('error', '摄像头连接请求失败');
+        showCameraPlaceholder('摄像头连接请求失败');
     }
 }
 
@@ -388,6 +428,7 @@ async function changeEncodeType() {
     const btn = document.getElementById('btn-encode');
     btn.disabled = true;
     btn.innerHTML = '<i class="ri-loader-4-line"></i>修改中...';
+    setCameraStatus('loading', '正在切换摄像头编码');
     const res = await apiPut('/camera/encode-type', null);
     if (res && res.code === 200) {
         btn.innerHTML = '<i class="ri-check-line"></i>已切换';
@@ -398,6 +439,7 @@ async function changeEncodeType() {
         }, 3000);
     } else {
         btn.innerHTML = '<i class="ri-close-line"></i>切换失败';
+        setCameraStatus('error', (res && res.msg) || '摄像头编码切换失败');
         setTimeout(function() {
             btn.innerHTML = '<i class="ri-settings-4-line"></i>设为H.264';
             btn.disabled = false;

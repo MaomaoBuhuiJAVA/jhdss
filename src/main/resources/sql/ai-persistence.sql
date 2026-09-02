@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS ai_knowledge_entry (
 
 CREATE TABLE IF NOT EXISTS ai_learn_video (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
-    video_name VARCHAR(255) NOT NULL UNIQUE COMMENT '上传视频文件名',
+    video_name VARCHAR(191) NOT NULL UNIQUE COMMENT '上传视频文件名',
     folder_key VARCHAR(50) NOT NULL COMMENT '资料目录标识',
     group_title VARCHAR(200) NOT NULL COMMENT '知识卡片分组标题',
     enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用 0否1是',

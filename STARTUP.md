@@ -10,6 +10,9 @@ set "INSECT_API_USERNAME=虫情灯账号"
 set "INSECT_API_PASSWORD=虫情灯密码"
 set "YS7_APP_KEY=萤石云AppKey"
 set "YS7_APP_SECRET=萤石云AppSecret"
+set "YS7_VERIFY_CODE=摄像头验证码"
+set "YS7_DEVICE_SERIAL=BG9980884"
+set "YS7_CHANNEL_NO=1"
 set "DASHSCOPE_API_KEY=阿里云DashScope密钥"
 ```
 

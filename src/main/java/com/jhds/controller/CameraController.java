@@ -2,6 +2,7 @@ package com.jhds.controller;
 
 import com.alibaba.fastjson.JSONArray;
 import com.jhds.common.Result;
+import com.jhds.config.YsjProperties;
 import com.jhds.service.EzvizService;
 import com.jhds.service.EzvizService.EncodeTarget;
 import io.swagger.annotations.Api;
@@ -19,23 +20,53 @@ public class CameraController {
 
     @Autowired
     private EzvizService ezvizService;
+    @Autowired
+    private YsjProperties ysjProperties;
 
     @ApiOperation("获取摄像头FLV播放地址")
     @GetMapping("/play-url")
-    public Result<String> getPlayUrl(@RequestParam String deviceSerial) {
-        String url = ezvizService.getPlayUrl(deviceSerial);
-        return Result.ok(url);
+    public Result<String> getPlayUrl(
+            @RequestParam(required = false) String deviceSerial,
+            @RequestParam(required = false) Integer channelNo,
+            @RequestParam(required = false) Integer protocol) {
+        try {
+            String url = ezvizService.getPlayUrl(resolveDeviceSerial(deviceSerial),
+                    channelNo == null ? ysjProperties.getChannelNo() : channelNo,
+                    protocol == null ? ysjProperties.getProtocol() : protocol);
+            return Result.ok(url);
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头播放地址获取失败：" + errorMessage(e));
+        }
+    }
+
+    @ApiOperation("检测萤石账号、设备绑定和播放地址")
+    @GetMapping("/stream-check")
+    public Result<Map<String, Object>> checkStream(
+            @RequestParam(required = false) String deviceSerial,
+            @RequestParam(required = false) Integer channelNo,
+            @RequestParam(required = false) Integer protocol) {
+        Map<String, Object> status = ezvizService.checkStream(
+                resolveDeviceSerial(deviceSerial),
+                channelNo == null ? ysjProperties.getChannelNo() : channelNo,
+                protocol == null ? ysjProperties.getProtocol() : protocol);
+        return Result.ok(status);
     }
 
     @ApiOperation("修改摄像头视频编码类型")
     @PutMapping("/encode-type")
     public Result<Void> changeEncodeType(
-            @RequestParam String deviceSerial,
+            @RequestParam(required = false) String deviceSerial,
             @RequestParam(defaultValue = "H264") String encodeType,
-            @RequestParam(defaultValue = "1") Integer streamType,
+            @RequestParam(required = false) Integer streamType,
             @RequestParam(required = false) Integer channelNo) {
-        ezvizService.changeEncodeType(deviceSerial, encodeType, streamType, channelNo);
-        return Result.ok();
+        try {
+            ezvizService.changeEncodeType(resolveDeviceSerial(deviceSerial), encodeType,
+                    streamType == null ? ysjProperties.getStreamType() : streamType,
+                    channelNo == null ? ysjProperties.getChannelNo() : channelNo);
+            return Result.ok();
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头编码切换失败：" + errorMessage(e));
+        }
     }
 
     @ApiOperation("查询摄像头视频编码格式")
@@ -111,5 +142,18 @@ public class CameraController {
         public void setEncodeType(String encodeType) { this.encodeType = encodeType; }
         public Integer getStreamType() { return streamType; }
         public void setStreamType(Integer streamType) { this.streamType = streamType; }
+    }
+
+    private String resolveDeviceSerial(String requested) {
+        String serial = requested == null || requested.trim().isEmpty()
+                ? ysjProperties.getDeviceSerial() : requested;
+        if (serial == null || serial.trim().isEmpty()) {
+            throw new IllegalArgumentException("请配置 YS7_DEVICE_SERIAL");
+        }
+        return serial.trim();
+    }
+
+    private String errorMessage(RuntimeException error) {
+        return error.getMessage() == null ? "未知错误" : error.getMessage();
     }
 }

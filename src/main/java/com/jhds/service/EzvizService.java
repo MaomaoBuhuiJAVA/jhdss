@@ -13,6 +13,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -27,6 +28,8 @@ public class EzvizService {
     private static final String REDIS_KEY = "jhds:ys7:access_token";
     /** 设备编码本地缓存前缀: jhds:ys7:encode:{deviceSerial}:{channelNo}:{streamType} */
     private static final String ENCODE_CACHE_PREFIX = "jhds:ys7:encode";
+    /** Keeps recent settings available when this deployment has no Redis service. */
+    private final Map<String, String> localEncodeCache = new ConcurrentHashMap<>();
 
     @Autowired
     private YsjProperties ysjProperties;
@@ -36,7 +39,8 @@ public class EzvizService {
     private StringRedisTemplate redisTemplate;
 
     public String getAccessToken() {
-        String cached = redisTemplate.opsForValue().get(REDIS_KEY);
+        requireUsableCredentials();
+        String cached = readCachedAccessToken();
         if (cached != null) {
             return cached;
         }
@@ -64,13 +68,120 @@ public class EzvizService {
             long expireTime = data.getLongValue("expireTime");
             long ttl = (expireTime - System.currentTimeMillis()) / 1000;
             if (ttl > 0) {
-                redisTemplate.opsForValue().set(REDIS_KEY, accessToken, ttl, TimeUnit.SECONDS);
+                cacheAccessToken(accessToken, ttl);
             }
             return accessToken;
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error getting YS7 accessToken", e);
             throw new RuntimeException("获取萤石AccessToken异常", e);
         }
+    }
+
+    /** Returns a user-facing diagnostic without returning a short-lived stream URL. */
+    public Map<String, Object> checkStream(String deviceSerial, Integer channelNo, Integer protocol) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        String serial = requireDeviceSerial(deviceSerial);
+        int channel = channelNo == null ? 1 : channelNo;
+        int selectedProtocol = protocol == null ? 4 : protocol;
+
+        result.put("deviceSerial", serial);
+        result.put("channelNo", channel);
+        result.put("protocol", selectedProtocol);
+        result.put("configured", hasUsableCredentials());
+        if (!hasUsableCredentials()) {
+            result.put("ready", false);
+            result.put("message", "请在 .env.local.bat 配置有效的 YS7_APP_KEY 和 YS7_APP_SECRET");
+            return result;
+        }
+
+        try {
+            getAccessToken();
+            result.put("authorized", true);
+
+            JSONArray devices = getDeviceList();
+            boolean deviceFound = false;
+            String deviceStatus = null;
+            if (devices != null) {
+                for (int i = 0; i < devices.size(); i++) {
+                    JSONObject device = devices.getJSONObject(i);
+                    if (serial.equalsIgnoreCase(device.getString("deviceSerial"))) {
+                        deviceFound = true;
+                        deviceStatus = device.getString("status");
+                        break;
+                    }
+                }
+            }
+            result.put("deviceFound", deviceFound);
+            if (deviceStatus != null) {
+                result.put("deviceStatus", deviceStatus);
+            }
+            if (!deviceFound) {
+                result.put("ready", false);
+                result.put("message", "当前萤石开放平台账号未绑定该摄像头");
+                return result;
+            }
+
+            String playUrl = getPlayUrl(serial, channel, selectedProtocol);
+            result.put("playAddressAvailable", playUrl != null && !playUrl.trim().isEmpty());
+            result.put("ready", Boolean.TRUE.equals(result.get("playAddressAvailable")));
+            result.put("message", Boolean.TRUE.equals(result.get("ready")) ? "摄像头视频流已就绪" : "萤石未返回播放地址");
+        } catch (RuntimeException e) {
+            result.put("ready", false);
+            result.put("message", userMessage(e));
+        }
+        return result;
+    }
+
+    private String readCachedAccessToken() {
+        try {
+            return redisTemplate.opsForValue().get(REDIS_KEY);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, request EZVIZ token without cache: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void cacheAccessToken(String accessToken, long ttl) {
+        try {
+            redisTemplate.opsForValue().set(REDIS_KEY, accessToken, ttl, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, skip EZVIZ token cache: {}", e.getMessage());
+        }
+    }
+
+    private boolean hasUsableCredentials() {
+        return isUsableValue(ysjProperties.getAppKey()) && isUsableValue(ysjProperties.getAppSecret());
+    }
+
+    private boolean isUsableValue(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return !"local-dev".equals(normalized) && !normalized.startsWith("your-");
+    }
+
+    private void requireUsableCredentials() {
+        if (!hasUsableCredentials()) {
+            throw new IllegalStateException("请在 .env.local.bat 配置有效的 YS7_APP_KEY 和 YS7_APP_SECRET");
+        }
+    }
+
+    private String requireDeviceSerial(String deviceSerial) {
+        if (deviceSerial == null || deviceSerial.trim().isEmpty()) {
+            throw new IllegalArgumentException("未配置萤石摄像头序列号");
+        }
+        return deviceSerial.trim();
+    }
+
+    private String userMessage(RuntimeException error) {
+        String message = error.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return "萤石云连接失败，请检查开放平台配置和摄像头网络";
+        }
+        return message;
     }
 
     public void changeEncodeType(String deviceSerial, String encodeType, Integer streamType) {
@@ -113,7 +224,7 @@ public class EzvizService {
                 throw new RuntimeException("修改设备编码失败: " + msg);
             }
             // 萤石云未提供"查询当前编码"的接口，本地缓存最近一次设置的编码，供查询接口读取
-            redisTemplate.opsForValue().set(encodeCacheKey(deviceSerial, ch, st), encodeType);
+            cacheEncodeType(encodeCacheKey(deviceSerial, ch, st), encodeType);
             log.info("Changed encodeType for {} (ch{}) to {}, streamType={}", deviceSerial, ch, encodeType, st);
         } catch (Exception e) {
             log.error("Error changing YS7 encodeType for device: {} ch{}", deviceSerial, ch, e);
@@ -135,7 +246,7 @@ public class EzvizService {
     public Integer getEncodeType(String deviceSerial, Integer channelNo, Integer streamType) {
         int ch = channelNo == null ? 1 : channelNo;
         int st = streamType == null ? 1 : streamType;
-        String cached = redisTemplate.opsForValue().get(encodeCacheKey(deviceSerial, ch, st));
+        String cached = readCachedEncodeType(encodeCacheKey(deviceSerial, ch, st));
         if (cached == null) {
             log.info("No local cached encodeType for {} ch{} st{} (EZVIZ has no public query API)", deviceSerial, ch, st);
             return null;
@@ -145,6 +256,27 @@ public class EzvizService {
 
     private String encodeCacheKey(String deviceSerial, int channelNo, int streamType) {
         return ENCODE_CACHE_PREFIX + ":" + deviceSerial + ":" + channelNo + ":" + streamType;
+    }
+
+    private void cacheEncodeType(String key, String encodeType) {
+        localEncodeCache.put(key, encodeType);
+        try {
+            redisTemplate.opsForValue().set(key, encodeType);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, keep EZVIZ encode type only in memory: {}", e.getMessage());
+        }
+    }
+
+    private String readCachedEncodeType(String key) {
+        try {
+            String cached = redisTemplate.opsForValue().get(key);
+            if (cached != null) {
+                return cached;
+            }
+        } catch (Exception e) {
+            log.warn("Redis unavailable, read EZVIZ encode type from memory: {}", e.getMessage());
+        }
+        return localEncodeCache.get(key);
     }
 
     private Integer encodeTypeToVideoCode(String encodeType) {
@@ -266,19 +398,30 @@ public class EzvizService {
     }
 
     public String getPlayUrl(String deviceSerial) {
-        return getPlayUrl(deviceSerial, 4);
+        return getPlayUrl(deviceSerial, 1, 4);
     }
 
     public String getPlayUrl(String deviceSerial, int protocol) {
+        return getPlayUrl(deviceSerial, 1, protocol);
+    }
+
+    public String getPlayUrl(String deviceSerial, Integer channelNo, Integer protocol) {
         String accessToken = getAccessToken();
+        String serial = requireDeviceSerial(deviceSerial);
+        int channel = channelNo == null ? 1 : channelNo;
+        int selectedProtocol = protocol == null ? 4 : protocol;
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("accessToken", accessToken);
-        body.add("deviceSerial", deviceSerial);
-        body.add("protocol", String.valueOf(protocol));
+        body.add("deviceSerial", serial);
+        body.add("channelNo", String.valueOf(channel));
+        body.add("protocol", String.valueOf(selectedProtocol));
+        if (isUsableValue(ysjProperties.getVerifyCode())) {
+            body.add("verifyCode", ysjProperties.getVerifyCode().trim());
+        }
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
@@ -293,8 +436,10 @@ public class EzvizService {
             }
             JSONObject data = json.getJSONObject("data");
             return data.getString("url");
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Error getting YS7 playUrl for device: {}", deviceSerial, e);
+            log.error("Error getting YS7 playUrl for device: {}", serial, e);
             throw new RuntimeException("获取萤石播放地址异常", e);
         }
     }
