@@ -22,13 +22,33 @@ if exist ".env.local.bat" (
     echo [WARN] .env.local.bat was not found. Required external-service variables may be missing.
 )
 
+if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
+    echo [WARN] JAVA_HOME does not contain bin\java.exe: %JAVA_HOME%
+    set "JAVA_HOME="
+)
+
+if not defined JAVA_HOME (
+    rem Maven requires JAVA_HOME even when java.exe is already available in PATH.
+    for /f "usebackq delims=" %%J in (`powershell -NoProfile -Command "$java = (Get-Command java.exe -ErrorAction SilentlyContinue).Source; if ($java) { Split-Path (Split-Path $java -Parent) -Parent }"`) do set "JAVA_HOME=%%J"
+    if defined JAVA_HOME (
+        echo [INFO] JAVA_HOME was not set; using !JAVA_HOME!
+    )
+)
+
 if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
 if defined MAVEN_HOME set "PATH=%MAVEN_HOME%\bin;%PATH%"
 
 where java >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Java was not found in PATH.
-    echo         Check JAVA_HOME and reopen this window.
+    echo         Install a JDK and set JAVA_HOME to its installation folder.
+    pause
+    exit /b 1
+)
+
+if not defined JAVA_HOME (
+    echo [ERROR] JAVA_HOME could not be determined from java.exe.
+    echo         Set JAVA_HOME to the JDK installation folder, not its bin folder.
     pause
     exit /b 1
 )
