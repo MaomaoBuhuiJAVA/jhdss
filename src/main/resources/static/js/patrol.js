@@ -329,9 +329,14 @@ function retryAiCapture() {
 }
 
 let __flvPlayer = null;
+let __hlsPlayer = null;
 let patrolVideoReady = false;
 
 function destroyCameraPlayer() {
+    if (__hlsPlayer) {
+        try { __hlsPlayer.destroy(); } catch (e) { /* ignore */ }
+        __hlsPlayer = null;
+    }
     if (__flvPlayer) {
         try {
             __flvPlayer.pause();
@@ -340,6 +345,12 @@ function destroyCameraPlayer() {
             __flvPlayer.destroy();
         } catch (e) { /* ignore */ }
         __flvPlayer = null;
+    }
+    var video = document.getElementById('video-player');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
     }
     patrolVideoReady = false;
 }
@@ -391,32 +402,54 @@ async function initCamera() {
             showCameraPlaceholder(message);
             return;
         }
-        if (typeof flvjs === 'undefined') {
-            setCameraStatus('error', '播放器组件加载失败');
-            showCameraPlaceholder('播放器组件加载失败');
-            return;
-        }
-        if (!flvjs.isSupported()) {
-            setCameraStatus('error', '当前浏览器不支持 FLV 播放');
-            showCameraPlaceholder('当前浏览器不支持 FLV 播放');
-            return;
-        }
         destroyCameraPlayer();
-        __flvPlayer = flvjs.createPlayer({ type: 'flv', url: res.data });
-        __flvPlayer.attachMediaElement(video);
-        __flvPlayer.load();
-        __flvPlayer.play();
-        video.addEventListener('playing', function() {
+        const isHls = /\.m3u8(?:$|\?)/i.test(res.data);
+        if (isHls) {
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = res.data;
+                video.play();
+            } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                __hlsPlayer = new Hls({ enableWorker: true, lowLatencyMode: true });
+                __hlsPlayer.on(Hls.Events.ERROR, function(event, data) {
+                    if (!data.fatal) return;
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        __hlsPlayer.startLoad();
+                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        __hlsPlayer.recoverMediaError();
+                    } else {
+                        setCameraStatus('error', 'HLS 视频流播放失败');
+                        showCameraPlaceholder('HLS 视频流播放失败，请刷新页面重试');
+                    }
+                });
+                __hlsPlayer.loadSource(res.data);
+                __hlsPlayer.attachMedia(video);
+            } else {
+                setCameraStatus('error', '当前浏览器不支持 HLS 播放');
+                showCameraPlaceholder('当前浏览器不支持 HLS 播放');
+                return;
+            }
+        } else {
+            if (typeof flvjs === 'undefined' || !flvjs.isSupported()) {
+                setCameraStatus('error', '当前浏览器不支持 FLV 播放');
+                showCameraPlaceholder('当前浏览器不支持 FLV 播放');
+                return;
+            }
+            __flvPlayer = flvjs.createPlayer({ type: 'flv', url: res.data });
+            __flvPlayer.attachMediaElement(video);
+            __flvPlayer.load();
+            __flvPlayer.play();
+        }
+        video.onplaying = function() {
             patrolVideoReady = true;
             setCameraStatus('ready', '萤石实时画面已连接');
             var placeholder = document.getElementById('video-placeholder');
             if (placeholder) placeholder.style.display = 'none';
-        });
-        video.addEventListener('error', function() {
+        };
+        video.onerror = function() {
             patrolVideoReady = false;
-            setCameraStatus('error', '视频流播放失败，请检查摄像头编码');
-            showCameraPlaceholder('视频流播放失败，请尝试设为 H.264');
-        });
+            setCameraStatus('error', '视频流播放失败，请检查摄像头编码和网络');
+            showCameraPlaceholder('视频流播放失败，请尝试设为 H.264 后刷新');
+        };
     } catch (e) {
         console.error('摄像头初始化失败:', e);
         setCameraStatus('error', '摄像头连接请求失败');

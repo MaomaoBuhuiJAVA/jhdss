@@ -84,7 +84,7 @@ public class EzvizService {
         Map<String, Object> result = new LinkedHashMap<>();
         String serial = requireDeviceSerial(deviceSerial);
         int channel = channelNo == null ? 1 : channelNo;
-        int selectedProtocol = protocol == null ? 4 : protocol;
+        int selectedProtocol = protocol == null ? 2 : protocol;
 
         result.put("deviceSerial", serial);
         result.put("channelNo", channel);

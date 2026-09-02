@@ -17,8 +17,8 @@ public class YsjProperties {
     private String deviceSerial = "BG9980884";
     /** EZVIZ camera channel number. Most standalone cameras use channel 1. */
     private Integer channelNo = 1;
-    /** 4 is EZVIZ FLV, which is played by the bundled flv.js client. */
-    private Integer protocol = 4;
+    /** 2 is EZVIZ HLS, which is broadly supported by the bundled hls.js player. */
+    private Integer protocol = 2;
     /** 1 is the main stream and is also used when requesting H.264 conversion. */
     private Integer streamType = 1;
     private int tokenTtl = 7;
