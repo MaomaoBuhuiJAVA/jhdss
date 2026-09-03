@@ -33,6 +33,9 @@ public class EzvizService {
     /** Keeps recent settings available when this deployment has no Redis service. */
     private final Map<String, String> localEncodeCache = new ConcurrentHashMap<>();
     private final Map<String, Long> h264EnsureCache = new ConcurrentHashMap<>();
+    /** Avoid a Redis round-trip for every PTZ command when Redis is unavailable. */
+    private volatile String localAccessToken;
+    private volatile long localAccessTokenExpiresAt;
 
     @Autowired
     private YsjProperties ysjProperties;
@@ -43,8 +46,16 @@ public class EzvizService {
 
     public String getAccessToken() {
         requireUsableCredentials();
+        String local = readLocalAccessToken();
+        if (local != null) {
+            return local;
+        }
         String cached = readCachedAccessToken();
         if (cached != null) {
+            // Redis does not expose the remaining TTL through this lookup. Keep
+            // a short local copy so rapid PTZ presses do not hit Redis again.
+            localAccessToken = cached;
+            localAccessTokenExpiresAt = System.currentTimeMillis() + 60000L;
             return cached;
         }
 
@@ -71,6 +82,8 @@ public class EzvizService {
             long expireTime = data.getLongValue("expireTime");
             long ttl = (expireTime - System.currentTimeMillis()) / 1000;
             if (ttl > 0) {
+                localAccessToken = accessToken;
+                localAccessTokenExpiresAt = System.currentTimeMillis() + Math.max(1L, ttl - 60L) * 1000L;
                 cacheAccessToken(accessToken, ttl);
             }
             return accessToken;
@@ -80,6 +93,17 @@ public class EzvizService {
             log.error("Error getting YS7 accessToken", e);
             throw new RuntimeException("获取萤石AccessToken异常", e);
         }
+    }
+
+    private String readLocalAccessToken() {
+        String token = localAccessToken;
+        if (token == null || token.trim().isEmpty()) return null;
+        if (System.currentTimeMillis() >= localAccessTokenExpiresAt) {
+            localAccessToken = null;
+            localAccessTokenExpiresAt = 0L;
+            return null;
+        }
+        return token;
     }
 
     /** Returns a user-facing diagnostic without returning a short-lived stream URL. */
