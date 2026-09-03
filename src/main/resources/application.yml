@@ -57,7 +57,8 @@ swagger:
 device:
   mqtt:
     broker-url: ${MQTT_BROKER_URL:tcp://11046xnld7705.vicp.fun:1883}
-    client-id: ${MQTT_CLIENT_ID:jhdskouhong}
+    # Must differ from the USR DTU client id (jhdskouhong).
+    client-id: ${MQTT_CLIENT_ID:jhdss-web-control}
     username: ${MQTT_USERNAME:mqttuser}
     password: ${MQTT_PASSWORD:a123456}
     topic:

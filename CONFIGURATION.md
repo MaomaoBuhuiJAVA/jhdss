@@ -55,7 +55,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.transparent-mode` | `true` | 有人云“纯透传”模式；设备命令必须填写空格分隔的十六进制串口帧 |
 | `device.mqtt.ignore-echo` | `true` | 过滤有人云“指令回显”，避免把回显误判为设备应答 |
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
-| `MQTT_CLIENT_ID` | `jhdskouhong` | 后端 MQTT 客户端 ID；与其他客户端冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
+| `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端 ID；必须与 DTU 的 `jhdskouhong` 不同；与其他后端实例冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
 | `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧 |
 
