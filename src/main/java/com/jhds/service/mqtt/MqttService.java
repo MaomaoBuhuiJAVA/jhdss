@@ -13,6 +13,7 @@ import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,8 @@ import javax.annotation.PostConstruct;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -37,6 +40,17 @@ public class MqttService implements DisposableBean {
     private EquipmentMapper equipmentMapper;
     @Autowired
     private ControlLogService controlLogService;
+
+    // Optional overrides are useful when the motor command table is managed by
+    // deployment configuration instead of edited directly in MySQL.
+    @Value("${device.commands.motor-direction-open:}")
+    private String motorDirectionOpen;
+    @Value("${device.commands.motor-direction-close:}")
+    private String motorDirectionClose;
+    @Value("${device.commands.motor-state-open:}")
+    private String motorStateOpen;
+    @Value("${device.commands.motor-state-close:}")
+    private String motorStateClose;
 
     private MqttClient mqttClient;
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingCommands = new ConcurrentHashMap<>();
@@ -60,7 +74,9 @@ public class MqttService implements DisposableBean {
             return;
         }
         try {
-            String clientId = mqttProperties.getClientId() + "-" + System.currentTimeMillis();
+            String configuredClientId = mqttProperties.getClientId();
+            String clientId = mqttProperties.isAppendInstanceId()
+                    ? configuredClientId + "-" + System.currentTimeMillis() : configuredClientId;
             mqttClient = new MqttClient(mqttProperties.getBrokerUrl(), clientId, new MemoryPersistence());
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName(mqttProperties.getUsername());
@@ -68,11 +84,11 @@ public class MqttService implements DisposableBean {
             options.setConnectionTimeout(mqttProperties.getConnectionTimeout());
             options.setKeepAliveInterval(mqttProperties.getKeepaliveInterval());
             options.setAutomaticReconnect(true);
-            options.setCleanSession(true);
+            options.setCleanSession(mqttProperties.isCleanSession());
             mqttClient.setCallback(new MqttCallbackHandler(this));
             mqttClient.connect(options);
             String responseTopic = mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix();
-            mqttClient.subscribe(responseTopic, 1);
+            mqttClient.subscribe(responseTopic, safeQos(mqttProperties.getResponseQos()));
             log.info("MQTT connected, subscribed to: {}", responseTopic);
         } catch (Exception e) {
             log.error("MQTT init error", e);
@@ -135,8 +151,16 @@ public class MqttService implements DisposableBean {
         if ("close".equals(value) || "stop".equals(value)) {
             commandCode = equipment.getCloseCode();
         }
+        if (commandCode == null || commandCode.trim().isEmpty()) {
+            commandCode = configuredCommand(alias, value);
+        }
         if (commandCode == null || commandCode.isEmpty()) {
             log.warn("Command code empty for {} value={}", alias, value);
+            return null;
+        }
+
+        if (mqttProperties.isTransparentMode() && !isHexCommand(commandCode)) {
+            log.warn("Transparent MQTT mode requires a hexadecimal serial frame: alias={}, value={}", alias, value);
             return null;
         }
 
@@ -156,8 +180,8 @@ public class MqttService implements DisposableBean {
             CompletableFuture<String> future = new CompletableFuture<>();
             pendingCommands.put(requestId, future);
 
-            MqttMessage message = new MqttMessage(payload.getBytes());
-            message.setQos(1);
+            MqttMessage message = new MqttMessage(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            message.setQos(safeQos(mqttProperties.getCommandQos()));
             mqttClient.publish(commandTopic, message);
             log.info("Command sent: topic={}, payload={}", commandTopic, payload);
 
@@ -211,6 +235,38 @@ public class MqttService implements DisposableBean {
         return frame.toJSONString();
     }
 
+    private boolean isHexCommand(String commandCode) {
+        return commandCode != null && commandCode.trim().matches("(?i)([0-9a-f]{2})(\\s+[0-9a-f]{2})*");
+    }
+
+    private String configuredCommand(String alias, String value) {
+        boolean close = "close".equalsIgnoreCase(value) || "stop".equalsIgnoreCase(value);
+        if ("MOTOR_DIRECTION".equalsIgnoreCase(alias)) {
+            return close ? motorDirectionClose : motorDirectionOpen;
+        }
+        if ("MOTOR_STATE".equalsIgnoreCase(alias)) {
+            return close ? motorStateClose : motorStateOpen;
+        }
+        return null;
+    }
+
+    private int safeQos(int qos) {
+        return qos < 0 || qos > 2 ? 1 : qos;
+    }
+
+    /** A password-free status snapshot for the web UI and troubleshooting. */
+    public Map<String, Object> connectionStatus() {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("enabled", mqttProperties.isEnabled());
+        status.put("connected", isConnected());
+        status.put("brokerUrl", mqttProperties.getBrokerUrl());
+        status.put("clientId", mqttProperties.getClientId());
+        status.put("commandTopic", mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getCommandSuffix());
+        status.put("responseTopic", mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix());
+        status.put("transparentMode", mqttProperties.isTransparentMode());
+        return status;
+    }
+
     public boolean isConnected() {
         return mqttClient != null && mqttClient.isConnected();
     }
@@ -228,10 +284,18 @@ public class MqttService implements DisposableBean {
 
     public String sendHexSync(String hexCommand, long timeoutMs) {
         try {
+            if (!isHexCommand(hexCommand)) {
+                log.warn("Invalid hexadecimal serial frame: {}", hexCommand);
+                return null;
+            }
+            if (!isConnected()) {
+                log.warn("MQTT is not connected; command was not sent");
+                return null;
+            }
             String commandTopic = mqttProperties.getTopic().getPrefix() + "/"
                     + mqttProperties.getTopic().getCommandSuffix();
             MqttMessage message = new MqttMessage(ModbusUtil.hexToBytes(hexCommand));
-            message.setQos(1);
+            message.setQos(safeQos(mqttProperties.getCommandQos()));
             mqttClient.publish(commandTopic, message);
             log.debug("Hex command sent: {}", hexCommand);
             return sequentialResponseQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);

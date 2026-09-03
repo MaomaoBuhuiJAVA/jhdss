@@ -68,7 +68,12 @@ async function setPatrolDir(dir) {
     currentDir = dir;
     document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
     if (dir !== 'stop') document.getElementById('btn-' + dir).classList.add('active');
-    await apiPost('/patrol/control', { dir: dir });
+    const res = await apiPost('/patrol/control', { dir: dir });
+    if (!res || res.code !== 200) {
+        document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
+        currentDir = 'stop';
+        window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
+    }
 }
 
 async function addPatrolTask() {

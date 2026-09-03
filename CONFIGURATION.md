@@ -51,6 +51,14 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.broker-url` | `tcp://11046xnld7705.vicp.fun:1883` | MQTT Broker |
 | `device.mqtt.username/password` | `mqttuser`/`a123456` | MQTT 认证 |
 | `device.mqtt.topic.prefix` | `/iot/jhds/prod` | 命令和响应主题前缀 |
+| `device.mqtt.clean-session` | `false` | 是否清除 MQTT 会话；有人云配置为“关”时保持 `false` |
+| `device.mqtt.transparent-mode` | `true` | 有人云“纯透传”模式；设备命令必须填写空格分隔的十六进制串口帧 |
+| `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
+| `MQTT_CLIENT_ID` | `jhdskouhong` | 后端 MQTT 客户端 ID；与其他客户端冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
+| `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
+| `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧 |
+
+有人云 DTU 配置为“纯透传”时，网页只负责发布原始串口字节，不能根据设备编号自动推断电机协议。请将电机控制器说明书中的实际十六进制帧（例如 `01 05 00 00 FF 00 8C 3A`）填入上述环境变量，或直接写入 `equipment.open_code` / `equipment.close_code`。没有这些帧时，网页会显示 MQTT 已连接，但不会发送危险的猜测指令。
 | `ollama.base-url` | `http://localhost:11434` | 本地 Ollama 地址 |
 | `ollama.model` | `qwen2.5vl:7b` | 本地视觉模型 |
 | `dashscope.model` | `kimi-k2.7-code` | 云端模型 |

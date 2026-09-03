@@ -15,6 +15,13 @@ public class MqttProperties {
     private int connectionTimeout = 10;
     private int keepaliveInterval = 60;
     private boolean enabled = true;
+    /** Match the DTU setting; can be overridden for brokers that require clean sessions. */
+    private boolean cleanSession = false;
+    /** Keep the configured client id stable unless a broker requires unique ids per process. */
+    private boolean appendInstanceId = false;
+    private boolean transparentMode = true;
+    private int commandQos = 1;
+    private int responseQos = 1;
 
     private Topic topic = new Topic();
 

@@ -37,6 +37,9 @@ public class PatrolController {
     public Result<String> control(@RequestBody Map<String, String> body) {
         String dir = body.get("dir");
         String result = patrolService.control(dir);
+        if (result == null) {
+            return Result.error(503, "MQTT未连接，或电机尚未配置有效的十六进制串口指令");
+        }
         return Result.ok(result);
     }
 

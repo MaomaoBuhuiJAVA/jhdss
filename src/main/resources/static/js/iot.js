@@ -64,6 +64,21 @@ async function loadDevices() {
     }).join('');
 }
 
+async function loadMqttStatus() {
+    const status = document.getElementById('mqtt-status');
+    if (!status) return;
+    const res = await apiGet('/iot/mqtt-status');
+    if (!res || !res.data) {
+        status.textContent = 'MQTT 未知';
+        status.className = 'mqtt-status offline';
+        return;
+    }
+    const connected = res.data.connected === true;
+    status.textContent = connected ? 'MQTT 已连接' : (res.data.enabled ? 'MQTT 未连接' : 'MQTT 已禁用');
+    status.className = 'mqtt-status ' + (connected ? 'online' : 'offline');
+    status.title = res.data.brokerUrl + ' · ' + res.data.commandTopic;
+}
+
 function renderDeviceStatus(alias, checked) {
     const safeAlias = alias.replace(/[^a-zA-Z0-9]/g, '_');
     const statusEl = document.getElementById('iot-status-' + safeAlias);
@@ -96,6 +111,8 @@ document.addEventListener('DOMContentLoaded', function() {
         controlDevice(input);
     });
     loadDevices();
+    loadMqttStatus();
     setInterval(loadDevices, 30000);
+    setInterval(loadMqttStatus, 10000);
     document.getElementById('iot-update-time').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
 });

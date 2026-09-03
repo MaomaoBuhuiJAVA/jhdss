@@ -56,17 +56,27 @@ swagger:
 
 device:
   mqtt:
-    broker-url: tcp://11046xnld7705.vicp.fun:1883
-    client-id: jhds-iot-client
-    username: mqttuser
-    password: a123456
+    broker-url: ${MQTT_BROKER_URL:tcp://11046xnld7705.vicp.fun:1883}
+    client-id: ${MQTT_CLIENT_ID:jhdskouhong}
+    username: ${MQTT_USERNAME:mqttuser}
+    password: ${MQTT_PASSWORD:a123456}
     topic:
       prefix: /iot/jhds/prod
       command-suffix: command
       response-suffix: response
-    connection-timeout: 10
-    keepalive-interval: 60
-    enabled: true
+    connection-timeout: ${MQTT_CONNECTION_TIMEOUT:10}
+    keepalive-interval: ${MQTT_KEEPALIVE_SECONDS:60}
+    clean-session: ${MQTT_CLEAN_SESSION:false}
+    append-instance-id: ${MQTT_APPEND_INSTANCE_ID:false}
+    transparent-mode: ${MQTT_TRANSPARENT_MODE:true}
+    command-qos: ${MQTT_COMMAND_QOS:1}
+    response-qos: ${MQTT_RESPONSE_QOS:1}
+    enabled: ${MQTT_ENABLED:true}
+  commands:
+    motor-direction-open: ${MOTOR_DIRECTION_OPEN_HEX:}
+    motor-direction-close: ${MOTOR_DIRECTION_CLOSE_HEX:}
+    motor-state-open: ${MOTOR_STATE_OPEN_HEX:}
+    motor-state-close: ${MOTOR_STATE_CLOSE_HEX:}
 
 custom:
   redis:

@@ -6,6 +6,8 @@ import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
+import java.nio.charset.StandardCharsets;
+
 @Slf4j
 public class MqttCallbackHandler implements MqttCallback {
 
@@ -25,7 +27,7 @@ public class MqttCallbackHandler implements MqttCallback {
     public void messageArrived(String topic, MqttMessage message) {
         byte[] raw = message.getPayload();
         String payload = (raw.length > 0 && raw[0] == 0x7B)
-                ? new String(raw)
+                ? new String(raw, StandardCharsets.UTF_8)
                 : ModbusUtil.bytesToHex(raw);
         log.debug("MQTT message arrived: topic={}, payload={}", topic, payload);
         mqttService.handleResponse(topic, payload);

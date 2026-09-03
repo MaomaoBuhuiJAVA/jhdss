@@ -46,6 +46,7 @@ public class DatabaseSchemaInitializer {
         seedDashboardAlarms();
         seedPatrolTasks();
         seedNutrientData();
+        seedMotorDevices();
         seedInsectData();
         createAiContentTables();
         seedAiKnowledge();
@@ -453,6 +454,22 @@ public class DatabaseSchemaInitializer {
                     Timestamp.valueOf(LocalDateTime.now()));
         }
         markSeeded("seed.nutrient.v1");
+    }
+
+    /** The patrol page controls these aliases; preserve any command frames already configured by an operator. */
+    private void seedMotorDevices() {
+        if (!tableExists("equipment")) return;
+        seedEquipmentIfMissing("轨道电机方向", "MOTOR_DIRECTION", 0);
+        seedEquipmentIfMissing("轨道电机运行", "MOTOR_STATE", 0);
+    }
+
+    private void seedEquipmentIfMissing(String name, String alias, int type) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM equipment WHERE alias = ?", Integer.class, alias);
+        if (count == null || count == 0) {
+            jdbcTemplate.update("INSERT INTO equipment (name, alias, type, open_code, close_code, status) VALUES (?, ?, ?, '', '', 0)",
+                    name, alias, type);
+        }
     }
 
     private void seedInsectData() {

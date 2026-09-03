@@ -14,6 +14,17 @@ set "YS7_VERIFY_CODE=摄像头验证码"
 set "YS7_DEVICE_SERIAL=BG9980884"
 set "YS7_CHANNEL_NO=1"
 set "DASHSCOPE_API_KEY=阿里云DashScope密钥"
+set "MQTT_BROKER_URL=tcp://11046xnld7705.vicp.fun:1883"
+set "MQTT_CLIENT_ID=jhdskouhong"
+set "MQTT_USERNAME=mqttuser"
+set "MQTT_PASSWORD=有人云MQTT密码"
+set "MQTT_CLEAN_SESSION=false"
+set "MQTT_TRANSPARENT_MODE=true"
+rem 按电机控制器说明书填写四个实际串口十六进制帧
+set "MOTOR_DIRECTION_OPEN_HEX="
+set "MOTOR_DIRECTION_CLOSE_HEX="
+set "MOTOR_STATE_OPEN_HEX="
+set "MOTOR_STATE_CLOSE_HEX="
 ```
 
 然后双击 `start-jhds.bat`，或在命令行运行：
@@ -61,6 +72,7 @@ start-jhds.bat
 - `Communications link failure`：MySQL 未启动、端口或密码不匹配。
 - Redis connection refused：Redis 未启动或地址不正确。
 - MQTT 连接失败：现场设备不可用时设置 `-Ddevice.mqtt.enabled=false`。
+- MQTT 已连接但电机不动作：确认 `equipment` 表或四个 `MOTOR_*_HEX` 环境变量已填写电机控制器的真实串口帧；纯透传模式无法自动猜测协议。
 - Maven 不可用：安装 Maven 并将其加入 PATH；需要 JAR 部署时先执行 `mvn -DskipTests package`。
 
 ## 停止服务

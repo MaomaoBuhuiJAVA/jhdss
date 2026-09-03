@@ -19,6 +19,15 @@ public class IotController {
     @Autowired
     private IotService iotService;
 
+    @Autowired
+    private com.jhds.service.mqtt.MqttService mqttService;
+
+    @ApiOperation("获取有人云 MQTT 连接状态")
+    @GetMapping("/mqtt-status")
+    public Result<Map<String, Object>> mqttStatus() {
+        return Result.ok(mqttService.connectionStatus());
+    }
+
     @ApiOperation("获取所有大棚设备")
     @GetMapping("/devices")
     public Result<List<Equipment>> getDevices() {

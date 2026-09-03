@@ -209,6 +209,8 @@ INSERT INTO equipment (name, alias, type, open_code, close_code, status) VALUES
 ('二氧化碳气肥', 'PUMP_CO2', 1, '', '', 0),
 ('灌溉循环泵', 'PUMP_CIRCULATION', 1, '', '', 0),
 ('氯化钙叶面肥', 'PUMP_CALCIUM', 1, '', '', 0),
+('轨道电机方向', 'MOTOR_DIRECTION', 0, '', '', 0),
+('轨道电机运行', 'MOTOR_STATE', 0, '', '', 0),
 ('轨道巡检摄像头', 'CAM_PATROL', 0, '', '', 0),
 ('气象站', 'WEATHER_STATION', 0, '', '', 0),
 ('土壤传感器', 'SOIL_SENSOR', 0, '', '', 0),
