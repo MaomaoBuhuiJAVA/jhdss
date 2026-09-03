@@ -57,6 +57,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
 | `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端 ID；必须与 DTU 的 `jhdskouhong` 不同；与其他后端实例冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
 | `ys7.force-h264` | `true` | 获取播放地址前请求萤石云将主/子码流切换为 H.264 |
+| `ys7.protocol` | `4` | 默认使用 FLV 低延迟播放；FLV 不可用时前端回退 HLS（2） |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
 | `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧 |
 

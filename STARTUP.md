@@ -14,6 +14,7 @@ set "YS7_VERIFY_CODE=摄像头验证码"
 set "YS7_DEVICE_SERIAL=BG9980884"
 set "YS7_CHANNEL_NO=1"
 set "YS7_FORCE_H264=true"
+set "YS7_LIVE_PROTOCOL=4"
 set "DASHSCOPE_API_KEY=阿里云DashScope密钥"
 set "MQTT_BROKER_URL=tcp://11046xnld7705.vicp.fun:1883"
 rem 后端 Client ID 必须与有人云 DTU 的 jhdskouhong 不同

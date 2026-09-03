@@ -2,7 +2,10 @@ let currentDir = 'stop';
 let isAiCapturing = false;
 let patrolPageAlert = null;
 let activePtzDirection = null;
+let activePtzStartPromise = null;
+let cameraAudioEnabled = false;
 let cameraRecoveryTimer = null;
+let cameraPreferredProtocol = 4;
 
 const PATROL_ALERT_FALLBACK = {
     title: '⚠️花朵数量严重超标！',
@@ -91,7 +94,8 @@ async function startPtz(direction, button) {
     if (button) button.classList.add('active');
     const speed = Number((document.getElementById('ptz-speed') || {}).value || 1);
     setPtzStatus('云台移动中');
-    const res = await apiPost('/camera/ptz/start', { direction: direction, speed: speed });
+    activePtzStartPromise = apiPost('/camera/ptz/start', { direction: direction, speed: speed });
+    const res = await activePtzStartPromise;
     if (!res || res.code !== 200) {
         activePtzDirection = null;
         if (button) button.classList.remove('active');
@@ -100,11 +104,21 @@ async function startPtz(direction, button) {
 }
 
 async function stopPtz(direction, button) {
-    if (direction === undefined || direction === null) direction = activePtzDirection;
+    const currentDirection = activePtzDirection;
+    if (direction === undefined || direction === null) direction = currentDirection;
     if (direction === undefined || direction === null) return;
-    const res = await apiPost('/camera/ptz/stop', { direction: direction });
+    // Ignore duplicate pointerup/lostpointercapture events and releases from
+    // an older button after another direction has become active.
+    if (currentDirection !== null && currentDirection !== direction) return;
+    if (currentDirection === null && !activePtzStartPromise) return;
+    // A quick pointer release can happen before the start request finishes.
+    // Preserve command order so EZVIZ does not receive stop before start.
+    const startPromise = activePtzStartPromise;
     activePtzDirection = null;
+    activePtzStartPromise = null;
     document.querySelectorAll('.ptz-btn.active').forEach(function(btn) { btn.classList.remove('active'); });
+    if (startPromise) await startPromise;
+    const res = await apiPost('/camera/ptz/stop', { direction: direction });
     if (!res || res.code !== 200) setPtzStatus((res && res.msg) || '云台停止失败', true);
     else setPtzStatus('云台待命');
 }
@@ -117,9 +131,8 @@ function bindPtzControls() {
             if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
             startPtz(direction, button);
         });
-        ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(type) {
+        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) {
             button.addEventListener(type, function(event) {
-                if (type === 'pointerleave' && !button.hasPointerCapture?.(event.pointerId)) return;
                 event.preventDefault();
                 stopPtz(direction, button);
             });
@@ -421,12 +434,48 @@ function destroyCameraPlayer() {
     patrolVideoReady = false;
 }
 
-function scheduleCameraRecovery(delay) {
+function scheduleCameraRecovery(delay, protocol) {
     if (cameraRecoveryTimer || document.hidden) return;
     cameraRecoveryTimer = window.setTimeout(function() {
         cameraRecoveryTimer = null;
-        initCamera();
+        initCamera(protocol);
     }, delay || 1800);
+}
+
+function updateAudioButton() {
+    const video = document.getElementById('video-player');
+    const button = document.getElementById('btn-audio');
+    if (!video || !button) return;
+    const enabled = !video.muted;
+    button.className = 'audio-btn' + (enabled ? ' enabled' : '');
+    button.innerHTML = enabled ? '<i class="ri-volume-up-line"></i>关闭声音' : '<i class="ri-volume-mute-line"></i>开启声音';
+}
+
+function toggleCameraAudio() {
+    const video = document.getElementById('video-player');
+    if (!video) return;
+    video.muted = !video.muted;
+    cameraAudioEnabled = !video.muted;
+    updateAudioButton();
+    video.play().catch(function() {
+        if (!video.muted) {
+            video.muted = true;
+            updateAudioButton();
+            setCameraStatus('ready', '画面已连接，请再次点击开启声音');
+        }
+    });
+}
+
+function playCameraVideo(video) {
+    // Browsers block autoplay with sound until a user gesture. Start muted,
+    // then let the user explicitly enable audio with the button.
+    video.muted = !cameraAudioEnabled;
+    updateAudioButton();
+    video.play().catch(function() {
+        video.muted = true;
+        updateAudioButton();
+        video.play().catch(function() {});
+    });
 }
 
 function setCameraStatus(state, message) {
@@ -450,16 +499,22 @@ function showCameraPlaceholder(message) {
     if (placeholder) placeholder.style.display = 'flex';
 }
 
-async function initCamera() {
+async function initCamera(protocolOverride) {
     const video = document.getElementById('video-player');
     if (!video) return;
 
+    const requestedProtocol = protocolOverride || cameraPreferredProtocol;
+    if (requestedProtocol !== 2 && requestedProtocol !== 4) cameraPreferredProtocol = 4;
+    const protocolQuery = '?protocol=' + encodeURIComponent(requestedProtocol);
+
     destroyCameraPlayer();
+    video.muted = !cameraAudioEnabled;
+    updateAudioButton();
     setCameraStatus('checking', '正在检查萤石连接');
     showCameraPlaceholder('正在检查萤石摄像头连接');
 
     try {
-        const diagnostic = await apiGet('/camera/stream-check');
+        const diagnostic = await apiGet('/camera/stream-check' + protocolQuery);
         const status = diagnostic && diagnostic.data;
         if (!diagnostic || diagnostic.code !== 200 || !status || !status.ready) {
             const message = (status && status.message) || (diagnostic && diagnostic.msg) || '无法连接萤石摄像头';
@@ -469,7 +524,7 @@ async function initCamera() {
         }
 
         setCameraStatus('loading', '正在加载实时画面');
-        const res = await apiGet('/camera/play-url');
+        const res = await apiGet('/camera/play-url' + protocolQuery);
         if (!res || !res.data) {
             const message = (res && res.msg) || '未获取到萤石播放地址';
             setCameraStatus('error', message);
@@ -478,10 +533,11 @@ async function initCamera() {
         }
         destroyCameraPlayer();
         const isHls = /\.m3u8(?:$|\?)/i.test(res.data);
+        cameraPreferredProtocol = isHls ? 2 : 4;
         if (isHls) {
             if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = res.data;
-                video.play();
+                playCameraVideo(video);
             } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 __hlsPlayer = new Hls({
                     enableWorker: true,
@@ -519,14 +575,34 @@ async function initCamera() {
                 showCameraPlaceholder('当前浏览器不支持 FLV 播放');
                 return;
             }
-            __flvPlayer = flvjs.createPlayer({ type: 'flv', url: res.data });
+            __flvPlayer = flvjs.createPlayer({
+                type: 'flv',
+                url: res.data,
+                isLive: true,
+                cors: true,
+                lazyLoad: false,
+                enableStashBuffer: true,
+                // Keep startup buffering small enough for live control while
+                // retaining a little protection against Wi-Fi jitter.
+                stashInitialSize: 64 * 1024,
+                autoCleanupSourceBuffer: true,
+                autoCleanupMaxBackwardDuration: 30,
+                autoCleanupMinBackwardDuration: 15
+            });
+            __flvPlayer.on(flvjs.Events.ERROR, function() {
+                setCameraStatus('loading', 'FLV 流异常，正在切换备用 HLS');
+                showCameraPlaceholder('FLV 流异常，正在切换备用 HLS');
+                cameraPreferredProtocol = 2;
+                scheduleCameraRecovery(1200, 2);
+            });
             __flvPlayer.attachMediaElement(video);
             __flvPlayer.load();
-            __flvPlayer.play();
+            playCameraVideo(video);
         }
         video.onplaying = function() {
             patrolVideoReady = true;
             setCameraStatus('ready', '萤石实时画面已连接');
+            updateAudioButton();
             var placeholder = document.getElementById('video-placeholder');
             if (placeholder) placeholder.style.display = 'none';
         };
@@ -534,7 +610,7 @@ async function initCamera() {
             patrolVideoReady = false;
             setCameraStatus('error', '视频流播放失败，请检查摄像头编码和网络');
             showCameraPlaceholder('视频流播放失败，正在自动重连');
-            scheduleCameraRecovery(1500);
+            scheduleCameraRecovery(1500, cameraPreferredProtocol === 4 ? 2 : cameraPreferredProtocol);
         };
         video.onstalled = function() {
             if (patrolVideoReady) {

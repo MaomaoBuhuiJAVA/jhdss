@@ -100,8 +100,8 @@ ys7:
   # The C6c serial printed on the camera. These can be overridden in .env.local.bat.
   device-serial: ${YS7_DEVICE_SERIAL:BG9980884}
   channel-no: ${YS7_CHANNEL_NO:1}
-  # EZVIZ protocol 2 is HLS, compatible with Chrome through the bundled hls.js player.
-  protocol: ${YS7_LIVE_PROTOCOL:2}
+  # EZVIZ protocol 4 is FLV (lower latency); the browser falls back to HLS (2) when needed.
+  protocol: ${YS7_LIVE_PROTOCOL:4}
   stream-type: ${YS7_STREAM_TYPE:1}
   force-h264: ${YS7_FORCE_H264:true}
 

@@ -87,7 +87,7 @@ public class EzvizService {
         Map<String, Object> result = new LinkedHashMap<>();
         String serial = requireDeviceSerial(deviceSerial);
         int channel = channelNo == null ? 1 : channelNo;
-        int selectedProtocol = protocol == null ? 2 : protocol;
+        int selectedProtocol = protocol == null ? ysjProperties.getProtocol() : protocol;
 
         result.put("deviceSerial", serial);
         result.put("channelNo", channel);
@@ -401,7 +401,7 @@ public class EzvizService {
     }
 
     public String getPlayUrl(String deviceSerial) {
-        return getPlayUrl(deviceSerial, 1, 4);
+        return getPlayUrl(deviceSerial, 1, ysjProperties.getProtocol());
     }
 
     public String getPlayUrl(String deviceSerial, int protocol) {
@@ -412,7 +412,7 @@ public class EzvizService {
         String accessToken = getAccessToken();
         String serial = requireDeviceSerial(deviceSerial);
         int channel = channelNo == null ? 1 : channelNo;
-        int selectedProtocol = protocol == null ? 4 : protocol;
+        int selectedProtocol = protocol == null ? ysjProperties.getProtocol() : protocol;
 
         ensureH264(serial, channel);
 

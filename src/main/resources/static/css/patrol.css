@@ -39,6 +39,9 @@
 .ctrl-btn.encode:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .patrol-video-main .ctrl-btn.encode { position: absolute; top: 12px; left: 12px; z-index: 10; padding: 4px 10px; font-size: 12px; flex: none; border-radius: 6px; gap: 4px; }
 .patrol-video-main .ctrl-btn.encode i { font-size: 14px; }
+.audio-btn { position: absolute; right: 12px; top: 12px; z-index: 10; padding: 5px 10px; border: 1px solid rgba(0, 198, 240, 0.45); border-radius: 6px; background: rgba(5, 12, 22, 0.78); color: var(--text-secondary); font: 11px var(--font-mono); cursor: pointer; }
+.audio-btn:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0, 180, 220, 0.14); }
+.audio-btn.enabled { color: var(--accent-secondary); border-color: var(--accent-secondary); }
 .camera-connection-status { margin-left: auto; color: var(--text-dim); font-size: 11px; }
 .camera-connection-status.ready { color: var(--accent-secondary); }
 .camera-connection-status.error { color: #ff9aac; }
