@@ -38,6 +38,18 @@
                         <button class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止</button>
                         <button class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i>AI拍照识别</button>
                     </div>
+                    <div class="ptz-controls" aria-label="摄像头云台控制">
+                        <div class="ptz-heading"><span><i class="ri-focus-3-line"></i>摄像头云台</span>
+                            <label>速度<select id="ptz-speed" class="ptz-speed"><option value="0">慢</option><option value="1" selected>中</option><option value="2">快</option></select></label>
+                        </div>
+                        <div class="ptz-pad">
+                            <span></span><button type="button" class="ptz-btn" data-ptz-direction="0" aria-label="云台上移" title="上移"><i class="ri-arrow-up-line"></i></button><span></span>
+                            <button type="button" class="ptz-btn" data-ptz-direction="2" aria-label="云台左移" title="左移"><i class="ri-arrow-left-line"></i></button><button type="button" class="ptz-btn ptz-stop" data-ptz-stop aria-label="停止云台" title="停止"><i class="ri-stop-circle-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="3" aria-label="云台右移" title="右移"><i class="ri-arrow-right-line"></i></button>
+                            <span></span><button type="button" class="ptz-btn" data-ptz-direction="1" aria-label="云台下移" title="下移"><i class="ri-arrow-down-line"></i></button><span></span>
+                        </div>
+                        <div class="ptz-extra"><button type="button" class="ptz-btn" data-ptz-direction="8" aria-label="放大" title="放大"><i class="ri-zoom-in-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="9" aria-label="缩小" title="缩小"><i class="ri-zoom-out-line"></i></button></div>
+                        <span class="ptz-status" id="ptz-status" aria-live="polite">云台待命</span>
+                    </div>
                 </div>
                 <div class="card" style="height:180px; flex-shrink:0;">
                     <div class="card-header"><i class="ri-image-line"></i><span>最近拍摄记录</span></div>

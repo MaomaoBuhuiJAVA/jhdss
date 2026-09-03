@@ -103,6 +103,7 @@ ys7:
   # EZVIZ protocol 2 is HLS, compatible with Chrome through the bundled hls.js player.
   protocol: ${YS7_LIVE_PROTOCOL:2}
   stream-type: ${YS7_STREAM_TYPE:1}
+  force-h264: ${YS7_FORCE_H264:true}
 
 ollama:
   base-url: http://localhost:11434

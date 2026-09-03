@@ -100,6 +100,39 @@ public class CameraController {
         return Result.ok(result);
     }
 
+    @ApiOperation("启动摄像头云台移动")
+    @PostMapping("/ptz/start")
+    public Result<Void> startPtz(
+            @RequestParam(required = false) String deviceSerial,
+            @RequestParam(required = false) Integer channelNo,
+            @RequestBody Map<String, Integer> body) {
+        try {
+            ezvizService.startPtz(resolveDeviceSerial(deviceSerial),
+                    channelNo == null ? ysjProperties.getChannelNo() : channelNo,
+                    body == null ? null : body.get("direction"),
+                    body == null ? null : body.get("speed"));
+            return Result.ok();
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头云台启动失败：" + errorMessage(e));
+        }
+    }
+
+    @ApiOperation("停止摄像头云台移动")
+    @PostMapping("/ptz/stop")
+    public Result<Void> stopPtz(
+            @RequestParam(required = false) String deviceSerial,
+            @RequestParam(required = false) Integer channelNo,
+            @RequestBody Map<String, Integer> body) {
+        try {
+            ezvizService.stopPtz(resolveDeviceSerial(deviceSerial),
+                    channelNo == null ? ysjProperties.getChannelNo() : channelNo,
+                    body == null ? null : body.get("direction"));
+            return Result.ok();
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头云台停止失败：" + errorMessage(e));
+        }
+    }
+
     @ApiOperation("获取账号下所有摄像头设备列表")
     @GetMapping("/devices")
     public Result<JSONArray> getDevices() {

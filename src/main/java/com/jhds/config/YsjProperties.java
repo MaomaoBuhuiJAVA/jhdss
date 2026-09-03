@@ -21,5 +21,7 @@ public class YsjProperties {
     private Integer protocol = 2;
     /** 1 is the main stream and is also used when requesting H.264 conversion. */
     private Integer streamType = 1;
+    /** Ask EZVIZ to use H.264 before requesting a live URL. */
+    private boolean forceH264 = true;
     private int tokenTtl = 7;
 }

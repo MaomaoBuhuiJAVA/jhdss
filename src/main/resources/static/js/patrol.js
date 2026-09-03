@@ -1,6 +1,8 @@
 let currentDir = 'stop';
 let isAiCapturing = false;
 let patrolPageAlert = null;
+let activePtzDirection = null;
+let cameraRecoveryTimer = null;
 
 const PATROL_ALERT_FALLBACK = {
     title: '⚠️花朵数量严重超标！',
@@ -74,6 +76,58 @@ async function setPatrolDir(dir) {
         currentDir = 'stop';
         window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
     }
+}
+
+function setPtzStatus(message, error) {
+    const status = document.getElementById('ptz-status');
+    if (!status) return;
+    status.textContent = message;
+    status.className = 'ptz-status' + (error ? ' error' : '');
+}
+
+async function startPtz(direction, button) {
+    if (activePtzDirection !== null) return;
+    activePtzDirection = direction;
+    if (button) button.classList.add('active');
+    const speed = Number((document.getElementById('ptz-speed') || {}).value || 1);
+    setPtzStatus('云台移动中');
+    const res = await apiPost('/camera/ptz/start', { direction: direction, speed: speed });
+    if (!res || res.code !== 200) {
+        activePtzDirection = null;
+        if (button) button.classList.remove('active');
+        setPtzStatus((res && res.msg) || '云台控制失败', true);
+    }
+}
+
+async function stopPtz(direction, button) {
+    if (direction === undefined || direction === null) direction = activePtzDirection;
+    if (direction === undefined || direction === null) return;
+    const res = await apiPost('/camera/ptz/stop', { direction: direction });
+    activePtzDirection = null;
+    document.querySelectorAll('.ptz-btn.active').forEach(function(btn) { btn.classList.remove('active'); });
+    if (!res || res.code !== 200) setPtzStatus((res && res.msg) || '云台停止失败', true);
+    else setPtzStatus('云台待命');
+}
+
+function bindPtzControls() {
+    document.querySelectorAll('[data-ptz-direction]').forEach(function(button) {
+        const direction = Number(button.dataset.ptzDirection);
+        button.addEventListener('pointerdown', function(event) {
+            event.preventDefault();
+            if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+            startPtz(direction, button);
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(type) {
+            button.addEventListener(type, function(event) {
+                if (type === 'pointerleave' && !button.hasPointerCapture?.(event.pointerId)) return;
+                event.preventDefault();
+                stopPtz(direction, button);
+            });
+        });
+        button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+    });
+    const stop = document.querySelector('[data-ptz-stop]');
+    if (stop) stop.addEventListener('click', function() { stopPtz(activePtzDirection); });
 }
 
 async function addPatrolTask() {
@@ -338,6 +392,10 @@ let __hlsPlayer = null;
 let patrolVideoReady = false;
 
 function destroyCameraPlayer() {
+    if (cameraRecoveryTimer) {
+        clearTimeout(cameraRecoveryTimer);
+        cameraRecoveryTimer = null;
+    }
     if (__hlsPlayer) {
         try { __hlsPlayer.destroy(); } catch (e) { /* ignore */ }
         __hlsPlayer = null;
@@ -353,11 +411,22 @@ function destroyCameraPlayer() {
     }
     var video = document.getElementById('video-player');
     if (video) {
+        video.onplaying = null;
+        video.onerror = null;
+        video.onstalled = null;
         video.pause();
         video.removeAttribute('src');
         video.load();
     }
     patrolVideoReady = false;
+}
+
+function scheduleCameraRecovery(delay) {
+    if (cameraRecoveryTimer || document.hidden) return;
+    cameraRecoveryTimer = window.setTimeout(function() {
+        cameraRecoveryTimer = null;
+        initCamera();
+    }, delay || 1800);
 }
 
 function setCameraStatus(state, message) {
@@ -414,16 +483,27 @@ async function initCamera() {
                 video.src = res.data;
                 video.play();
             } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                __hlsPlayer = new Hls({ enableWorker: true, lowLatencyMode: true });
+                __hlsPlayer = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backBufferLength: 30,
+                    maxBufferLength: 12,
+                    liveSyncDurationCount: 3,
+                    manifestLoadingMaxRetry: 3,
+                    fragLoadingMaxRetry: 3
+                });
                 __hlsPlayer.on(Hls.Events.ERROR, function(event, data) {
                     if (!data.fatal) return;
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                         __hlsPlayer.startLoad();
+                        scheduleCameraRecovery(2500);
                     } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         __hlsPlayer.recoverMediaError();
+                        scheduleCameraRecovery(3500);
                     } else {
                         setCameraStatus('error', 'HLS 视频流播放失败');
-                        showCameraPlaceholder('HLS 视频流播放失败，请刷新页面重试');
+                        showCameraPlaceholder('HLS 视频流播放失败，正在自动重连');
+                        scheduleCameraRecovery(1500);
                     }
                 });
                 __hlsPlayer.loadSource(res.data);
@@ -453,7 +533,14 @@ async function initCamera() {
         video.onerror = function() {
             patrolVideoReady = false;
             setCameraStatus('error', '视频流播放失败，请检查摄像头编码和网络');
-            showCameraPlaceholder('视频流播放失败，请尝试设为 H.264 后刷新');
+            showCameraPlaceholder('视频流播放失败，正在自动重连');
+            scheduleCameraRecovery(1500);
+        };
+        video.onstalled = function() {
+            if (patrolVideoReady) {
+                setCameraStatus('loading', '视频流卡顿，正在恢复');
+                scheduleCameraRecovery(3000);
+            }
         };
     } catch (e) {
         console.error('摄像头初始化失败:', e);
@@ -497,6 +584,7 @@ window.addEventListener('DOMContentLoaded', function() {
     if (aiBtn) {
         aiBtn.addEventListener('click', triggerAiCapture);
     }
+    bindPtzControls();
     var warningOverlay = document.getElementById('patrolWarningOverlay');
     if (warningOverlay) {
         warningOverlay.addEventListener('click', function(event) {
@@ -519,5 +607,5 @@ document.addEventListener('keydown', function(event) {
 window.addEventListener('pageshow', function (event) {
     if (event.persisted) initCamera();
 });
-window.addEventListener('pagehide', destroyCameraPlayer);
-window.addEventListener('beforeunload', destroyCameraPlayer);
+window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); });
+window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); });

@@ -25,11 +25,14 @@ public class EzvizService {
     private static final String ENCODE_TYPE_URL = "https://open.ys7.com/api/v3/device/video/encodeType";
     private static final String DEVICE_LIST_URL = "https://open.ys7.com/api/lapp/device/list";
     private static final String CAMERA_LIST_URL = "https://open.ys7.com/api/lapp/device/camera/list";
+    private static final String PTZ_START_URL = "https://open.ys7.com/api/lapp/device/ptz/start";
+    private static final String PTZ_STOP_URL = "https://open.ys7.com/api/lapp/device/ptz/stop";
     private static final String REDIS_KEY = "jhds:ys7:access_token";
     /** 设备编码本地缓存前缀: jhds:ys7:encode:{deviceSerial}:{channelNo}:{streamType} */
     private static final String ENCODE_CACHE_PREFIX = "jhds:ys7:encode";
     /** Keeps recent settings available when this deployment has no Redis service. */
     private final Map<String, String> localEncodeCache = new ConcurrentHashMap<>();
+    private final Map<String, Long> h264EnsureCache = new ConcurrentHashMap<>();
 
     @Autowired
     private YsjProperties ysjProperties;
@@ -411,6 +414,8 @@ public class EzvizService {
         int channel = channelNo == null ? 1 : channelNo;
         int selectedProtocol = protocol == null ? 4 : protocol;
 
+        ensureH264(serial, channel);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
@@ -441,6 +446,81 @@ public class EzvizService {
         } catch (Exception e) {
             log.error("Error getting YS7 playUrl for device: {}", serial, e);
             throw new RuntimeException("获取萤石播放地址异常", e);
+        }
+    }
+
+    /**
+     * Keep the stream compatible with browsers before asking EZVIZ for a URL.
+     * A failed conversion is non-fatal because some camera firmwares do not
+     * expose the encoding switch even though their stream is playable.
+     */
+    private void ensureH264(String deviceSerial, int channelNo) {
+        if (!ysjProperties.isForceH264()) return;
+        String key = encodeCacheKey(deviceSerial, channelNo, ysjProperties.getStreamType());
+        Long lastAttempt = h264EnsureCache.get(key);
+        if (lastAttempt != null && System.currentTimeMillis() - lastAttempt < 300000L) return;
+        try {
+            changeEncodeType(deviceSerial, "H264", ysjProperties.getStreamType(), channelNo);
+            h264EnsureCache.put(key, System.currentTimeMillis());
+        } catch (RuntimeException e) {
+            log.warn("Unable to force EZVIZ H.264 for {} ch{}; continuing with current encoding: {}",
+                    deviceSerial, channelNo, userMessage(e));
+            h264EnsureCache.put(key, System.currentTimeMillis());
+        }
+    }
+
+    /** Start a camera PTZ movement through the EZVIZ cloud API. */
+    public void startPtz(String deviceSerial, Integer channelNo, Integer direction, Integer speed) {
+        callPtz(PTZ_START_URL, deviceSerial, channelNo, direction, speed, true);
+    }
+
+    /** Stop the current camera PTZ movement through the EZVIZ cloud API. */
+    public void stopPtz(String deviceSerial, Integer channelNo, Integer direction) {
+        callPtz(PTZ_STOP_URL, deviceSerial, channelNo, direction, null, false);
+    }
+
+    private void callPtz(String url, String deviceSerial, Integer channelNo, Integer direction,
+                         Integer speed, boolean includeSpeed) {
+        String accessToken = getAccessToken();
+        String serial = requireDeviceSerial(deviceSerial);
+        int channel = channelNo == null ? 1 : channelNo;
+        int dir = direction == null ? 0 : direction;
+        if (channel < 1 || dir < 0 || dir > 9) {
+            throw new IllegalArgumentException("云台通道或方向参数无效");
+        }
+        int selectedSpeed = speed == null ? 1 : speed;
+        if (selectedSpeed < 0 || selectedSpeed > 2) {
+            throw new IllegalArgumentException("云台速度必须为 0、1 或 2");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("accessToken", accessToken);
+        body.add("deviceSerial", serial);
+        body.add("channelNo", String.valueOf(channel));
+        body.add("direction", String.valueOf(dir));
+        if (includeSpeed) body.add("speed", String.valueOf(selectedSpeed));
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+            JSONObject json = JSONObject.parseObject(response.getBody());
+            Integer code = json.getInteger("code");
+            JSONObject meta = json.getJSONObject("meta");
+            if (code == null && meta != null) code = meta.getInteger("code");
+            if (code == null || code != 200) {
+                String message = json.getString("msg");
+                if (meta != null && meta.getString("message") != null) message = meta.getString("message");
+                throw new RuntimeException("萤石云云台控制失败: " + message);
+            }
+            log.info("EZVIZ PTZ {}: device={}, channel={}, direction={}, speed={}",
+                    url.endsWith("/start") ? "start" : "stop", serial, channel, dir, selectedSpeed);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("EZVIZ PTZ request failed: device={}, channel={}, direction={}", serial, channel, dir, e);
+            throw new RuntimeException("萤石云云台请求异常", e);
         }
     }
 }
