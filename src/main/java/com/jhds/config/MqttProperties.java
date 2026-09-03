@@ -20,6 +20,8 @@ public class MqttProperties {
     /** Keep the configured client id stable unless a broker requires unique ids per process. */
     private boolean appendInstanceId = false;
     private boolean transparentMode = true;
+    /** USR DTU may echo the transmitted frame before the downstream device responds. */
+    private boolean ignoreEcho = true;
     private int commandQos = 1;
     private int responseQos = 1;
 

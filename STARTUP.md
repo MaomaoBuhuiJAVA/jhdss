@@ -20,6 +20,7 @@ set "MQTT_USERNAME=mqttuser"
 set "MQTT_PASSWORD=有人云MQTT密码"
 set "MQTT_CLEAN_SESSION=false"
 set "MQTT_TRANSPARENT_MODE=true"
+set "MQTT_IGNORE_ECHO=true"
 rem 按电机控制器说明书填写四个实际串口十六进制帧
 set "MOTOR_DIRECTION_OPEN_HEX="
 set "MOTOR_DIRECTION_CLOSE_HEX="

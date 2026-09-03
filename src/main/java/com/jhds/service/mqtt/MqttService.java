@@ -298,11 +298,27 @@ public class MqttService implements DisposableBean {
             message.setQos(safeQos(mqttProperties.getCommandQos()));
             mqttClient.publish(commandTopic, message);
             log.debug("Hex command sent: {}", hexCommand);
-            return sequentialResponseQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            String normalizedCommand = normalizeHex(hexCommand);
+            while (true) {
+                long remainingNanos = deadline - System.nanoTime();
+                if (remainingNanos <= 0) return null;
+                String response = sequentialResponseQueue.poll(remainingNanos, TimeUnit.NANOSECONDS);
+                if (response == null) return null;
+                if (mqttProperties.isIgnoreEcho() && normalizedCommand.equals(normalizeHex(response))) {
+                    log.debug("Ignoring DTU command echo: {}", response);
+                    continue;
+                }
+                return response;
+            }
         } catch (Exception e) {
             log.error("sendHexSync failed: {}", hexCommand, e);
             return null;
         }
+    }
+
+    private String normalizeHex(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ").toUpperCase();
     }
 
     public void reconnect() {

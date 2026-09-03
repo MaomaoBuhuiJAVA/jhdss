@@ -69,6 +69,7 @@ device:
     clean-session: ${MQTT_CLEAN_SESSION:false}
     append-instance-id: ${MQTT_APPEND_INSTANCE_ID:false}
     transparent-mode: ${MQTT_TRANSPARENT_MODE:true}
+    ignore-echo: ${MQTT_IGNORE_ECHO:true}
     command-qos: ${MQTT_COMMAND_QOS:1}
     response-qos: ${MQTT_RESPONSE_QOS:1}
     enabled: ${MQTT_ENABLED:true}

@@ -53,6 +53,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.topic.prefix` | `/iot/jhds/prod` | 命令和响应主题前缀 |
 | `device.mqtt.clean-session` | `false` | 是否清除 MQTT 会话；有人云配置为“关”时保持 `false` |
 | `device.mqtt.transparent-mode` | `true` | 有人云“纯透传”模式；设备命令必须填写空格分隔的十六进制串口帧 |
+| `device.mqtt.ignore-echo` | `true` | 过滤有人云“指令回显”，避免把回显误判为设备应答 |
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
 | `MQTT_CLIENT_ID` | `jhdskouhong` | 后端 MQTT 客户端 ID；与其他客户端冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
