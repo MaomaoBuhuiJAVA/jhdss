@@ -16,6 +16,8 @@ set "YS7_CHANNEL_NO=1"
 set "YS7_FORCE_H264=true"
 set "YS7_LIVE_PROTOCOL=4"
 set "DASHSCOPE_API_KEY=阿里云DashScope密钥"
+set "SPRING_DATASOURCE_USERNAME=root"
+set "SPRING_DATASOURCE_PASSWORD=MySQL实际密码"
 set "MQTT_BROKER_URL=tcp://11046xnld7705.vicp.fun:1883"
 rem 后端 Client ID 必须与有人云 DTU 的 jhdskouhong 不同
 set "MQTT_CLIENT_ID=jhdss-web-control"
@@ -48,7 +50,7 @@ start-jhds.bat
    mysql -uroot -p < src\main\resources\sql\init.sql
    ```
 
-   默认连接为 `127.0.0.1:3306`、数据库 `jhds`、用户 `root`、密码 `a123456`。密码不同可在 `.env.local.bat` 中设置 `SPRING_DATASOURCE_PASSWORD`。
+   默认连接为 `127.0.0.1:3306`、数据库 `jhds`、用户 `root`、密码 `a123456`。账号或密码不同可在 `.env.local.bat` 中设置 `SPRING_DATASOURCE_USERNAME` 和 `SPRING_DATASOURCE_PASSWORD`。
 3. 启动 Redis，默认监听 `127.0.0.1:6379`。
 4. 如果本地没有物联网 MQTT Broker，可在 `.env.local.bat` 中关闭 MQTT：
 
