@@ -68,11 +68,13 @@ device:
     connection-timeout: ${MQTT_CONNECTION_TIMEOUT:10}
     keepalive-interval: ${MQTT_KEEPALIVE_SECONDS:60}
     clean-session: ${MQTT_CLEAN_SESSION:false}
-    append-instance-id: ${MQTT_APPEND_INSTANCE_ID:false}
+    append-instance-id: ${MQTT_APPEND_INSTANCE_ID:true}
     transparent-mode: ${MQTT_TRANSPARENT_MODE:true}
     ignore-echo: ${MQTT_IGNORE_ECHO:true}
     command-qos: ${MQTT_COMMAND_QOS:1}
     response-qos: ${MQTT_RESPONSE_QOS:1}
+    reconnect-interval-ms: ${MQTT_RECONNECT_INTERVAL_MS:10000}
+    reconnect-initial-delay-ms: ${MQTT_RECONNECT_INITIAL_DELAY_MS:10000}
     enabled: ${MQTT_ENABLED:true}
   commands:
     motor-direction-open: ${MOTOR_DIRECTION_OPEN_HEX:}

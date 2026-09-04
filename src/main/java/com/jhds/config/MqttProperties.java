@@ -17,8 +17,8 @@ public class MqttProperties {
     private boolean enabled = true;
     /** Match the DTU setting; can be overridden for brokers that require clean sessions. */
     private boolean cleanSession = false;
-    /** Keep the configured client id stable unless a broker requires unique ids per process. */
-    private boolean appendInstanceId = false;
+    /** Prevent two web instances from disconnecting each other at the broker. */
+    private boolean appendInstanceId = true;
     private boolean transparentMode = true;
     /** USR DTU may echo the transmitted frame before the downstream device responds. */
     private boolean ignoreEcho = true;

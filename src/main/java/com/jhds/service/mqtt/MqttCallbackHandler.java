@@ -3,13 +3,13 @@ package com.jhds.service.mqtt;
 import com.jhds.common.ModbusUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
-public class MqttCallbackHandler implements MqttCallback {
+public class MqttCallbackHandler implements MqttCallbackExtended {
 
     private final MqttService mqttService;
 
@@ -19,8 +19,12 @@ public class MqttCallbackHandler implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        log.error("MQTT connection lost: {}", cause.getMessage());
-        mqttService.reconnect();
+        mqttService.handleConnectionLost(cause);
+    }
+
+    @Override
+    public void connectComplete(boolean reconnect, String serverURI) {
+        mqttService.handleConnected(reconnect, serverURI);
     }
 
     @Override

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -53,6 +54,11 @@ public class MqttService implements DisposableBean {
     private String motorStateClose;
 
     private MqttClient mqttClient;
+    private volatile String effectiveClientId;
+    private volatile String lastDisconnectReason;
+    private volatile String lastConnectionError;
+    private volatile long lastConnectedAt;
+    private volatile long lastDisconnectedAt;
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingCommands = new ConcurrentHashMap<>();
 
     private final ReentrantLock sequentialLock = new ReentrantLock();
@@ -77,6 +83,7 @@ public class MqttService implements DisposableBean {
             String configuredClientId = mqttProperties.getClientId();
             String clientId = mqttProperties.isAppendInstanceId()
                     ? configuredClientId + "-" + System.currentTimeMillis() : configuredClientId;
+            effectiveClientId = clientId;
             mqttClient = new MqttClient(mqttProperties.getBrokerUrl(), clientId, new MemoryPersistence());
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName(mqttProperties.getUsername());
@@ -87,12 +94,33 @@ public class MqttService implements DisposableBean {
             options.setCleanSession(mqttProperties.isCleanSession());
             mqttClient.setCallback(new MqttCallbackHandler(this));
             mqttClient.connect(options);
-            String responseTopic = mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix();
-            mqttClient.subscribe(responseTopic, safeQos(mqttProperties.getResponseQos()));
-            log.info("MQTT connected, subscribed to: {}", responseTopic);
         } catch (Exception e) {
+            lastConnectionError = e.getMessage();
             log.error("MQTT init error", e);
         }
+    }
+
+    /** Called after the initial connection and after Paho automatic reconnect. */
+    public synchronized void handleConnected(boolean reconnect, String serverUri) {
+        try {
+            String responseTopic = mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix();
+            if (mqttClient != null && mqttClient.isConnected()) {
+                mqttClient.subscribe(responseTopic, safeQos(mqttProperties.getResponseQos()));
+                lastConnectedAt = System.currentTimeMillis();
+                lastConnectionError = null;
+                log.info("MQTT {}connected, clientId={}, subscribed to: {}",
+                        reconnect ? "re" : "", effectiveClientId, responseTopic);
+            }
+        } catch (Exception e) {
+            lastConnectionError = e.getMessage();
+            log.error("MQTT subscription failed after connection", e);
+        }
+    }
+
+    public void handleConnectionLost(Throwable cause) {
+        lastDisconnectedAt = System.currentTimeMillis();
+        lastDisconnectReason = cause == null ? "unknown" : cause.toString();
+        log.error("MQTT connection lost, clientId={}, reason={}", effectiveClientId, lastDisconnectReason);
     }
 
     public void handleResponse(String topic, String payload) {
@@ -267,14 +295,34 @@ public class MqttService implements DisposableBean {
         status.put("connected", isConnected());
         status.put("brokerUrl", mqttProperties.getBrokerUrl());
         status.put("clientId", mqttProperties.getClientId());
+        status.put("effectiveClientId", effectiveClientId);
         status.put("commandTopic", mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getCommandSuffix());
         status.put("responseTopic", mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix());
         status.put("transparentMode", mqttProperties.isTransparentMode());
+        status.put("lastDisconnectReason", lastDisconnectReason);
+        status.put("lastConnectionError", lastConnectionError);
+        status.put("lastConnectedAt", lastConnectedAt == 0 ? null : new Date(lastConnectedAt));
+        status.put("lastDisconnectedAt", lastDisconnectedAt == 0 ? null : new Date(lastDisconnectedAt));
         return status;
     }
 
     public boolean isConnected() {
         return mqttClient != null && mqttClient.isConnected();
+    }
+
+    /**
+     * Paho automatic reconnect starts only after a connection has succeeded.
+     * Retry here as well so a temporary outage during application startup does
+     * not leave the service permanently offline.
+     */
+    @Scheduled(
+            fixedDelayString = "${device.mqtt.reconnect-interval-ms:10000}",
+            initialDelayString = "${device.mqtt.reconnect-initial-delay-ms:10000}")
+    public void ensureConnected() {
+        if (!mqttProperties.isEnabled() || isConnected()) {
+            return;
+        }
+        reconnect();
     }
 
     public void lockSequential() {
@@ -387,7 +435,12 @@ public class MqttService implements DisposableBean {
 
     public void reconnect() {
         try {
-            if (mqttClient != null && !mqttClient.isConnected()) {
+            if (mqttClient == null) {
+                // The first client construction can fail before a broker is
+                // reachable. Re-run initialization so the scheduled retry can
+                // recover without restarting the whole web application.
+                init();
+            } else if (!mqttClient.isConnected()) {
                 mqttClient.reconnect();
                 log.info("MQTT reconnected");
             }

@@ -55,7 +55,9 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.transparent-mode` | `true` | 有人云“纯透传”模式；设备命令必须填写空格分隔的十六进制串口帧 |
 | `device.mqtt.ignore-echo` | `true` | 过滤查询等非写入帧的有人云回显；Modbus 写入帧（05/06/15/16）的同帧回显会作为确认 |
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
-| `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端 ID；必须与 DTU 的 `jhdskouhong` 不同；与其他后端实例冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
+| `MQTT_RECONNECT_INTERVAL_MS` | `10000` | 连接失败或断开后的后台重试间隔（毫秒）；Paho 自动重连仍会处理已建立连接的短暂断线 |
+| `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端基础 ID；必须与 DTU 的 `jhdskouhong` 不同；程序默认追加实例 ID，避免多台电脑互相踢下线 |
+| `MQTT_APPEND_INSTANCE_ID` | `true` | 为每个后端实例追加唯一后缀；两台电脑同时运行时必须开启 |
 | `ys7.force-h264` | `true` | 获取播放地址前请求萤石云将主/子码流切换为 H.264 |
 | `ys7.protocol` | `4` | 默认使用 FLV 低延迟播放；FLV 不可用时前端回退 HLS（2） |
 | `SPRING_DATASOURCE_USERNAME` | `root` | MySQL 登录用户名 |
