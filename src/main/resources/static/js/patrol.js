@@ -7,6 +7,7 @@ let activePtzStartedAt = 0;
 let cameraAudioEnabled = false;
 let cameraRecoveryTimer = null;
 let cameraPreferredProtocol = 4;
+let cameraLatencyTimer = null;
 
 const PATROL_ALERT_FALLBACK = {
     title: '⚠️花朵数量严重超标！',
@@ -425,6 +426,10 @@ function destroyCameraPlayer() {
         clearTimeout(cameraRecoveryTimer);
         cameraRecoveryTimer = null;
     }
+    if (cameraLatencyTimer) {
+        clearInterval(cameraLatencyTimer);
+        cameraLatencyTimer = null;
+    }
     if (__hlsPlayer) {
         try { __hlsPlayer.destroy(); } catch (e) { /* ignore */ }
         __hlsPlayer = null;
@@ -448,6 +453,21 @@ function destroyCameraPlayer() {
         video.load();
     }
     patrolVideoReady = false;
+}
+
+function startLiveLatencyMonitor(video) {
+    if (cameraLatencyTimer) clearInterval(cameraLatencyTimer);
+    // A live stream should not silently build a multi-second buffer after a
+    // brief network stall. Catch up only when the buffered tail is clearly
+    // stale, avoiding constant seeks during normal playback.
+    cameraLatencyTimer = window.setInterval(function() {
+        if (!video || video.paused || video.seeking || video.readyState < 3 || !video.buffered.length) return;
+        const end = video.buffered.end(video.buffered.length - 1);
+        const lag = end - video.currentTime;
+        if (lag > 2.5) {
+            video.currentTime = Math.max(0, end - 0.35);
+        }
+    }, 1000);
 }
 
 function scheduleCameraRecovery(delay, protocol) {
@@ -530,15 +550,6 @@ async function initCamera(protocolOverride) {
     showCameraPlaceholder('正在检查萤石摄像头连接');
 
     try {
-        const diagnostic = await apiGet('/camera/stream-check' + protocolQuery);
-        const status = diagnostic && diagnostic.data;
-        if (!diagnostic || diagnostic.code !== 200 || !status || !status.ready) {
-            const message = (status && status.message) || (diagnostic && diagnostic.msg) || '无法连接萤石摄像头';
-            setCameraStatus('error', message);
-            showCameraPlaceholder(message);
-            return;
-        }
-
         setCameraStatus('loading', '正在加载实时画面');
         const res = await apiGet('/camera/play-url' + protocolQuery);
         if (!res || !res.data) {
@@ -558,9 +569,11 @@ async function initCamera(protocolOverride) {
                 __hlsPlayer = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
-                    backBufferLength: 30,
-                    maxBufferLength: 12,
-                    liveSyncDurationCount: 3,
+                    backBufferLength: 10,
+                    maxBufferLength: 4,
+                    maxMaxBufferLength: 6,
+                    liveSyncDurationCount: 1,
+                    liveMaxLatencyDurationCount: 3,
                     manifestLoadingMaxRetry: 3,
                     fragLoadingMaxRetry: 3
                 });
@@ -597,13 +610,12 @@ async function initCamera(protocolOverride) {
                 isLive: true,
                 cors: true,
                 lazyLoad: false,
-                enableStashBuffer: true,
-                // Keep startup buffering small enough for live control while
-                // retaining a little protection against Wi-Fi jitter.
-                stashInitialSize: 64 * 1024,
+                // Disable the stash for live control. The stash is useful for
+                // VOD, but it adds visible latency to a camera stream.
+                enableStashBuffer: false,
                 autoCleanupSourceBuffer: true,
-                autoCleanupMaxBackwardDuration: 30,
-                autoCleanupMinBackwardDuration: 15
+                autoCleanupMaxBackwardDuration: 10,
+                autoCleanupMinBackwardDuration: 5
             });
             __flvPlayer.on(flvjs.Events.ERROR, function() {
                 setCameraStatus('loading', 'FLV 流异常，正在切换备用 HLS');
@@ -617,6 +629,7 @@ async function initCamera(protocolOverride) {
         }
         video.onplaying = function() {
             patrolVideoReady = true;
+            startLiveLatencyMonitor(video);
             setCameraStatus('ready', '萤石实时画面已连接');
             updateAudioButton();
             var placeholder = document.getElementById('video-placeholder');

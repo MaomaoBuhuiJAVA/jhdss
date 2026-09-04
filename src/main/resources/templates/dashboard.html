@@ -105,8 +105,13 @@
     <script>
         let dashboardFlvPlayer = null;
         let dashboardVideoReady = false;
+        let dashboardLatencyTimer = null;
 
         function destroyDashboardPlayer() {
+            if (dashboardLatencyTimer) {
+                clearInterval(dashboardLatencyTimer);
+                dashboardLatencyTimer = null;
+            }
             if (dashboardFlvPlayer) {
                 try {
                     dashboardFlvPlayer.pause();
@@ -117,6 +122,15 @@
                 dashboardFlvPlayer = null;
             }
             dashboardVideoReady = false;
+        }
+
+        function startDashboardLatencyMonitor(video) {
+            if (dashboardLatencyTimer) clearInterval(dashboardLatencyTimer);
+            dashboardLatencyTimer = window.setInterval(function () {
+                if (!video || video.paused || video.seeking || video.readyState < 3 || !video.buffered.length) return;
+                const end = video.buffered.end(video.buffered.length - 1);
+                if (end - video.currentTime > 2.5) video.currentTime = Math.max(0, end - 0.35);
+            }, 1000);
         }
 
         function initDashboardVideo() {
@@ -141,12 +155,23 @@
                         return;
                     }
                     destroyDashboardPlayer();
-                    dashboardFlvPlayer = flvjs.createPlayer({ type: 'flv', url: res.data });
+                    dashboardFlvPlayer = flvjs.createPlayer({
+                        type: 'flv',
+                        url: res.data,
+                        isLive: true,
+                        cors: true,
+                        lazyLoad: false,
+                        enableStashBuffer: false,
+                        autoCleanupSourceBuffer: true,
+                        autoCleanupMaxBackwardDuration: 10,
+                        autoCleanupMinBackwardDuration: 5
+                    });
                     dashboardFlvPlayer.attachMediaElement(video);
                     dashboardFlvPlayer.load();
                     dashboardFlvPlayer.play();
                     video.addEventListener('playing', function () {
                         dashboardVideoReady = true;
+                        startDashboardLatencyMonitor(video);
                         if (placeholder) placeholder.style.display = 'none';
                     });
                     video.addEventListener('error', function () {
