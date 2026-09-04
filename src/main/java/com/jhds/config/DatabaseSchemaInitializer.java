@@ -47,6 +47,7 @@ public class DatabaseSchemaInitializer {
         seedPatrolTasks();
         seedNutrientData();
         seedMotorDevices();
+        seedDeviceCommands();
         seedInsectData();
         createAiContentTables();
         seedAiKnowledge();
@@ -461,6 +462,27 @@ public class DatabaseSchemaInitializer {
         if (!tableExists("equipment")) return;
         seedEquipmentIfMissing("轨道电机方向", "MOTOR_DIRECTION", 0);
         seedEquipmentIfMissing("轨道电机运行", "MOTOR_STATE", 0);
+    }
+
+    /** Applies the verified 金华 controller frames without overwriting site-specific commands. */
+    private void seedDeviceCommands() {
+        if (!tableExists("equipment")) return;
+        updateCommandIfEmpty("PUMP_CO2", "01 06 00 02 00 01 E9 CA", "01 06 00 02 00 00 28 0A");
+        updateCommandIfEmpty("PUMP_CIRCULATION", "01 06 00 01 00 01 19 CA", "01 06 00 01 00 00 D8 0A");
+        // PatrolService maps left to open_code and right to close_code.
+        updateCommandIfEmpty("MOTOR_DIRECTION", "03 05 00 01 00 FF DD A8", "03 05 00 01 FF 00 DC 18");
+        updateCloseCommandIfEmpty("MOTOR_STATE", "03 05 00 01 00 00 9D E8");
+    }
+
+    private void updateCommandIfEmpty(String alias, String openCode, String closeCode) {
+        jdbcTemplate.update("UPDATE equipment SET open_code = COALESCE(NULLIF(TRIM(open_code), ''), ?), "
+                        + "close_code = COALESCE(NULLIF(TRIM(close_code), ''), ?) WHERE alias = ?",
+                openCode, closeCode, alias);
+    }
+
+    private void updateCloseCommandIfEmpty(String alias, String closeCode) {
+        jdbcTemplate.update("UPDATE equipment SET close_code = ? WHERE alias = ? AND COALESCE(TRIM(close_code), '') = ''",
+                closeCode, alias);
     }
 
     private void seedEquipmentIfMissing(String name, String alias, int type) {
