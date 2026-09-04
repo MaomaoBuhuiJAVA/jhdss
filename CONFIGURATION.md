@@ -53,7 +53,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.topic.prefix` | `/iot/jhds/prod` | 命令和响应主题前缀 |
 | `device.mqtt.clean-session` | `false` | 是否清除 MQTT 会话；有人云配置为“关”时保持 `false` |
 | `device.mqtt.transparent-mode` | `true` | 有人云“纯透传”模式；设备命令必须填写空格分隔的十六进制串口帧 |
-| `device.mqtt.ignore-echo` | `true` | 过滤有人云“指令回显”，避免把回显误判为设备应答 |
+| `device.mqtt.ignore-echo` | `true` | 过滤查询等非写入帧的有人云回显；Modbus 写入帧（05/06/15/16）的同帧回显会作为确认 |
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
 | `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端 ID；必须与 DTU 的 `jhdskouhong` 不同；与其他后端实例冲突时打开 `MQTT_APPEND_INSTANCE_ID` |
 | `ys7.force-h264` | `true` | 获取播放地址前请求萤石云将主/子码流切换为 H.264 |
@@ -61,7 +61,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `SPRING_DATASOURCE_USERNAME` | `root` | MySQL 登录用户名 |
 | `SPRING_DATASOURCE_PASSWORD` | `a123456` | MySQL 登录密码；必须与目标电脑实际账号密码一致 |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
-| `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧 |
+| `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧；若配置了启动帧，左右移动会在方向帧后自动发送 |
 
 有人云 DTU 配置为“纯透传”时，网页只负责发布原始串口字节，不能根据设备编号自动推断电机协议。请将电机控制器说明书中的实际十六进制帧（例如 `01 05 00 00 FF 00 8C 3A`）填入上述环境变量，或直接写入 `equipment.open_code` / `equipment.close_code`。没有这些帧时，网页会显示 MQTT 已连接，但不会发送危险的猜测指令。
 | `ollama.base-url` | `http://localhost:11434` | 本地 Ollama 地址 |

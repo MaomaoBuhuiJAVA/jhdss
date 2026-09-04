@@ -3,6 +3,7 @@ let isAiCapturing = false;
 let patrolPageAlert = null;
 let activePtzDirection = null;
 let activePtzStartPromise = null;
+let activePtzStartedAt = 0;
 let cameraAudioEnabled = false;
 let cameraRecoveryTimer = null;
 let cameraPreferredProtocol = 4;
@@ -91,6 +92,7 @@ function setPtzStatus(message, error) {
 async function startPtz(direction, button) {
     if (activePtzDirection !== null) return;
     activePtzDirection = direction;
+    activePtzStartedAt = 0;
     if (button) button.classList.add('active');
     const speed = Number((document.getElementById('ptz-speed') || {}).value || 1);
     setPtzStatus('云台移动中');
@@ -98,12 +100,18 @@ async function startPtz(direction, button) {
     const res = await activePtzStartPromise;
     if (!res || res.code !== 200) {
         activePtzDirection = null;
+        activePtzStartedAt = 0;
         if (button) button.classList.remove('active');
         setPtzStatus((res && res.msg) || '云台控制失败', true);
+    } else {
+        // The cloud API acknowledges the start asynchronously. Record the
+        // actual start time so a quick click cannot issue stop immediately
+        // after start and produce an imperceptible movement.
+        activePtzStartedAt = performance.now();
     }
 }
 
-async function stopPtz(direction, button) {
+async function stopPtz(direction, button, keepMinimumMotion) {
     const currentDirection = activePtzDirection;
     if (direction === undefined || direction === null) direction = currentDirection;
     if (direction === undefined || direction === null) return;
@@ -118,6 +126,14 @@ async function stopPtz(direction, button) {
     activePtzStartPromise = null;
     document.querySelectorAll('.ptz-btn.active').forEach(function(btn) { btn.classList.remove('active'); });
     if (startPromise) await startPromise;
+    if (keepMinimumMotion && activePtzStartedAt) {
+        const elapsed = performance.now() - activePtzStartedAt;
+        const minimumMotionMs = 500;
+        if (elapsed < minimumMotionMs) {
+            await new Promise(function(resolve) { setTimeout(resolve, minimumMotionMs - elapsed); });
+        }
+    }
+    activePtzStartedAt = 0;
     const res = await apiPost('/camera/ptz/stop', { direction: direction });
     if (!res || res.code !== 200) setPtzStatus((res && res.msg) || '云台停止失败', true);
     else setPtzStatus('云台待命');
@@ -134,13 +150,13 @@ function bindPtzControls() {
         ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) {
             button.addEventListener(type, function(event) {
                 event.preventDefault();
-                stopPtz(direction, button);
+                stopPtz(direction, button, true);
             });
         });
         button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
     });
     const stop = document.querySelector('[data-ptz-stop]');
-    if (stop) stop.addEventListener('click', function() { stopPtz(activePtzDirection); });
+    if (stop) stop.addEventListener('click', function() { stopPtz(activePtzDirection, stop, false); });
 }
 
 async function addPatrolTask() {

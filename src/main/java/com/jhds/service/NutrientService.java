@@ -85,6 +85,11 @@ public class NutrientService {
                 equipment.setStatus(status);
                 equipmentMapper.updateById(equipment);
                 response = "LOCAL_SAVED";
+            } else {
+                // Do not persist a hardware state when the DTU/controller did
+                // not acknowledge the command. The UI can then roll back the
+                // switch and show the real communication failure.
+                throw new IllegalStateException("设备未响应，数据库状态未修改");
             }
         }
         if (response != null) {

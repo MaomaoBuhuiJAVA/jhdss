@@ -206,7 +206,13 @@ public class MqttService implements DisposableBean {
     private String sendHexCommand(String alias, Equipment equipment, String commandCode, String value, boolean automatic) {
         try {
             lockSequential();
-            String response = sendHexSync(commandCode, Constants.COMMAND_TIMEOUT * 1000L);
+            // A transparent MQTT write should be acknowledged immediately by
+            // the DTU echo or the controller. Cap the wait so an unrelated
+            // serial frame cannot make a button appear hung for 30 seconds.
+            long timeoutMs = isModbusWriteCommand(commandCode)
+                    ? Math.min(Constants.COMMAND_TIMEOUT * 1000L, 5000L)
+                    : Constants.COMMAND_TIMEOUT * 1000L;
+            String response = sendHexSync(commandCode, timeoutMs);
             boolean success = response != null;
             controlLogService.log(alias, equipment.getName(), value,
                     automatic ? 1 : 0, commandCode, response, success ? 1 : 0);
@@ -300,13 +306,27 @@ public class MqttService implements DisposableBean {
             log.debug("Hex command sent: {}", hexCommand);
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
             String normalizedCommand = normalizeHex(hexCommand);
+            // Modbus write responses (functions 05/06) are normally identical
+            // to the transmitted frame. In transparent mode the DTU may label
+            // that frame as an echo, but it is also the only acknowledgement
+            // available when the downstream controller does not publish a
+            // second response. Accept it for writes so controls do not wait
+            // for the full timeout or report a false failure.
+            boolean writeCommand = isModbusWriteCommand(hexCommand);
             while (true) {
                 long remainingNanos = deadline - System.nanoTime();
                 if (remainingNanos <= 0) return null;
                 String response = sequentialResponseQueue.poll(remainingNanos, TimeUnit.NANOSECONDS);
                 if (response == null) return null;
-                if (mqttProperties.isIgnoreEcho() && normalizedCommand.equals(normalizeHex(response))) {
+                if (mqttProperties.isIgnoreEcho() && normalizedCommand.equals(normalizeHex(response)) && !writeCommand) {
                     log.debug("Ignoring DTU command echo: {}", response);
+                    continue;
+                }
+                if (writeCommand && !isMatchingModbusWriteResponse(hexCommand, response)) {
+                    // Sensor polling and a motor command share the transparent
+                    // response topic. Do not consume an unrelated frame and
+                    // report a false motor success.
+                    log.debug("Ignoring unrelated response for {}: {}", hexCommand, response);
                     continue;
                 }
                 return response;
@@ -319,6 +339,50 @@ public class MqttService implements DisposableBean {
 
     private String normalizeHex(String value) {
         return value == null ? "" : value.trim().replaceAll("\\s+", " ").toUpperCase();
+    }
+
+    private boolean isModbusWriteCommand(String hexCommand) {
+        try {
+            byte[] frame = ModbusUtil.hexToBytes(hexCommand);
+            if (frame.length < 2) return false;
+            int function = frame[1] & 0xFF;
+            return function == 5 || function == 6 || function == 15 || function == 16;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * A Modbus write acknowledgement must come from the same slave and use
+     * the same function code/address. Most controllers echo the full frame,
+     * while some return a valid status value in the data bytes. An exception
+     * response uses function|0x80 and is not treated as success.
+     */
+    private boolean isMatchingModbusWriteResponse(String hexCommand, String response) {
+        try {
+            byte[] request = ModbusUtil.hexToBytes(hexCommand);
+            byte[] reply = ModbusUtil.hexToBytes(response);
+            if (request.length < 2 || reply.length < 2) return false;
+            if ((request[0] & 0xFF) != (reply[0] & 0xFF)) return false;
+            int requestFunction = request[1] & 0xFF;
+            int replyFunction = reply[1] & 0xFF;
+            if (replyFunction == (requestFunction | 0x80)) {
+                log.warn("Modbus write exception for {}: {}", hexCommand, response);
+                return false;
+            }
+            if (replyFunction != requestFunction) return false;
+            // Write responses retain the slave, function and target address.
+            // Validate the complete returned frame CRC, but allow the device
+            // specific status/value bytes to differ from the request.
+            int prefixLength = requestFunction == 15 || requestFunction == 16 ? 6 : 4;
+            if (request.length < prefixLength || reply.length < prefixLength + 2) return false;
+            for (int i = 0; i < prefixLength; i++) {
+                if (request[i] != reply[i]) return false;
+            }
+            return ModbusUtil.verifyCRC(reply);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     public void reconnect() {

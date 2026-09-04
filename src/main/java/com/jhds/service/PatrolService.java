@@ -165,7 +165,17 @@ public class PatrolService {
                 log.warn("Unknown patrol direction: {}", dir);
                 return null;
         }
-        return mqttService.sendCommand(alias, value, false);
+        String response = mqttService.sendCommand(alias, value, false);
+        if (response == null || !"MOTOR_DIRECTION".equals(alias)) {
+            return response;
+        }
+
+        // Some controller revisions require a separate run coil after the
+        // direction coil is selected. Only send it when MOTOR_STATE.open_code
+        // (or MOTOR_STATE_OPEN_HEX) is actually configured; the JinHua sheet
+        // uses a single direction frame, so an absent run frame remains valid.
+        String runResponse = mqttService.sendCommand("MOTOR_STATE", "open", false);
+        return runResponse == null ? response : runResponse;
     }
 
     public void addTask(PatrolTask task) {
