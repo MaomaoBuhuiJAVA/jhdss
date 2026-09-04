@@ -448,6 +448,9 @@ public class EzvizService {
         body.add("deviceSerial", serial);
         body.add("channelNo", String.valueOf(channel));
         body.add("protocol", String.valueOf(selectedProtocol));
+        // Request the configured stream explicitly. Sub-stream (type 2) is
+        // less likely to queue on a constrained uplink for live viewing.
+        body.add("type", String.valueOf(ysjProperties.getStreamType()));
         if (isUsableValue(ysjProperties.getVerifyCode())) {
             body.add("verifyCode", ysjProperties.getVerifyCode().trim());
         }

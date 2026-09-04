@@ -19,8 +19,8 @@ public class YsjProperties {
     private Integer channelNo = 1;
     /** 2 is EZVIZ HLS, which is broadly supported by the bundled hls.js player. */
     private Integer protocol = 2;
-    /** 1 is the main stream and is also used when requesting H.264 conversion. */
-    private Integer streamType = 1;
+    /** 2 is the sub-stream and is preferred for lower-latency browser viewing. */
+    private Integer streamType = 2;
     /** Ask EZVIZ to use H.264 before requesting a live URL. */
     private boolean forceH264 = true;
     private int tokenTtl = 7;

@@ -104,7 +104,8 @@ ys7:
   channel-no: ${YS7_CHANNEL_NO:1}
   # EZVIZ protocol 4 is FLV (lower latency); the browser falls back to HLS (2) when needed.
   protocol: ${YS7_LIVE_PROTOCOL:4}
-  stream-type: ${YS7_STREAM_TYPE:1}
+  # 2=子码流（低延迟）；设置 YS7_STREAM_TYPE=1 可恢复主码流画质。
+  stream-type: ${YS7_STREAM_TYPE:2}
   force-h264: ${YS7_FORCE_H264:true}
 
 ollama:
