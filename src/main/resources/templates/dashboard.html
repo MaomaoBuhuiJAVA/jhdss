@@ -106,8 +106,20 @@
         let dashboardFlvPlayer = null;
         let dashboardVideoReady = false;
         let dashboardLatencyTimer = null;
+        let dashboardWatchdogTimer = null;
+        let dashboardRecoveryTimer = null;
+        let dashboardLastProgressAt = 0;
+        let dashboardInitStartedAt = 0;
 
         function destroyDashboardPlayer() {
+            if (dashboardRecoveryTimer) {
+                clearTimeout(dashboardRecoveryTimer);
+                dashboardRecoveryTimer = null;
+            }
+            if (dashboardWatchdogTimer) {
+                clearInterval(dashboardWatchdogTimer);
+                dashboardWatchdogTimer = null;
+            }
             if (dashboardLatencyTimer) {
                 clearInterval(dashboardLatencyTimer);
                 dashboardLatencyTimer = null;
@@ -121,7 +133,37 @@
                 } catch (e) { /* ignore */ }
                 dashboardFlvPlayer = null;
             }
+            const video = document.getElementById('dashboard-video-player');
+            if (video) {
+                video.onplaying = null;
+                video.onerror = null;
+                video.ontimeupdate = null;
+                video.onstalled = null;
+                video.onwaiting = null;
+            }
             dashboardVideoReady = false;
+        }
+
+        function scheduleDashboardRecovery(delay) {
+            if (dashboardRecoveryTimer || document.hidden) return;
+            dashboardRecoveryTimer = window.setTimeout(function () {
+                dashboardRecoveryTimer = null;
+                initDashboardVideo();
+            }, delay || 1000);
+        }
+
+        function startDashboardWatchdog(video) {
+            if (dashboardWatchdogTimer) clearInterval(dashboardWatchdogTimer);
+            dashboardInitStartedAt = Date.now();
+            dashboardLastProgressAt = dashboardInitStartedAt;
+            dashboardWatchdogTimer = window.setInterval(function () {
+                if (document.hidden || dashboardRecoveryTimer) return;
+                const now = Date.now();
+                if ((!dashboardVideoReady && now - dashboardInitStartedAt > 12000) ||
+                    (dashboardVideoReady && now - dashboardLastProgressAt > 6000)) {
+                    scheduleDashboardRecovery(300);
+                }
+            }, 2000);
         }
 
         function startDashboardLatencyMonitor(video) {
@@ -139,6 +181,7 @@
             if (!video) return;
 
             destroyDashboardPlayer();
+            startDashboardWatchdog(video);
 
             apiGet('/camera/play-url?deviceSerial=BG9980884').then(res => {
                 if (!res || !res.data) {
@@ -155,6 +198,7 @@
                         return;
                     }
                     destroyDashboardPlayer();
+                    startDashboardWatchdog(video);
                     dashboardFlvPlayer = flvjs.createPlayer({
                         type: 'flv',
                         url: res.data,
@@ -169,15 +213,20 @@
                     dashboardFlvPlayer.attachMediaElement(video);
                     dashboardFlvPlayer.load();
                     dashboardFlvPlayer.play();
-                    video.addEventListener('playing', function () {
+                    video.onplaying = function () {
                         dashboardVideoReady = true;
+                        dashboardLastProgressAt = Date.now();
                         startDashboardLatencyMonitor(video);
                         if (placeholder) placeholder.style.display = 'none';
-                    });
-                    video.addEventListener('error', function () {
+                    };
+                    video.onerror = function () {
                         dashboardVideoReady = false;
                         if (placeholder) placeholder.style.display = 'flex';
-                    });
+                        scheduleDashboardRecovery(800);
+                    };
+                    video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); };
+                    video.onstalled = function () { scheduleDashboardRecovery(800); };
+                    video.onwaiting = function () { scheduleDashboardRecovery(1200); };
                 } catch (e) {
                     console.error('视频初始化失败:', e);
                     if (placeholder) placeholder.style.display = 'flex';

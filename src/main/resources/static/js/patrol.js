@@ -8,6 +8,9 @@ let cameraAudioEnabled = false;
 let cameraRecoveryTimer = null;
 let cameraPreferredProtocol = 4;
 let cameraLatencyTimer = null;
+let cameraWatchdogTimer = null;
+let cameraLastProgressAt = 0;
+let cameraInitStartedAt = 0;
 
 const PATROL_ALERT_FALLBACK = {
     title: '⚠️花朵数量严重超标！',
@@ -430,6 +433,10 @@ function destroyCameraPlayer() {
         clearInterval(cameraLatencyTimer);
         cameraLatencyTimer = null;
     }
+    if (cameraWatchdogTimer) {
+        clearInterval(cameraWatchdogTimer);
+        cameraWatchdogTimer = null;
+    }
     if (__hlsPlayer) {
         try { __hlsPlayer.destroy(); } catch (e) { /* ignore */ }
         __hlsPlayer = null;
@@ -448,11 +455,30 @@ function destroyCameraPlayer() {
         video.onplaying = null;
         video.onerror = null;
         video.onstalled = null;
+        video.onwaiting = null;
+        video.ontimeupdate = null;
         video.pause();
         video.removeAttribute('src');
         video.load();
     }
     patrolVideoReady = false;
+}
+
+function startCameraWatchdog(video) {
+    if (cameraWatchdogTimer) clearInterval(cameraWatchdogTimer);
+    cameraInitStartedAt = Date.now();
+    cameraLastProgressAt = cameraInitStartedAt;
+    cameraWatchdogTimer = window.setInterval(function() {
+        if (document.hidden || cameraRecoveryTimer) return;
+        const now = Date.now();
+        const loadingTooLong = !patrolVideoReady && now - cameraInitStartedAt > 12000;
+        const playbackStalled = patrolVideoReady && now - cameraLastProgressAt > 6000;
+        if (loadingTooLong || playbackStalled) {
+            setCameraStatus('loading', '视频流无响应，正在自动恢复');
+            showCameraPlaceholder('视频流无响应，正在自动重连');
+            scheduleCameraRecovery(300, cameraPreferredProtocol);
+        }
+    }, 2000);
 }
 
 function startLiveLatencyMonitor(video) {
@@ -544,6 +570,7 @@ async function initCamera(protocolOverride) {
     const protocolQuery = '?protocol=' + encodeURIComponent(requestedProtocol);
 
     destroyCameraPlayer();
+    startCameraWatchdog(video);
     video.muted = !cameraAudioEnabled;
     updateAudioButton();
     setCameraStatus('checking', '正在检查萤石连接');
@@ -559,6 +586,7 @@ async function initCamera(protocolOverride) {
             return;
         }
         destroyCameraPlayer();
+        startCameraWatchdog(video);
         const isHls = /\.m3u8(?:$|\?)/i.test(res.data);
         cameraPreferredProtocol = isHls ? 2 : 4;
         if (isHls) {
@@ -629,6 +657,7 @@ async function initCamera(protocolOverride) {
         }
         video.onplaying = function() {
             patrolVideoReady = true;
+            cameraLastProgressAt = Date.now();
             startLiveLatencyMonitor(video);
             setCameraStatus('ready', '萤石实时画面已连接');
             updateAudioButton();
@@ -641,11 +670,16 @@ async function initCamera(protocolOverride) {
             showCameraPlaceholder('视频流播放失败，正在自动重连');
             scheduleCameraRecovery(1500, cameraPreferredProtocol === 4 ? 2 : cameraPreferredProtocol);
         };
+        video.ontimeupdate = function() {
+            cameraLastProgressAt = Date.now();
+        };
         video.onstalled = function() {
-            if (patrolVideoReady) {
-                setCameraStatus('loading', '视频流卡顿，正在恢复');
-                scheduleCameraRecovery(3000);
-            }
+            setCameraStatus('loading', '视频流卡顿，正在恢复');
+            scheduleCameraRecovery(1000, cameraPreferredProtocol);
+        };
+        video.onwaiting = function() {
+            setCameraStatus('loading', '视频流等待数据，正在恢复');
+            scheduleCameraRecovery(1800, cameraPreferredProtocol);
         };
     } catch (e) {
         console.error('摄像头初始化失败:', e);
@@ -663,7 +697,7 @@ async function changeEncodeType() {
     if (res && res.code === 200) {
         btn.innerHTML = '<i class="ri-check-line"></i>已切换';
         setTimeout(function() {
-            btn.innerHTML = '<i class="ri-settings-4-line"></i>设为H.264';
+            btn.innerHTML = '<i class="ri-settings-4-line"></i>H.264 默认';
             btn.disabled = false;
             initCamera();
         }, 3000);
@@ -671,7 +705,7 @@ async function changeEncodeType() {
         btn.innerHTML = '<i class="ri-close-line"></i>切换失败';
         setCameraStatus('error', (res && res.msg) || '摄像头编码切换失败');
         setTimeout(function() {
-            btn.innerHTML = '<i class="ri-settings-4-line"></i>设为H.264';
+            btn.innerHTML = '<i class="ri-settings-4-line"></i>H.264 默认';
             btn.disabled = false;
         }, 3000);
     }
