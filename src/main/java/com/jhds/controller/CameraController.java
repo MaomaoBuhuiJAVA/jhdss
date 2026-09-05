@@ -9,6 +9,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,8 @@ public class CameraController {
     private EzvizService ezvizService;
     @Autowired
     private YsjProperties ysjProperties;
+    @Autowired
+    private com.jhds.service.LocalCameraStreamService localCameraStreamService;
 
     @ApiOperation("获取摄像头FLV播放地址")
     @GetMapping("/play-url")
@@ -30,6 +33,12 @@ public class CameraController {
             @RequestParam(required = false) Integer channelNo,
             @RequestParam(required = false) Integer protocol) {
         try {
+            if (localCameraStreamService.isEnabled()) {
+                localCameraStreamService.ensureRunning();
+                String url = ServletUriComponentsBuilder.fromCurrentContextPath()
+                        .path("/local-camera/index.m3u8").toUriString();
+                return Result.ok(url);
+            }
             String url = ezvizService.getPlayUrl(resolveDeviceSerial(deviceSerial),
                     channelNo == null ? ysjProperties.getChannelNo() : channelNo,
                     protocol == null ? ysjProperties.getProtocol() : protocol);
@@ -37,6 +46,12 @@ public class CameraController {
         } catch (RuntimeException e) {
             return Result.error(502, "摄像头播放地址获取失败：" + errorMessage(e));
         }
+    }
+
+    @ApiOperation("检测局域网 RTSP 转码状态")
+    @GetMapping("/local-status")
+    public Result<Map<String, Object>> localStatus() {
+        return Result.ok(localCameraStreamService.status());
     }
 
     @ApiOperation("检测萤石账号、设备绑定和播放地址")

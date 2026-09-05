@@ -17,6 +17,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${ai.learn.photo-path:./photo}")
     private String aiLearnPhotoPath;
 
+    @Value("${camera.local.hls-path:./work/camera/hls}")
+    private String localCameraHlsPath;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")
@@ -31,6 +34,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations(directoryLocation(archiveUploadPath));
         registry.addResourceHandler("/ai-learn-media/**")
                 .addResourceLocations(directoryLocation(aiLearnPhotoPath));
+        registry.addResourceHandler("/local-camera/**")
+                .addResourceLocations(directoryLocation(localCameraHlsPath));
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/", "classpath:/image/temp/");
     }

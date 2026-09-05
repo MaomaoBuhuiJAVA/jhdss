@@ -11,6 +11,7 @@ photo/
 .env
 .env.*
 !.env.local.bat.example
+env.local.for-other-pc.bat
 
 # IDE and operating-system files
 .idea/

@@ -108,6 +108,24 @@ ys7:
   stream-type: ${YS7_STREAM_TYPE:2}
   force-h264: ${YS7_FORCE_H264:true}
 
+# Local RTSP camera bridge. Enable this on the computer connected to the same
+# LAN as the camera; FFmpeg converts RTSP to low-bitrate H.264/AAC HLS for the browser.
+camera:
+  local:
+    enabled: ${CAMERA_LOCAL_ENABLED:false}
+    host: ${CAMERA_LOCAL_HOST:127.0.0.1}
+    port: ${CAMERA_LOCAL_PORT:554}
+    username: ${CAMERA_LOCAL_USERNAME:admin}
+    password: ${CAMERA_LOCAL_PASSWORD:}
+    path: ${CAMERA_LOCAL_PATH:/ch1/main}
+    transport: ${CAMERA_LOCAL_TRANSPORT:udp}
+    ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
+    hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
+    width: ${CAMERA_LOCAL_WIDTH:640}
+    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:500k}
+    segment-seconds: ${CAMERA_LOCAL_SEGMENT_SECONDS:1}
+    list-size: ${CAMERA_LOCAL_LIST_SIZE:3}
+
 ollama:
   base-url: http://localhost:11434
   model: qwen2.5vl:7b
