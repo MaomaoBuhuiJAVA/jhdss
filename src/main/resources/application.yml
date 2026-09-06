@@ -118,7 +118,7 @@ camera:
     username: ${CAMERA_LOCAL_USERNAME:admin}
     password: ${CAMERA_LOCAL_PASSWORD:}
     path: ${CAMERA_LOCAL_PATH:/ch1/main}
-    transport: ${CAMERA_LOCAL_TRANSPORT:udp}
+    transport: ${CAMERA_LOCAL_TRANSPORT:tcp}
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
     width: ${CAMERA_LOCAL_WIDTH:1080}

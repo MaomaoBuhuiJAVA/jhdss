@@ -15,7 +15,7 @@ public class LocalCameraProperties {
     private String username = "admin";
     private String password = "";
     private String path = "/ch1/main";
-    private String transport = "udp";
+    private String transport = "tcp";
     private String ffmpegPath = "ffmpeg";
     private String hlsPath = "./work/camera/hls";
     private int width = 1080;

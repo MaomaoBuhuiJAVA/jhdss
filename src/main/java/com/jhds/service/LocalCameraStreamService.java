@@ -12,6 +12,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +30,10 @@ public class LocalCameraStreamService {
     private volatile Process ffmpegProcess;
     private volatile String lastError;
     private volatile long startedAt;
+
+    private Path pidFile() {
+        return outputDirectory().resolve("ffmpeg.pid");
+    }
 
     public boolean isEnabled() {
         return properties.isEnabled();
@@ -52,6 +57,7 @@ public class LocalCameraStreamService {
             try {
                 Path output = outputDirectory();
                 Files.createDirectories(output);
+                stopStaleProcess(output);
                 cleanOutput(output);
 
                 List<String> command = buildCommand(output);
@@ -63,6 +69,10 @@ public class LocalCameraStreamService {
                 Path logFile = output.resolve("ffmpeg-" + System.currentTimeMillis() + ".log");
                 builder.redirectError(logFile.toFile());
                 ffmpegProcess = builder.start();
+                long processId = processId(ffmpegProcess);
+                if (processId > 0) {
+                    Files.write(pidFile(), String.valueOf(processId).getBytes(StandardCharsets.US_ASCII));
+                }
                 startedAt = System.currentTimeMillis();
                 lastError = null;
                 log.info("Local RTSP bridge started: {}:{}{}, HLS path={}",
@@ -86,14 +96,13 @@ public class LocalCameraStreamService {
         command.add("-rtsp_transport");
         command.add(properties.getTransport() == null || properties.getTransport().trim().isEmpty()
                 ? "udp" : properties.getTransport().trim());
+        // Keep enough RTSP buffering to receive complete H.264 access units.
         command.add("-fflags");
-        command.add("nobuffer");
-        command.add("-flags");
-        command.add("low_delay");
+        command.add("+genpts");
         command.add("-analyzeduration");
-        command.add("1000000");
+        command.add("3000000");
         command.add("-probesize");
-        command.add("1000000");
+        command.add("3000000");
         command.add("-i");
         command.add(buildRtspUrl());
         command.add("-map");
@@ -102,6 +111,10 @@ public class LocalCameraStreamService {
         command.add("0:a:0?");
         command.add("-vf");
         command.add("scale=-2:" + properties.getWidth());
+        command.add("-r");
+        command.add("15");
+        command.add("-fps_mode");
+        command.add("cfr");
         command.add("-c:v");
         command.add("libx264");
         command.add("-preset");
@@ -110,6 +123,8 @@ public class LocalCameraStreamService {
         command.add("zerolatency");
         command.add("-profile:v");
         command.add("main");
+        command.add("-pix_fmt");
+        command.add("yuv420p");
         command.add("-b:v");
         command.add(properties.getVideoBitrate());
         command.add("-maxrate");
@@ -161,10 +176,38 @@ public class LocalCameraStreamService {
             for (Path file : files) {
                 String name = file.getFileName().toString();
                 if (name.equals("index.m3u8") || name.startsWith("segment-")
+                        || name.equals("index.m3u8.tmp") || name.startsWith("segment-" ) && name.endsWith(".tmp")
                         || name.equals("ffmpeg.log") || name.startsWith("ffmpeg-")) {
                     Files.deleteIfExists(file);
                 }
             }
+        }
+    }
+
+    private void stopStaleProcess(Path output) {
+        Path pid = output.resolve("ffmpeg.pid");
+        if (!Files.exists(pid)) return;
+        try {
+            String value = new String(Files.readAllBytes(pid), StandardCharsets.US_ASCII).trim();
+            long processId = Long.parseLong(value);
+            log.warn("Stopping stale FFmpeg process {} before starting a new bridge", processId);
+            Process killer = new ProcessBuilder("taskkill", "/PID", String.valueOf(processId), "/T", "/F")
+                    .redirectErrorStream(true).start();
+            killer.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.debug("Unable to inspect stale FFmpeg pid file", e);
+        } finally {
+            try { Files.deleteIfExists(pid); } catch (IOException ignored) { }
+        }
+    }
+
+    private long processId(Process process) {
+        try {
+            java.lang.reflect.Method method = process.getClass().getMethod("pid");
+            Object value = method.invoke(process);
+            return value instanceof Number ? ((Number) value).longValue() : -1;
+        } catch (Exception ignored) {
+            return -1;
         }
     }
 
@@ -198,6 +241,7 @@ public class LocalCameraStreamService {
             } catch (Exception ignored) {
             }
             ffmpegProcess = null;
+            try { Files.deleteIfExists(pidFile()); } catch (IOException ignored) { }
         }
     }
 

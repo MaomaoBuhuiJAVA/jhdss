@@ -61,7 +61,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `ys7.force-h264` | `true` | 获取播放地址前请求萤石云将主/子码流切换为 H.264 |
 | `ys7.protocol` | `4` | 默认使用 FLV 低延迟播放；FLV 不可用时前端回退 HLS（2） |
 | `CAMERA_LOCAL_ENABLED` | `false` | 启用局域网 RTSP；启用后网页使用本机 FFmpeg 转出的 HLS，不再请求萤石直播地址 |
-| `CAMERA_LOCAL_HOST/PORT/PATH/TRANSPORT` | `127.0.0.1/554`/`/ch1/main`/`udp` | 摄像头局域网 RTSP 地址；端口通常为 554。当前设备使用 UDP 可持续出帧；网络若禁用 UDP 可改为 `tcp` |
+| `CAMERA_LOCAL_HOST/PORT/PATH/TRANSPORT` | `127.0.0.1/554`/`/ch1/main`/`tcp` | 摄像头局域网 RTSP 地址；TCP 可避免 UDP 丢包导致 H.264 花屏；若网络环境确认可靠，也可改为 `udp` |
 | `CAMERA_LOCAL_USERNAME/PASSWORD` | `admin`/空 | RTSP 认证；萤石设备通常使用 `admin` 和设备验证码 |
 | `CAMERA_LOCAL_WIDTH/VIDEO_BITRATE` | `1080`/`4000k` | FFmpeg 输出高度和码率，默认 1920×1080 超清；性能不足时可降为 720/2000k |
 | `CAMERA_LOCAL_FFMPEG_PATH` | `ffmpeg` | FFmpeg 可执行文件路径，要求在 PATH 中或填写绝对路径 |
