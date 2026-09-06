@@ -145,6 +145,11 @@ dashscope:
 patrol:
   capture-path: ./captures
 
+# Bluetooth PAN irrigation controller. Override on the deployment computer
+# when the controller receives a different link-local address.
+control-panel:
+  base-url: ${CONTROL_PANEL_BASE_URL:http://169.254.240.33}
+
 archive:
   upload-path: ./uploads/archive
 

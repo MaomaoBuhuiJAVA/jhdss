@@ -79,6 +79,26 @@ async function loadMqttStatus() {
     status.title = res.data.brokerUrl + ' · ' + res.data.commandTopic;
 }
 
+async function loadControlPanelStatus() {
+    const value = document.getElementById('control-panel-status-value');
+    const dot = document.getElementById('control-panel-status-dot');
+    const text = document.getElementById('control-panel-status-text');
+    const command = document.getElementById('control-panel-last-command');
+    if (!value || !dot || !text) return;
+    const res = await apiGet('/control-panel/status');
+    const data = res && res.code === 200 ? res.data : null;
+    const online = !!(data && data.reachable);
+    value.textContent = online ? '已连接' : '未连接';
+    value.className = 'control-panel-status-value ' + (online ? 'online' : 'offline');
+    dot.className = 'control-panel-status-dot ' + (online ? 'online' : 'offline');
+    text.textContent = online ? ('局域网地址：' + (data.baseUrl || '169.254.240.33')) : '无法访问局域网控制面板';
+    if (command && data) {
+        const motion = data.forwardActive ? '上移中' : (data.backwardActive ? '下移中' : '移动停止');
+        command.textContent = '最近状态：' + motion + ' · 水泵' + (data.pumpActive ? '运行中' : '已关闭');
+    }
+    value.title = data && data.lastError ? data.lastError : '';
+}
+
 function renderDeviceStatus(alias, checked) {
     const safeAlias = alias.replace(/[^a-zA-Z0-9]/g, '_');
     const statusEl = document.getElementById('iot-status-' + safeAlias);
@@ -112,7 +132,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     loadDevices();
     loadMqttStatus();
+    loadControlPanelStatus();
     setInterval(loadDevices, 30000);
     setInterval(loadMqttStatus, 10000);
+    setInterval(loadControlPanelStatus, 15000);
     document.getElementById('iot-update-time').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
 });

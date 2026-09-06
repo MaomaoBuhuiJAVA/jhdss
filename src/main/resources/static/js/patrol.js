@@ -14,6 +14,8 @@ let cameraInitStartedAt = 0;
 let cameraZoom = 1;
 let ptzStopTimer = null;
 let motorRequestId = 0;
+let panelMotionDir = null;
+let panelMotionRequestId = 0;
 
 function applyCameraZoom() {
     var video = document.getElementById('video-player');
@@ -90,6 +92,23 @@ function closePatrolWarning() {
     document.body.style.overflow = '';
 }
 
+function openPatrolRecords() {
+    const overlay = document.getElementById('patrolRecordsOverlay');
+    if (!overlay) return;
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    loadPatrolRecords();
+    const closeButton = overlay.querySelector('button');
+    if (closeButton) closeButton.focus();
+}
+
+function closePatrolRecords() {
+    const overlay = document.getElementById('patrolRecordsOverlay');
+    if (!overlay) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+}
+
 function patrolKeyTargetIsEditable(target) {
     return target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 }
@@ -143,6 +162,54 @@ async function setPatrolDir(dir) {
             }
         }
     }
+}
+
+function updatePanelMotionButtons(dir, pending) {
+    document.querySelectorAll('[data-panel-direction]').forEach(function (btn) {
+        const active = dir !== null && btn.dataset.panelDirection === dir;
+        btn.classList.toggle('active', active);
+        btn.classList.toggle('pending', active && pending);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+}
+
+function setPanelMotionStatus(message, error) {
+    const status = document.getElementById('panel-motion-status');
+    if (!status) return;
+    status.textContent = message;
+    status.className = 'panel-motion-status' + (error ? ' error' : '');
+}
+
+async function togglePanelMotion(direction) {
+    const enabled = panelMotionDir !== direction;
+    const requestId = ++panelMotionRequestId;
+    updatePanelMotionButtons(enabled ? direction : null, true);
+    setPanelMotionStatus(enabled ? '正在发送控制面板指令...' : '正在发送停止指令...');
+    const res = await apiPost('/control-panel/move', { direction: direction, enabled: enabled });
+    if (requestId !== panelMotionRequestId) return;
+    if (!res || res.code !== 200) {
+        updatePanelMotionButtons(panelMotionDir, false);
+        setPanelMotionStatus((res && res.msg) || '控制面板指令失败', true);
+        return;
+    }
+    panelMotionDir = enabled ? direction : null;
+    updatePanelMotionButtons(panelMotionDir, false);
+    setPanelMotionStatus(enabled ? (direction === 'forward' ? '控制面板上移中' : '控制面板下移中') : '控制面板已停止');
+}
+
+async function loadControlPanelStatus() {
+    const connection = document.getElementById('panel-motion-connection');
+    if (!connection) return;
+    const res = await apiGet('/control-panel/status');
+    const data = res && res.code === 200 ? res.data : null;
+    const online = !!(data && data.reachable);
+    connection.textContent = online ? '局域网已连接' : '局域网未连接';
+    connection.className = 'panel-motion-connection ' + (online ? 'online' : 'offline');
+    if (online && panelMotionDir === null && data) {
+        panelMotionDir = data.forwardActive ? 'forward' : (data.backwardActive ? 'backward' : null);
+        updatePanelMotionButtons(panelMotionDir, false);
+    }
+    connection.title = data && data.baseUrl ? data.baseUrl : 'http://169.254.240.33';
 }
 
 function setPtzStatus(message, error) {
@@ -819,10 +886,18 @@ window.addEventListener('DOMContentLoaded', function() {
         aiBtn.addEventListener('click', triggerAiCapture);
     }
     bindPtzControls();
+    loadControlPanelStatus();
+    window.setInterval(loadControlPanelStatus, 15000);
     var warningOverlay = document.getElementById('patrolWarningOverlay');
     if (warningOverlay) {
         warningOverlay.addEventListener('click', function(event) {
             if (event.target === warningOverlay) closePatrolWarning();
+        });
+    }
+    var recordsOverlay = document.getElementById('patrolRecordsOverlay');
+    if (recordsOverlay) {
+        recordsOverlay.addEventListener('click', function(event) {
+            if (event.target === recordsOverlay) closePatrolRecords();
         });
     }
 });
@@ -830,6 +905,7 @@ window.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closePatrolWarning();
+        closePatrolRecords();
         return;
     }
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {

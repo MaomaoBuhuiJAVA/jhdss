@@ -191,24 +191,45 @@ function pumpStatusId(alias) {
     return 'status-' + String(alias || '').replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+let controlPanelPumpState = false;
+
+function isControlPanelPump(pump) {
+    const name = String((pump && pump.name) || '');
+    const alias = String((pump && pump.alias) || '').toUpperCase();
+    return name.includes('氯化钙') || name.includes('叶面肥') || alias.includes('PUMP_CA') || alias.includes('FOLIAR');
+}
+
+function renderControlPanelPumpCard() {
+    const checked = controlPanelPumpState;
+    return '<div class="pump-card control-panel-pump-card" data-api-pump>'
+        + '<div class="pump-icon"><i class="ri-bluetooth-connect-line"></i></div>'
+        + '<div class="pump-name">叶面肥水泵</div>'
+        + '<label class="toggle-switch"><input type="checkbox" id="control-panel-pump" data-control-panel-pump="true" aria-label="叶面肥水泵开关"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
+        + '<div class="pump-status" id="control-panel-pump-status" style="color:' + (checked ? 'var(--accent-secondary)' : 'var(--text-secondary)') + '">' + (checked ? '运行中' : '已关闭（最近状态）') + '</div>'
+        + '</div>';
+}
+
 async function loadPumpStatus() {
     const grid = document.getElementById('pump-grid');
     if (!grid) return;
     const res = await apiGet('/nutrient/pumps');
     const pumps = apiSucceeded(res) && Array.isArray(res.data) ? res.data : [];
     if (!pumps.length) {
-        grid.innerHTML = '<div class="pump-empty">暂无已配置的配液设备</div>';
+        grid.innerHTML = '<div class="pump-empty">暂无已配置的配液设备</div>' + renderControlPanelPumpCard();
         return;
     }
     grid.innerHTML = pumps.map(function (pump) {
-        const checked = Number(pump.status) === 1;
+        const panelPump = isControlPanelPump(pump);
+        const checked = panelPump ? controlPanelPumpState : Number(pump.status) === 1;
         const alias = String(pump.alias || '');
         const statusId = pumpStatusId(alias);
+        const name = panelPump ? '叶面肥水泵' : (pump.name || alias);
+        if (panelPump) return renderControlPanelPumpCard();
         return '<div class="pump-card" data-api-pump>'
-            + '<div class="pump-icon"><i class="' + getPumpIcon(pump) + '"></i></div>'
-            + '<div class="pump-name">' + escapeHtml(pump.name || alias) + '</div>'
-            + '<label class="toggle-switch"><input type="checkbox" data-alias="' + escapeHtml(alias) + '" aria-label="' + escapeHtml(pump.name || alias) + '开关"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
-            + '<div class="pump-status" id="' + statusId + '" style="color:' + (checked ? 'var(--accent-secondary)' : 'var(--text-secondary)') + '">' + (checked ? '运行中' : '已关闭') + '</div>'
+            + '<div class="pump-icon"><i class="' + (panelPump ? 'ri-bluetooth-connect-line' : getPumpIcon(pump)) + '"></i></div>'
+            + '<div class="pump-name">' + escapeHtml(name) + '</div>'
+            + '<label class="toggle-switch"><input type="checkbox" ' + (panelPump ? 'id="control-panel-pump" data-control-panel-pump="true"' : 'data-alias="' + escapeHtml(alias) + '"') + ' aria-label="' + escapeHtml(name) + '开关"' + (checked ? ' checked' : '') + '><span class="toggle-slider"></span></label>'
+            + '<div class="pump-status" id="' + (panelPump ? 'control-panel-pump-status' : statusId) + '" style="color:' + (checked ? 'var(--accent-secondary)' : 'var(--text-secondary)') + '">' + (checked ? '运行中' : (panelPump ? '已关闭（最近状态）' : '已关闭')) + '</div>'
             + '</div>';
     }).join('');
 }
@@ -337,10 +358,53 @@ async function loadIrrigationRecords() {
     }
 }
 
+function renderControlPanelPumpStatus(message, error) {
+    const status = document.getElementById('control-panel-pump-status');
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = error ? 'var(--accent-warn)' : (controlPanelPumpState ? 'var(--accent-secondary)' : 'var(--text-secondary)');
+}
+
+async function loadControlPanelPumpStatus() {
+    const input = document.getElementById('control-panel-pump');
+    if (!input) return;
+    const res = await apiGet('/control-panel/status');
+    if (!apiSucceeded(res) || !res.data) {
+        renderControlPanelPumpStatus('控制面板未连接', true);
+        return;
+    }
+    controlPanelPumpState = !!res.data.pumpActive;
+    input.checked = controlPanelPumpState;
+    renderControlPanelPumpStatus(controlPanelPumpState ? '运行中（最近状态）' : '已关闭（最近状态）');
+}
+
+async function controlPanelPump(input) {
+    if (!input) return;
+    const previous = controlPanelPumpState;
+    const next = input.checked;
+    input.disabled = true;
+    controlPanelPumpState = next;
+    renderControlPanelPumpStatus('发送控制面板指令中...');
+    const res = await apiPost('/control-panel/pump', { enabled: next });
+    input.disabled = false;
+    if (!apiSucceeded(res)) {
+        controlPanelPumpState = previous;
+        input.checked = previous;
+        renderControlPanelPumpStatus((res && res.msg) || '控制面板水泵控制失败', true);
+        return;
+    }
+    renderControlPanelPumpStatus(next ? '运行中' : '已关闭');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const grid = document.getElementById('pump-grid');
     if (grid) {
         grid.addEventListener('change', function (event) {
+            const panelInput = event.target.closest('.toggle-switch input[data-control-panel-pump]');
+            if (panelInput) {
+                controlPanelPump(panelInput);
+                return;
+            }
             const input = event.target.closest('.toggle-switch input[data-alias]');
             if (input) controlPump(input.dataset.alias, input.checked, input);
         });
@@ -351,11 +415,14 @@ document.addEventListener('DOMContentLoaded', function () {
     loadNutrientMode();
     loadSoilData();
     initSoilChart();
-    loadPumpStatus();
+    loadPumpStatus().then(loadControlPanelPumpStatus);
     loadSchedules();
     loadIrrigationRecords();
+    const controlPanelPumpInput = document.getElementById('control-panel-pump');
+    if (controlPanelPumpInput) controlPanelPumpInput.addEventListener('change', function () { controlPanelPump(controlPanelPumpInput); });
     setInterval(loadSoilData, 30000);
     setInterval(loadPumpStatus, 30000);
     setInterval(loadSchedules, 30000);
     setInterval(loadIrrigationRecords, 30000);
+    setInterval(loadControlPanelPumpStatus, 15000);
 });

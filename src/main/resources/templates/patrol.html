@@ -24,6 +24,7 @@
                             <span class="status-badge camera-status-badge checking" id="camera-status-badge">检查中</span>
                             <span class="camera-connection-status checking" id="camera-connection-status" aria-live="polite">正在检查萤石连接</span>
                         </div>
+                        <button type="button" class="video-records-btn" onclick="openPatrolRecords()"><i class="ri-gallery-line"></i>最近记录</button>
 
                     </div>
                     <div class="patrol-video-main">
@@ -39,32 +40,32 @@
                             <button type="button" class="video-view-btn" onclick="resetCameraZoom()" title="恢复画面比例" aria-label="恢复画面比例"><i class="ri-refresh-line"></i></button>
                         </div>
                     </div>
-                    <div class="patrol-controls">
-                        <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" onclick="togglePatrolDir('left')"><i class="ri-arrow-left-line"></i>左移（MQTT电机）</button>
-                        <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" onclick="togglePatrolDir('right')"><i class="ri-arrow-right-line"></i>右移（MQTT电机）</button>
-                        <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止电机</button>
-                        <button class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i>AI拍照识别</button>
-                    </div>
-                    <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>
-                    <div class="ptz-controls" aria-label="摄像头云台控制">
-                        <div class="ptz-heading"><span><i class="ri-focus-3-line"></i>摄像头云台</span>
-                            <label>速度<select id="ptz-speed" class="ptz-speed"><option value="0">慢</option><option value="1" selected>中</option><option value="2">快</option></select></label>
-                        </div>
-                        <div class="ptz-pad">
-                            <span></span><button type="button" class="ptz-btn" data-ptz-direction="0" aria-label="云台上移" title="上移"><i class="ri-arrow-up-line"></i></button><span></span>
-                            <button type="button" class="ptz-btn" data-ptz-direction="2" aria-label="云台左移" title="左移"><i class="ri-arrow-left-line"></i></button><button type="button" class="ptz-btn ptz-stop" data-ptz-stop aria-label="停止云台" title="停止"><i class="ri-stop-circle-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="3" aria-label="云台右移" title="右移"><i class="ri-arrow-right-line"></i></button>
-                            <span></span><button type="button" class="ptz-btn" data-ptz-direction="1" aria-label="云台下移" title="下移"><i class="ri-arrow-down-line"></i></button><span></span>
-                        </div>
-                        <div class="ptz-extra"><button type="button" class="ptz-btn" data-ptz-direction="8" aria-label="放大" title="放大"><i class="ri-zoom-in-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="9" aria-label="缩小" title="缩小"><i class="ri-zoom-out-line"></i></button></div>
-                        <span class="ptz-status" id="ptz-status" aria-live="polite">云台待命</span>
-                    </div>
-                </div>
-                <div class="card" style="height:180px; flex-shrink:0;">
-                    <div class="card-header"><i class="ri-image-line"></i><span>最近拍摄记录</span></div>
-                    <div id="patrol-records" style="padding:12px 18px; display:flex; gap:12px; overflow-x:auto;">
-                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
-                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
-                        <div class="record-placeholder" style="min-width:140px; height:90px; background:linear-gradient(135deg, #0a1f2e, #0d2a3a); border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(30,60,100,0.3);"><i class="ri-image-line" style="font-size:28px; color:#1e3550;"></i></div>
+                    <div class="patrol-control-cards">
+                        <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
+                            <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><span class="panel-motion-connection" id="panel-motion-connection">控制面板检查中</span></div>
+                            <div class="motor-direction-grid">
+                                <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" onclick="togglePatrolDir('left')"><i class="ri-arrow-left-line"></i><span>左移</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" onclick="togglePatrolDir('right')"><i class="ri-arrow-right-line"></i><span>右移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-forward" data-panel-direction="forward" aria-pressed="false" onclick="togglePanelMotion('forward')"><i class="ri-arrow-up-line"></i><span>上移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-backward" data-panel-direction="backward" aria-pressed="false" onclick="togglePanelMotion('backward')"><i class="ri-arrow-down-line"></i><span>下移</span></button>
+                            </div>
+                            <div class="control-card-actions">
+                                <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i><span>停止电机</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i><span>AI拍照识别</span></button>
+                            </div>
+                            <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>
+                            <div class="panel-motion-status" id="panel-motion-status" aria-live="polite">控制面板待命</div>
+                        </section>
+                        <section class="patrol-control-card ptz-controls" aria-label="摄像头云台控制">
+                            <div class="control-card-heading"><i class="ri-focus-3-line"></i><span>摄像头云台</span><span class="ptz-status" id="ptz-status" aria-live="polite">云台待命</span></div>
+                            <label class="ptz-speed-label">速度<select id="ptz-speed" class="ptz-speed"><option value="0">慢</option><option value="1" selected>中</option><option value="2">快</option></select></label>
+                            <div class="ptz-pad">
+                                <span></span><button type="button" class="ptz-btn" data-ptz-direction="0" aria-label="云台上移" title="上移"><i class="ri-arrow-up-line"></i></button><span></span>
+                                <button type="button" class="ptz-btn" data-ptz-direction="2" aria-label="云台左移" title="左移"><i class="ri-arrow-left-line"></i></button><button type="button" class="ptz-btn ptz-stop" data-ptz-stop aria-label="停止云台" title="停止"><i class="ri-stop-circle-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="3" aria-label="云台右移" title="右移"><i class="ri-arrow-right-line"></i></button>
+                                <span></span><button type="button" class="ptz-btn" data-ptz-direction="1" aria-label="云台下移" title="下移"><i class="ri-arrow-down-line"></i></button><span></span>
+                            </div>
+                            <div class="ptz-extra"><button type="button" class="ptz-btn" data-ptz-direction="8" aria-label="放大" title="放大"><i class="ri-zoom-in-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="9" aria-label="缩小" title="缩小"><i class="ri-zoom-out-line"></i></button></div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -105,6 +106,20 @@
             </div>
         </div>
     </main>
+
+    <div class="patrol-records-overlay" id="patrolRecordsOverlay" hidden>
+        <section class="patrol-records-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-records-title">
+            <header class="patrol-records-header">
+                <h2 id="patrol-records-title"><i class="ri-image-line"></i>最近拍摄记录</h2>
+                <button type="button" onclick="closePatrolRecords()" aria-label="关闭"><i class="ri-close-line"></i></button>
+            </header>
+            <div id="patrol-records" class="patrol-records-grid">
+                <div class="record-placeholder"><i class="ri-image-line"></i></div>
+                <div class="record-placeholder"><i class="ri-image-line"></i></div>
+                <div class="record-placeholder"><i class="ri-image-line"></i></div>
+            </div>
+        </section>
+    </div>
 
     <!-- AI拍照识别结果弹窗 -->
     <div class="ai-capture-overlay" id="aiCaptureOverlay" style="display:none;">

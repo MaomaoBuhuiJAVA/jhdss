@@ -40,3 +40,16 @@
 .mqtt-status { margin-left: auto; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
 .mqtt-status.online { color: var(--accent-secondary); }
 .mqtt-status.offline { color: #f0a35b; }
+.control-panel-status-card { padding-bottom: 14px; }
+.control-panel-status-value { margin-left: auto; font: 11px var(--font-mono); }
+.control-panel-status-value.online { color: var(--accent-secondary); }
+.control-panel-status-value.offline { color: var(--accent-warn); }
+.control-panel-status-body { display: flex; align-items: center; gap: 8px; padding: 0 20px; color: var(--text-secondary); font-size: 12px; }
+.control-panel-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex: 0 0 auto; }
+.control-panel-status-dot.online { background: var(--accent-secondary); box-shadow: 0 0 10px var(--accent-secondary); }
+.control-panel-status-dot.offline { background: var(--accent-warn); box-shadow: 0 0 8px rgba(240, 163, 91, .45); }
+.control-panel-last-command { margin-left: auto; color: var(--text-dim); font: 11px var(--font-mono); }
+@media (max-width: 620px) {
+    .control-panel-status-body { align-items: flex-start; flex-wrap: wrap; }
+    .control-panel-last-command { width: 100%; margin-left: 16px; }
+}
