@@ -633,8 +633,10 @@ async function initCamera(protocolOverride) {
         const res = await apiGet('/camera/play-url' + protocolQuery);
         if (!res || !res.data) {
             const message = (res && res.msg) || '未获取到萤石播放地址';
-            setCameraStatus('error', message);
-            showCameraPlaceholder(message);
+            const starting = res && res.code === 503;
+            setCameraStatus(starting ? 'loading' : 'error', message);
+            showCameraPlaceholder(message + (starting ? '，正在重试' : ''));
+            scheduleCameraRecovery(starting ? 1200 : 2500, requestedProtocol);
             return;
         }
         destroyCameraPlayer();
@@ -745,6 +747,7 @@ async function initCamera(protocolOverride) {
         console.error('摄像头初始化失败:', e);
         setCameraStatus('error', '摄像头连接请求失败');
         showCameraPlaceholder('摄像头连接请求失败');
+        scheduleCameraRecovery(2000, requestedProtocol);
     }
 }
 

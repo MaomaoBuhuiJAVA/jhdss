@@ -3,6 +3,7 @@ package com.jhds.service;
 import com.jhds.config.LocalCameraProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PreDestroy;
@@ -49,11 +50,7 @@ public class LocalCameraStreamService {
         long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
         Path playlist = outputDirectory().resolve("index.m3u8");
         while (System.currentTimeMillis() <= deadline) {
-            try {
-                if (Files.exists(playlist) && Files.size(playlist) > 32) return true;
-            } catch (IOException ignored) {
-                // FFmpeg may be replacing the playlist atomically; retry.
-            }
+            if (isPlaylistReady(playlist)) return true;
             try {
                 Thread.sleep(150L);
             } catch (InterruptedException e) {
@@ -61,14 +58,14 @@ public class LocalCameraStreamService {
                 break;
             }
         }
-        return Files.exists(playlist);
+        return isPlaylistReady(playlist);
     }
 
     public void ensureRunning() {
         synchronized (processLock) {
             if (ffmpegProcess != null && ffmpegProcess.isAlive()) {
                 Path playlist = outputDirectory().resolve("index.m3u8");
-                boolean ready = Files.exists(playlist);
+                boolean ready = isPlaylistReady(playlist);
                 boolean startupGracePeriod = startedAt > 0
                         && System.currentTimeMillis() - startedAt < 15000;
                 if (ready || startupGracePeriod) return;
@@ -124,6 +121,8 @@ public class LocalCameraStreamService {
         command.add("3000000");
         command.add("-probesize");
         command.add("3000000");
+        command.add("-rw_timeout");
+        command.add("10000000");
         command.add("-i");
         command.add(buildRtspUrl());
         command.add("-map");
@@ -194,6 +193,31 @@ public class LocalCameraStreamService {
 
     private Path outputDirectory() {
         return Paths.get(properties.getHlsPath()).toAbsolutePath().normalize();
+    }
+
+    private boolean isPlaylistReady(Path playlist) {
+        try {
+            if (!Files.exists(playlist) || Files.size(playlist) <= 32) return false;
+            long age = System.currentTimeMillis() - Files.getLastModifiedTime(playlist).toMillis();
+            if (age > 5000L) return false;
+            String content = new String(Files.readAllBytes(playlist), StandardCharsets.UTF_8);
+            return content.contains("#EXTINF:") && !content.contains("#EXT-X-ENDLIST");
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${camera.local.watchdog-interval-ms:10000}")
+    public void watchdog() {
+        if (!properties.isEnabled() || startedAt == 0) return;
+        Path playlist = outputDirectory().resolve("index.m3u8");
+        if (ffmpegProcess == null || !ffmpegProcess.isAlive() || !isPlaylistReady(playlist)) {
+            try {
+                ensureRunning();
+            } catch (RuntimeException e) {
+                log.warn("Local camera watchdog restart failed: {}", e.getMessage());
+            }
+        }
     }
 
     private void cleanOutput(Path output) throws IOException {
@@ -301,7 +325,7 @@ public class LocalCameraStreamService {
         status.put("port", properties.getPort());
         status.put("path", properties.getPath());
         status.put("running", ffmpegProcess != null && ffmpegProcess.isAlive());
-        status.put("hlsReady", Files.exists(outputDirectory().resolve("index.m3u8")));
+        status.put("hlsReady", isPlaylistReady(outputDirectory().resolve("index.m3u8")));
         status.put("startedAt", startedAt == 0 ? null : startedAt);
         status.put("lastError", lastError);
         return status;
