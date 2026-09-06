@@ -621,6 +621,11 @@ async function initCamera(protocolOverride) {
                     maxMaxBufferLength: 6,
                     liveSyncDurationCount: 1,
                     liveMaxLatencyDurationCount: 3,
+                    // Never let a cached playlist keep the player on a stale
+                    // sequence after the bridge has restarted.
+                    xhrSetup: function(xhr) {
+                        xhr.setRequestHeader('Cache-Control', 'no-cache');
+                    },
                     manifestLoadingMaxRetry: 3,
                     fragLoadingMaxRetry: 3
                 });
@@ -674,7 +679,7 @@ async function initCamera(protocolOverride) {
             __flvPlayer.load();
             playCameraVideo(video);
         }
-        video.onplaying = function() {
+        function markCameraPlaying() {
             patrolVideoReady = true;
             cameraLastProgressAt = Date.now();
             startLiveLatencyMonitor(video);
@@ -682,7 +687,10 @@ async function initCamera(protocolOverride) {
             updateAudioButton();
             var placeholder = document.getElementById('video-placeholder');
             if (placeholder) placeholder.style.display = 'none';
-        };
+        }
+        video.onplaying = markCameraPlaying;
+        video.onloadeddata = markCameraPlaying;
+        video.oncanplay = markCameraPlaying;
         video.onerror = function() {
             patrolVideoReady = false;
             setCameraStatus('error', '视频流播放失败，请检查摄像头编码和网络');

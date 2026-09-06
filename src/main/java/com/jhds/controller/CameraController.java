@@ -36,7 +36,12 @@ public class CameraController {
             if (localCameraStreamService.isEnabled()) {
                 localCameraStreamService.ensureRunning();
                 String url = ServletUriComponentsBuilder.fromCurrentContextPath()
-                        .path("/local-camera/index.m3u8").toUriString();
+                        .path("/local-camera/index.m3u8")
+                        // The playlist is rewritten every second. A cache
+                        // buster prevents a browser from replaying an old
+                        // empty/stale playlist after a camera restart.
+                        .queryParam("t", System.currentTimeMillis())
+                        .toUriString();
                 return Result.ok(url);
             }
             String url = ezvizService.getPlayUrl(resolveDeviceSerial(deviceSerial),
