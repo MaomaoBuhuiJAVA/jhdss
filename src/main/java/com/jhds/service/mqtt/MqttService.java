@@ -419,10 +419,11 @@ public class MqttService implements DisposableBean {
                 return false;
             }
             if (replyFunction != requestFunction) return false;
-            // Write responses retain the slave, function and target address.
-            // Validate the complete returned frame CRC, but allow the device
-            // specific status/value bytes to differ from the request.
-            int prefixLength = requestFunction == 15 || requestFunction == 16 ? 6 : 4;
+            // A valid Modbus write acknowledgement echoes the address and the
+            // written value/quantity. Requiring all six bytes prevents a
+            // different controller status frame from being reported as a
+            // successful motor command.
+            int prefixLength = 6;
             if (request.length < prefixLength || reply.length < prefixLength + 2) return false;
             for (int i = 0; i < prefixLength; i++) {
                 if (request[i] != reply[i]) return false;

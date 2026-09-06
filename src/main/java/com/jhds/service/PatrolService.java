@@ -151,13 +151,13 @@ public class PatrolService {
         switch (dir) {
             case "left":
                 alias = "MOTOR_DIRECTION";
-                // JinHua controller sheet: left = FF 00 coil command
-                // (equipment.close_code), right = 00 FF (open_code).
-                value = "close";
+                // JinHua controller sheet: left = 00 FF (open_code),
+                // right = FF 00 (close_code).
+                value = "open";
                 break;
             case "right":
                 alias = "MOTOR_DIRECTION";
-                value = "open";
+                value = "close";
                 break;
             case "stop":
                 alias = "MOTOR_STATE";

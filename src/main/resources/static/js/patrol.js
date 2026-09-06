@@ -644,10 +644,11 @@ async function initCamera(protocolOverride) {
         const isHls = /\.m3u8(?:$|\?)/i.test(res.data);
         cameraPreferredProtocol = isHls ? 2 : 4;
         if (isHls) {
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = res.data;
-                playCameraVideo(video);
-            } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            // Chromium can report a non-empty canPlayType result for HLS
+            // without actually being able to play an m3u8 URL natively.
+            // Prefer hls.js whenever MediaSource is available; reserve the
+            // native path for Safari/iOS where it is the reliable option.
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 __hlsPlayer = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
@@ -680,6 +681,9 @@ async function initCamera(protocolOverride) {
                 });
                 __hlsPlayer.loadSource(res.data);
                 __hlsPlayer.attachMedia(video);
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = res.data;
+                playCameraVideo(video);
             } else {
                 setCameraStatus('error', '当前浏览器不支持 HLS 播放');
                 showCameraPlaceholder('当前浏览器不支持 HLS 播放');

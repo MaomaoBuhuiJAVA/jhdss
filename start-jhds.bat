@@ -18,8 +18,11 @@ if not exist "pom.xml" (
 if exist ".env.local.bat" (
     echo [INFO] Loading .env.local.bat
     call ".env.local.bat"
+) else if exist "env.local.bat" (
+    echo [WARN] Loading env.local.bat. Rename it to .env.local.bat for consistency.
+    call "env.local.bat"
 ) else (
-    echo [WARN] .env.local.bat was not found. Required external-service variables may be missing.
+    echo [WARN] .env.local.bat or env.local.bat was not found. Required external-service variables may be missing.
 )
 
 if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (

@@ -2,7 +2,7 @@
 
 ## 快速启动
 
-在项目根目录创建 `.env.local.bat`，填入真实凭据（不要提交到 Git）：
+在项目根目录创建 `.env.local.bat`，填入真实凭据（不要提交到 Git）。启动脚本也兼容 `env.local.bat`，但建议统一改名为 `.env.local.bat`：
 
 ```bat
 @echo off

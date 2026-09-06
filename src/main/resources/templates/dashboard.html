@@ -207,10 +207,11 @@
                 }
                 try {
                     if (/\\.m3u8(?:$|\\?)/i.test(res.data)) {
-                        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                            video.src = res.data;
-                            video.play().catch(function () {});
-                        } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                        // Chromium may report a non-empty canPlayType value
+                        // for HLS while still being unable to play m3u8
+                        // natively. Prefer hls.js when MediaSource exists;
+                        // use native HLS only as a Safari/iOS fallback.
+                        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                             dashboardHlsPlayer = new Hls({
                                 enableWorker: true,
                                 lowLatencyMode: true,
@@ -230,6 +231,9 @@
                             });
                             dashboardHlsPlayer.loadSource(res.data);
                             dashboardHlsPlayer.attachMedia(video);
+                        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                            video.src = res.data;
+                            video.play().catch(function () {});
                         } else {
                             throw new Error('浏览器不支持 HLS 播放');
                         }

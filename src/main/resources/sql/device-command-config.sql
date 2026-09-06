@@ -16,7 +16,7 @@ WHERE alias = 'PUMP_CIRCULATION'
 
 -- 表格未提供 PUMP_IRRIGATE（灌溉泵）的独立指令，因此不猜测、不填充。
 
--- 金华巡检设备表：right=open_code（00 FF），left=close_code（FF 00）。
+-- 金华巡检设备表：left=open_code（00 FF），right=close_code（FF 00）。
 UPDATE equipment
 SET open_code = COALESCE(NULLIF(TRIM(open_code), ''), '03 05 00 01 00 FF DD A8'),
     close_code = COALESCE(NULLIF(TRIM(close_code), ''), '03 05 00 01 FF 00 DC 18')
