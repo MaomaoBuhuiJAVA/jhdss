@@ -35,7 +35,7 @@ public class CameraController {
         try {
             if (localCameraStreamService.isEnabled()) {
                 localCameraStreamService.ensureRunning();
-                if (!localCameraStreamService.awaitReady(5000L)) {
+                if (!localCameraStreamService.awaitReady(30000L)) {
                     return Result.error(503, "本地摄像头流正在启动，请稍后重试");
                 }
                 String url = ServletUriComponentsBuilder.fromCurrentContextPath()

@@ -66,8 +66,11 @@ public class LocalCameraStreamService {
             if (ffmpegProcess != null && ffmpegProcess.isAlive()) {
                 Path playlist = outputDirectory().resolve("index.m3u8");
                 boolean ready = isPlaylistReady(playlist);
+                // A camera may wait for its next key frame before FFmpeg can
+                // write the first HLS segment. Do not restart the bridge while
+                // that initial handshake is still in progress.
                 boolean startupGracePeriod = startedAt > 0
-                        && System.currentTimeMillis() - startedAt < 15000;
+                        && System.currentTimeMillis() - startedAt < 60000;
                 if (ready || startupGracePeriod) return;
                 log.warn("Local RTSP bridge is alive but has produced no HLS playlist; restarting it");
             }

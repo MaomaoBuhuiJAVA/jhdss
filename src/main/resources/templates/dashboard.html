@@ -203,10 +203,14 @@
             apiGet('/camera/play-url?deviceSerial=BG9980884').then(res => {
                 if (!res || !res.data) {
                     if (placeholder) placeholder.style.display = 'flex';
+                    // The local bridge can still be waiting for the first
+                    // camera key frame. Retry instead of leaving the screen
+                    // permanently on the placeholder after a 503 response.
+                    if (!res || res.code === 503) scheduleDashboardRecovery(1500);
                     return;
                 }
                 try {
-                    if (/\\.m3u8(?:$|\\?)/i.test(res.data)) {
+                    if (/\.m3u8(?:$|\?)/i.test(res.data)) {
                         // Chromium may report a non-empty canPlayType value
                         // for HLS while still being unable to play m3u8
                         // natively. Prefer hls.js when MediaSource exists;

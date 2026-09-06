@@ -40,9 +40,9 @@
                         </div>
                     </div>
                     <div class="patrol-controls">
-                        <button class="ctrl-btn" id="btn-left" onclick="setPatrolDir('left')"><i class="ri-arrow-left-line"></i>左移（MQTT电机）</button>
-                        <button class="ctrl-btn" id="btn-right" onclick="setPatrolDir('right')"><i class="ri-arrow-right-line"></i>右移（MQTT电机）</button>
-                        <button class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止电机</button>
+                        <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" onclick="togglePatrolDir('left')"><i class="ri-arrow-left-line"></i>左移（MQTT电机）</button>
+                        <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" onclick="togglePatrolDir('right')"><i class="ri-arrow-right-line"></i>右移（MQTT电机）</button>
+                        <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止电机</button>
                         <button class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i>AI拍照识别</button>
                     </div>
                     <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>

@@ -13,6 +13,7 @@ let cameraLastProgressAt = 0;
 let cameraInitStartedAt = 0;
 let cameraZoom = 1;
 let ptzStopTimer = null;
+let motorRequestId = 0;
 
 function applyCameraZoom() {
     var video = document.getElementById('video-player');
@@ -93,27 +94,54 @@ function patrolKeyTargetIsEditable(target) {
     return target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 }
 
+function updateMotorButtonState(dir, pending) {
+    document.querySelectorAll('[data-motor-direction]').forEach(function(btn) {
+        const active = dir !== 'stop' && btn.dataset.motorDirection === dir;
+        btn.classList.toggle('active', active);
+        btn.classList.toggle('pending', active && pending);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+}
+
+function togglePatrolDir(dir) {
+    setPatrolDir(currentDir === dir ? 'stop' : dir);
+}
+
 async function setPatrolDir(dir) {
+    const requestId = ++motorRequestId;
     const status = document.getElementById('motor-control-status');
     currentDir = dir;
-    document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
-    if (dir !== 'stop') document.getElementById('btn-' + dir).classList.add('active');
+    updateMotorButtonState(dir, true);
     if (status) {
         status.className = 'motor-control-status pending';
         status.textContent = dir === 'stop' ? '正在发送停止指令...' : '正在发送 MQTT 电机指令...';
     }
     const res = await apiPost('/patrol/control', { dir: dir });
+    // A newer click owns the visible state. Do not let an older response
+    // overwrite the direction selected by the user.
+    if (requestId !== motorRequestId) return res;
     if (!res || res.code !== 200) {
-        document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
         currentDir = 'stop';
+        updateMotorButtonState('stop', false);
         if (status) {
             status.className = 'motor-control-status error';
             status.textContent = (res && res.msg) || 'MQTT 电机指令失败';
         }
         window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
-    } else if (status) {
-        status.className = 'motor-control-status success';
-        status.textContent = dir === 'stop' ? '电机已停止' : (dir === 'left' ? 'MQTT 左移指令已发送' : 'MQTT 右移指令已发送');
+    } else {
+        updateMotorButtonState(dir, false);
+        if (status) {
+            status.className = 'motor-control-status success';
+            status.textContent = dir === 'stop' ? '电机已停止' : (dir === 'left' ? 'MQTT 左移中' : 'MQTT 右移中');
+        }
+        if (dir === 'stop') {
+            const stopButton = document.getElementById('btn-stop');
+            if (stopButton) {
+                stopButton.classList.remove('stop-pulse');
+                void stopButton.offsetWidth;
+                stopButton.classList.add('stop-pulse');
+            }
+        }
     }
 }
 
