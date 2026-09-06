@@ -57,7 +57,11 @@ public class LocalCameraStreamService {
                 List<String> command = buildCommand(output);
                 ProcessBuilder builder = new ProcessBuilder(command);
                 builder.directory(new File("."));
-                builder.redirectError(output.resolve("ffmpeg.log").toFile());
+                // Use a per-process log file. Reusing one log file can fail on
+                // Windows while a previous FFmpeg process is still releasing
+                // its handle during a recovery restart.
+                Path logFile = output.resolve("ffmpeg-" + System.currentTimeMillis() + ".log");
+                builder.redirectError(logFile.toFile());
                 ffmpegProcess = builder.start();
                 startedAt = System.currentTimeMillis();
                 lastError = null;
@@ -66,7 +70,9 @@ public class LocalCameraStreamService {
             } catch (Exception e) {
                 lastError = e.getMessage();
                 log.error("Unable to start local RTSP bridge", e);
-                throw new IllegalStateException("本地摄像头流启动失败，请确认 FFmpeg 已安装并可在 PATH 中执行", e);
+                String detail = e.getMessage() == null ? "未知错误" : e.getMessage();
+                throw new IllegalStateException("本地摄像头流启动失败：" + detail
+                        + "；请确认 FFmpeg 已安装并可在 PATH 中执行", e);
             }
         }
     }
@@ -154,7 +160,8 @@ public class LocalCameraStreamService {
         try (DirectoryStream<Path> files = Files.newDirectoryStream(output)) {
             for (Path file : files) {
                 String name = file.getFileName().toString();
-                if (name.equals("index.m3u8") || name.startsWith("segment-") || name.equals("ffmpeg.log")) {
+                if (name.equals("index.m3u8") || name.startsWith("segment-")
+                        || name.equals("ffmpeg.log") || name.startsWith("ffmpeg-")) {
                     Files.deleteIfExists(file);
                 }
             }
@@ -184,7 +191,10 @@ public class LocalCameraStreamService {
         if (ffmpegProcess != null) {
             try {
                 ffmpegProcess.destroy();
-                if (ffmpegProcess.isAlive()) ffmpegProcess.destroyForcibly();
+                if (!ffmpegProcess.waitFor(1500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    ffmpegProcess.destroyForcibly();
+                    ffmpegProcess.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS);
+                }
             } catch (Exception ignored) {
             }
             ffmpegProcess = null;
