@@ -40,11 +40,12 @@
                         </div>
                     </div>
                     <div class="patrol-controls">
-                        <button class="ctrl-btn" id="btn-left" onclick="setPatrolDir('left')"><i class="ri-arrow-left-line"></i>左移</button>
-                        <button class="ctrl-btn" id="btn-right" onclick="setPatrolDir('right')"><i class="ri-arrow-right-line"></i>右移</button>
-                        <button class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止</button>
+                        <button class="ctrl-btn" id="btn-left" onclick="setPatrolDir('left')"><i class="ri-arrow-left-line"></i>左移（MQTT电机）</button>
+                        <button class="ctrl-btn" id="btn-right" onclick="setPatrolDir('right')"><i class="ri-arrow-right-line"></i>右移（MQTT电机）</button>
+                        <button class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i>停止电机</button>
                         <button class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i>AI拍照识别</button>
                     </div>
+                    <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>
                     <div class="ptz-controls" aria-label="摄像头云台控制">
                         <div class="ptz-heading"><span><i class="ri-focus-3-line"></i>摄像头云台</span>
                             <label>速度<select id="ptz-speed" class="ptz-speed"><option value="0">慢</option><option value="1" selected>中</option><option value="2">快</option></select></label>

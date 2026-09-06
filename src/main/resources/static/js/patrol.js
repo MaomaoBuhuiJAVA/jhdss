@@ -94,14 +94,26 @@ function patrolKeyTargetIsEditable(target) {
 }
 
 async function setPatrolDir(dir) {
+    const status = document.getElementById('motor-control-status');
     currentDir = dir;
     document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
     if (dir !== 'stop') document.getElementById('btn-' + dir).classList.add('active');
+    if (status) {
+        status.className = 'motor-control-status pending';
+        status.textContent = dir === 'stop' ? '正在发送停止指令...' : '正在发送 MQTT 电机指令...';
+    }
     const res = await apiPost('/patrol/control', { dir: dir });
     if (!res || res.code !== 200) {
         document.querySelectorAll('.ctrl-btn').forEach(btn => btn.classList.remove('active'));
         currentDir = 'stop';
+        if (status) {
+            status.className = 'motor-control-status error';
+            status.textContent = (res && res.msg) || 'MQTT 电机指令失败';
+        }
         window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
+    } else if (status) {
+        status.className = 'motor-control-status success';
+        status.textContent = dir === 'stop' ? '电机已停止' : (dir === 'left' ? 'MQTT 左移指令已发送' : 'MQTT 右移指令已发送');
     }
 }
 

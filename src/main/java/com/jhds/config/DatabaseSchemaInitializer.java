@@ -469,7 +469,8 @@ public class DatabaseSchemaInitializer {
         if (!tableExists("equipment")) return;
         updateCommandIfEmpty("PUMP_CO2", "01 06 00 02 00 01 E9 CA", "01 06 00 02 00 00 28 0A");
         updateCommandIfEmpty("PUMP_CIRCULATION", "01 06 00 01 00 01 19 CA", "01 06 00 01 00 00 D8 0A");
-        // PatrolService maps left to open_code and right to close_code.
+        // JinHua inspection controller: right uses open_code (00 FF),
+        // left uses close_code (FF 00); PatrolService applies that mapping.
         updateCommandIfEmpty("MOTOR_DIRECTION", "03 05 00 01 00 FF DD A8", "03 05 00 01 FF 00 DC 18");
         updateCloseCommandIfEmpty("MOTOR_STATE", "03 05 00 01 00 00 9D E8");
     }
