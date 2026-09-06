@@ -121,8 +121,6 @@ public class LocalCameraStreamService {
         command.add("3000000");
         command.add("-probesize");
         command.add("3000000");
-        command.add("-rw_timeout");
-        command.add("10000000");
         command.add("-i");
         command.add(buildRtspUrl());
         command.add("-map");
