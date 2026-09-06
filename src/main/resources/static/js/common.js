@@ -1,13 +1,29 @@
 const API_BASE = window.location.origin + '/jhds/api';
 
 async function apiGet(url) {
-    try {
-        const res = await fetch(API_BASE + url);
-        return await res.json();
-    } catch(e) {
-        console.warn('API error:', url, e);
-        return null;
+    // Live camera requests must not hang indefinitely while the bridge is
+    // restarting. Retry short network failures so the page recovers without a
+    // manual refresh; other API calls keep the same single-request behavior.
+    const isCameraRequest = /\/camera\/(play-url|local-status)/.test(url);
+    const attempts = isCameraRequest ? 3 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timer = controller ? setTimeout(() => controller.abort(), isCameraRequest ? 12000 : 30000) : null;
+            const res = await fetch(API_BASE + url, controller ? { signal: controller.signal } : undefined);
+            if (timer) clearTimeout(timer);
+            const data = await res.json();
+            if (data && data.code === 503 && attempt + 1 < attempts) {
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+                continue;
+            }
+            return data;
+        } catch(e) {
+            console.warn('API error:', url, e);
+            if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
     }
+    return null;
 }
 async function apiPost(url, body) {
     try {

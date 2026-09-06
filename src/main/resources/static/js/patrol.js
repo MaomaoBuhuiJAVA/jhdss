@@ -11,6 +11,7 @@ let cameraLatencyTimer = null;
 let cameraWatchdogTimer = null;
 let cameraLastProgressAt = 0;
 let cameraInitStartedAt = 0;
+let cameraRecoveryAttempts = 0;
 let cameraZoom = 1;
 let ptzStopTimer = null;
 let motorRequestId = 0;
@@ -618,8 +619,8 @@ function startCameraWatchdog(video) {
     cameraWatchdogTimer = window.setInterval(function() {
         if (document.hidden || cameraRecoveryTimer) return;
         const now = Date.now();
-        const loadingTooLong = !patrolVideoReady && now - cameraInitStartedAt > 12000;
-        const playbackStalled = patrolVideoReady && now - cameraLastProgressAt > 6000;
+        const loadingTooLong = !patrolVideoReady && now - cameraInitStartedAt > 30000;
+        const playbackStalled = patrolVideoReady && now - cameraLastProgressAt > 15000;
         if (loadingTooLong || playbackStalled) {
             setCameraStatus('loading', '视频流无响应，正在自动恢复');
             showCameraPlaceholder('视频流无响应，正在自动重连');
@@ -645,10 +646,12 @@ function startLiveLatencyMonitor(video) {
 
 function scheduleCameraRecovery(delay, protocol) {
     if (cameraRecoveryTimer || document.hidden) return;
+    cameraRecoveryAttempts = Math.min(cameraRecoveryAttempts + 1, 5);
+    const backoff = Math.min(15000, Math.max(1000, (delay || 1800) * Math.pow(1.6, cameraRecoveryAttempts - 1)));
     cameraRecoveryTimer = window.setTimeout(function() {
         cameraRecoveryTimer = null;
         initCamera(protocol);
-    }, delay || 1800);
+    }, backoff);
 }
 
 function updateAudioButton() {
@@ -752,13 +755,16 @@ async function initCamera(protocolOverride) {
                     maxMaxBufferLength: 6,
                     liveSyncDurationCount: 1,
                     liveMaxLatencyDurationCount: 3,
+                    maxLiveSyncPlaybackRate: 1.2,
                     // Never let a cached playlist keep the player on a stale
                     // sequence after the bridge has restarted.
                     xhrSetup: function(xhr) {
                         xhr.setRequestHeader('Cache-Control', 'no-cache');
                     },
                     manifestLoadingMaxRetry: 3,
-                    fragLoadingMaxRetry: 3
+                    fragLoadingMaxRetry: 3,
+                    fragLoadingRetryDelay: 300,
+                    manifestLoadingRetryDelay: 500
                 });
                 __hlsPlayer.on(Hls.Events.ERROR, function(event, data) {
                     if (!data.fatal) return;
@@ -815,6 +821,7 @@ async function initCamera(protocolOverride) {
         }
         function markCameraPlaying() {
             patrolVideoReady = true;
+            cameraRecoveryAttempts = 0;
             cameraLastProgressAt = Date.now();
             startLiveLatencyMonitor(video);
             setCameraStatus('ready', '萤石实时画面已连接');

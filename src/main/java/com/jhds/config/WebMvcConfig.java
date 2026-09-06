@@ -35,7 +35,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/ai-learn-media/**")
                 .addResourceLocations(directoryLocation(aiLearnPhotoPath));
         registry.addResourceHandler("/local-camera/**")
-                .addResourceLocations(directoryLocation(localCameraHlsPath));
+                .addResourceLocations(directoryLocation(localCameraHlsPath))
+                // Playlists and segments are live resources. A cached m3u8
+                // can keep a browser on an old sequence after reconnecting.
+                .setCachePeriod(0);
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/", "classpath:/image/temp/");
     }

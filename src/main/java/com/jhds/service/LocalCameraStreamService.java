@@ -32,6 +32,10 @@ public class LocalCameraStreamService {
     private volatile Process ffmpegProcess;
     private volatile String lastError;
     private volatile long startedAt;
+    private volatile String activePath;
+    private volatile long lastRestartAt;
+    private volatile int restartCount;
+    private volatile long nextRetryAt;
 
     private Path pidFile() {
         return outputDirectory().resolve("ffmpeg.pid");
@@ -63,6 +67,7 @@ public class LocalCameraStreamService {
 
     public void ensureRunning() {
         synchronized (processLock) {
+            long now = System.currentTimeMillis();
             if (ffmpegProcess != null && ffmpegProcess.isAlive()) {
                 Path playlist = outputDirectory().resolve("index.m3u8");
                 boolean ready = isPlaylistReady(playlist);
@@ -70,9 +75,19 @@ public class LocalCameraStreamService {
                 // write the first HLS segment. Do not restart the bridge while
                 // that initial handshake is still in progress.
                 boolean startupGracePeriod = startedAt > 0
-                        && System.currentTimeMillis() - startedAt < 60000;
+                        && now - startedAt < Math.max(10000, properties.getStartupTimeoutMs());
                 if (ready || startupGracePeriod) return;
+                if (now - lastRestartAt < Math.max(1000, properties.getRestartCooldownMs())) {
+                    return;
+                }
                 log.warn("Local RTSP bridge is alive but has produced no HLS playlist; restarting it");
+                rotatePath();
+            } else if (ffmpegProcess != null) {
+                // A failed FFmpeg process can exit before the watchdog sees a
+                // playlist. Rotate once so a bad main stream cannot loop
+                // forever without trying the camera sub-stream.
+                if (now < nextRetryAt) return;
+                rotatePath();
             }
             stopProcessLocked();
             try {
@@ -81,7 +96,8 @@ public class LocalCameraStreamService {
                 stopStaleProcesses(output);
                 cleanOutput(output);
 
-                List<String> command = buildCommand(output);
+                String inputPath = selectInitialPath();
+                List<String> command = buildCommand(output, inputPath);
                 ProcessBuilder builder = new ProcessBuilder(command);
                 builder.directory(new File("."));
                 // Use a per-process log file. Reusing one log file can fail on
@@ -95,11 +111,15 @@ public class LocalCameraStreamService {
                     Files.write(pidFile(), String.valueOf(processId).getBytes(StandardCharsets.US_ASCII));
                 }
                 startedAt = System.currentTimeMillis();
+                lastRestartAt = startedAt;
+                restartCount++;
+                nextRetryAt = 0L;
                 lastError = null;
-                log.info("Local RTSP bridge started: {}:{}{}, HLS path={}",
-                        properties.getHost(), properties.getPort(), properties.getPath(), output);
+                log.info("Local RTSP bridge started: {}:{}{}, HLS directory={}, streamWidth={}",
+                        properties.getHost(), properties.getPort(), inputPath, output, properties.getWidth());
             } catch (Exception e) {
                 lastError = e.getMessage();
+                nextRetryAt = System.currentTimeMillis() + Math.max(1000, properties.getRestartCooldownMs());
                 log.error("Unable to start local RTSP bridge", e);
                 String detail = e.getMessage() == null ? "未知错误" : e.getMessage();
                 throw new IllegalStateException("本地摄像头流启动失败：" + detail
@@ -108,7 +128,7 @@ public class LocalCameraStreamService {
         }
     }
 
-    private List<String> buildCommand(Path output) {
+    private List<String> buildCommand(Path output, String inputPath) {
         List<String> command = new ArrayList<>();
         command.add(properties.getFfmpegPath());
         command.add("-hide_banner");
@@ -117,15 +137,29 @@ public class LocalCameraStreamService {
         command.add("-rtsp_transport");
         command.add(properties.getTransport() == null || properties.getTransport().trim().isEmpty()
                 ? "udp" : properties.getTransport().trim());
-        // Keep enough RTSP buffering to receive complete H.264 access units.
+        // Fail a dead RTSP socket quickly so the watchdog can switch streams.
+        command.add("-timeout");
+        command.add(String.valueOf(Math.max(1000, properties.getConnectTimeoutMs()) * 1000L));
+        command.add("-rtsp_flags");
+        command.add("prefer_tcp");
         command.add("-fflags");
-        command.add("+genpts");
+        command.add("+genpts+discardcorrupt");
+        command.add("-flags");
+        command.add("low_delay");
+        command.add("-max_delay");
+        command.add("500000");
+        command.add("-reorder_queue_size");
+        command.add("0");
         command.add("-analyzeduration");
-        command.add("3000000");
+        command.add("1000000");
         command.add("-probesize");
-        command.add("3000000");
+        command.add("1000000");
+        // Some cameras expose an RTP clock that jumps backwards after a
+        // reconnect. Wall-clock timestamps keep the HLS muxer monotonic.
+        command.add("-use_wallclock_as_timestamps");
+        command.add("1");
         command.add("-i");
-        command.add(buildRtspUrl());
+        command.add(buildRtspUrl(inputPath));
         command.add("-map");
         command.add("0:v:0");
         command.add("-map");
@@ -169,6 +203,12 @@ public class LocalCameraStreamService {
         command.add("64k");
         command.add("-ac");
         command.add("1");
+        command.add("-avoid_negative_ts");
+        command.add("make_zero");
+        command.add("-muxdelay");
+        command.add("0");
+        command.add("-muxpreload");
+        command.add("0");
         command.add("-f");
         command.add("hls");
         command.add("-hls_time");
@@ -176,20 +216,62 @@ public class LocalCameraStreamService {
         command.add("-hls_list_size");
         command.add(String.valueOf(Math.max(2, properties.getListSize())));
         command.add("-hls_flags");
-        command.add("delete_segments+append_list+independent_segments+program_date_time");
+        // temp_file prevents the browser from reading a partially-written
+        // segment during a reconnect. omit_endlist keeps the playlist live.
+        command.add("delete_segments+independent_segments+program_date_time+temp_file");
         command.add("-hls_segment_filename");
         command.add(output.resolve("segment-%03d.ts").toString());
         command.add(output.resolve("index.m3u8").toString());
         return command;
     }
 
-    private String buildRtspUrl() {
+    private String buildRtspUrl(String streamPath) {
         String user = properties.getUsername() == null ? "" : properties.getUsername();
         String password = properties.getPassword() == null ? "" : properties.getPassword();
         String auth = user.isEmpty() ? "" : user + (password.isEmpty() ? "" : ":" + password) + "@";
-        String path = properties.getPath() == null ? "/ch1/main" : properties.getPath().trim();
+        String path = streamPath == null ? "/ch1/main" : streamPath.trim();
         if (!path.startsWith("/")) path = "/" + path;
         return "rtsp://" + auth + properties.getHost() + ":" + properties.getPort() + path;
+    }
+
+    private String configuredPath() {
+        String path = properties.getPath() == null ? "/ch1/main" : properties.getPath().trim();
+        return path.isEmpty() ? "/ch1/main" : (path.startsWith("/") ? path : "/" + path);
+    }
+
+    private String fallbackPath() {
+        String path = properties.getFallbackPath();
+        if (path == null || path.trim().isEmpty()) return null;
+        path = path.trim();
+        return path.startsWith("/") ? path : "/" + path;
+    }
+
+    private String selectInitialPath() {
+        if (activePath != null && !activePath.trim().isEmpty()) return activePath;
+        String configured = configuredPath();
+        String fallback = fallbackPath();
+        if (properties.isPreferFallback() && fallback != null && !fallback.equalsIgnoreCase(configured)) {
+            activePath = fallback;
+        } else {
+            activePath = configured;
+        }
+        return activePath;
+    }
+
+    private void rotatePath() {
+        String configured = configuredPath();
+        String fallback = fallbackPath();
+        if (fallback == null || fallback.equalsIgnoreCase(configured)) {
+            activePath = configured;
+        } else if (properties.isPreferFallback()) {
+            // The sub-stream is deliberately the recovery target. Switching
+            // back to a damaged 4K main stream after one network hiccup makes
+            // the browser report a failed camera request again.
+            activePath = fallback;
+        } else {
+            activePath = configured;
+        }
+        log.warn("Retrying local camera RTSP path {}", activePath);
     }
 
     private Path outputDirectory() {
@@ -200,7 +282,10 @@ public class LocalCameraStreamService {
         try {
             if (!Files.exists(playlist) || Files.size(playlist) <= 32) return false;
             long age = System.currentTimeMillis() - Files.getLastModifiedTime(playlist).toMillis();
-            if (age > 5000L) return false;
+            // A segment can be delayed briefly while the camera sends its next
+            // key frame. Treating six seconds as dead caused needless process
+            // restarts and transient /play-url failures.
+            if (age > Math.max(10000L, properties.getStaleTimeoutMs())) return false;
             String content = new String(Files.readAllBytes(playlist), StandardCharsets.UTF_8);
             return content.contains("#EXTINF:") && !content.contains("#EXT-X-ENDLIST");
         } catch (IOException ignored) {
@@ -325,9 +410,11 @@ public class LocalCameraStreamService {
         status.put("host", properties.getHost());
         status.put("port", properties.getPort());
         status.put("path", properties.getPath());
+        status.put("activePath", activePath == null ? selectInitialPath() : activePath);
         status.put("running", ffmpegProcess != null && ffmpegProcess.isAlive());
         status.put("hlsReady", isPlaylistReady(outputDirectory().resolve("index.m3u8")));
         status.put("startedAt", startedAt == 0 ? null : startedAt);
+        status.put("restartCount", restartCount);
         status.put("lastError", lastError);
         return status;
     }

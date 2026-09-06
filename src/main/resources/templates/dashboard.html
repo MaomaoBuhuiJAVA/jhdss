@@ -107,7 +107,7 @@
         <span>点击开始对话</span>
     </div>
 
-    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/common.js(v='20260906-camera-watchdog2')}"></script>
     <script th:src="@{/js/dashboard.js}"></script>
     <script>
         let dashboardFlvPlayer = null;
@@ -119,6 +119,7 @@
         let dashboardRecoveryTimer = null;
         let dashboardLastProgressAt = 0;
         let dashboardInitStartedAt = 0;
+        let dashboardRecoveryAttempts = 0;
 
         function destroyDashboardPlayer() {
             if (dashboardRecoveryTimer) {
@@ -163,10 +164,12 @@
 
         function scheduleDashboardRecovery(delay) {
             if (dashboardRecoveryTimer || document.hidden) return;
+            dashboardRecoveryAttempts = Math.min(dashboardRecoveryAttempts + 1, 5);
+            const backoff = Math.min(15000, Math.max(1000, (delay || 1000) * Math.pow(1.6, dashboardRecoveryAttempts - 1)));
             dashboardRecoveryTimer = window.setTimeout(function () {
                 dashboardRecoveryTimer = null;
                 initDashboardVideo();
-            }, delay || 1000);
+            }, backoff);
         }
 
         function startDashboardWatchdog(video) {
@@ -176,8 +179,8 @@
             dashboardWatchdogTimer = window.setInterval(function () {
                 if (document.hidden || dashboardRecoveryTimer) return;
                 const now = Date.now();
-                if ((!dashboardVideoReady && now - dashboardInitStartedAt > 12000) ||
-                    (dashboardVideoReady && now - dashboardLastProgressAt > 6000)) {
+                if ((!dashboardVideoReady && now - dashboardInitStartedAt > 30000) ||
+                    (dashboardVideoReady && now - dashboardLastProgressAt > 15000)) {
                     scheduleDashboardRecovery(300);
                 }
             }, 2000);
@@ -224,8 +227,14 @@
                                 maxMaxBufferLength: 5,
                                 liveSyncDurationCount: 1,
                                 liveMaxLatencyDurationCount: 2,
+                                maxLiveSyncPlaybackRate: 1.2,
                                 manifestLoadingMaxRetry: 3,
-                                fragLoadingMaxRetry: 3
+                                fragLoadingMaxRetry: 3,
+                                fragLoadingRetryDelay: 300,
+                                manifestLoadingRetryDelay: 500,
+                                xhrSetup: function (xhr) {
+                                    xhr.setRequestHeader('Cache-Control', 'no-cache');
+                                }
                             });
                             dashboardHlsPlayer.on(Hls.Events.ERROR, function (event, data) {
                                 if (!data.fatal) return;
@@ -243,6 +252,7 @@
                         }
                         video.onplaying = function () {
                             dashboardVideoReady = true;
+                            dashboardRecoveryAttempts = 0;
                             dashboardLastProgressAt = Date.now();
                             startDashboardLatencyMonitor(video);
                             if (placeholder) placeholder.style.display = 'none';
@@ -279,6 +289,7 @@
                     dashboardFlvPlayer.play();
                     video.onplaying = function () {
                         dashboardVideoReady = true;
+                        dashboardRecoveryAttempts = 0;
                         dashboardLastProgressAt = Date.now();
                         startDashboardLatencyMonitor(video);
                         if (placeholder) placeholder.style.display = 'none';

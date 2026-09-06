@@ -118,13 +118,19 @@ camera:
     username: ${CAMERA_LOCAL_USERNAME:admin}
     password: ${CAMERA_LOCAL_PASSWORD:}
     path: ${CAMERA_LOCAL_PATH:/ch1/main}
+    fallback-path: ${CAMERA_LOCAL_FALLBACK_PATH:/ch1/sub}
+    prefer-fallback: ${CAMERA_LOCAL_PREFER_FALLBACK:true}
     transport: ${CAMERA_LOCAL_TRANSPORT:tcp}
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
-    width: ${CAMERA_LOCAL_WIDTH:1080}
-    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:4000k}
+    width: ${CAMERA_LOCAL_WIDTH:720}
+    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:1800k}
     segment-seconds: ${CAMERA_LOCAL_SEGMENT_SECONDS:1}
     list-size: ${CAMERA_LOCAL_LIST_SIZE:3}
+    connect-timeout-ms: ${CAMERA_LOCAL_CONNECT_TIMEOUT_MS:8000}
+    startup-timeout-ms: ${CAMERA_LOCAL_STARTUP_TIMEOUT_MS:30000}
+    stale-timeout-ms: ${CAMERA_LOCAL_STALE_TIMEOUT_MS:30000}
+    restart-cooldown-ms: ${CAMERA_LOCAL_RESTART_COOLDOWN_MS:10000}
 
 ollama:
   base-url: http://localhost:11434
