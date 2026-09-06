@@ -20,6 +20,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$pidFile = Join-Path (Get-Location).Path 'work\camera\hls\ffmpeg.pid'; if (Test-Path -LiteralPath $pidFile) { $cameraPid = (Get-Content -LiteralPath $pidFile -Raw).Trim(); if ($cameraPid -match '^\d+$') { Write-Host ('[INFO] Stopping camera FFmpeg tree PID ' + $cameraPid); & taskkill.exe /PID $cameraPid /T /F 2>$null | Out-Null }; Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue }"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$project = [IO.Path]::GetFullPath((Get-Location).Path); $hls = [IO.Path]::GetFullPath((Join-Path $project 'work\camera\hls')); $re = [regex]::Escape($hls); $targets = @(Get-CimInstance Win32_Process -Filter \"Name = 'ffmpeg.exe'\" | Where-Object { $_.CommandLine -and $_.CommandLine -match $re }); $targets | ForEach-Object { Write-Host ('[INFO] Stopping camera FFmpeg process ' + $_.ProcessId); & taskkill.exe /PID $_.ProcessId /T /F 2>$null | Out-Null }"
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$project = [IO.Path]::GetFullPath((Get-Location).Path); $escaped = [regex]::Escape($project.TrimEnd([char]92)); $targets = @(Get-CimInstance Win32_Process | Where-Object { $line = [string]$_.CommandLine; ($line -match 'spring-boot:run') -and (($line -match $escaped) -or ($line -match 'com\.jhds\.JhdsApplication')) }); if ($targets.Count -eq 0) { Write-Host '[INFO] No JHDS Spring Boot process found.'; exit 0 }; $targets | Sort-Object @{Expression={ if ($_.Name -ieq 'cmd.exe') { 0 } else { 1 } }} | ForEach-Object { Write-Host ('[INFO] Stopping PID ' + $_.ProcessId + ' (' + $_.Name + ')'); Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2"
 
 if errorlevel 1 (

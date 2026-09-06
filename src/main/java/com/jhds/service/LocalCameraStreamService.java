@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /** Bridges the camera's local RTSP stream to browser-compatible low-latency HLS. */
 @Slf4j
@@ -57,7 +58,7 @@ public class LocalCameraStreamService {
             try {
                 Path output = outputDirectory();
                 Files.createDirectories(output);
-                stopStaleProcess(output);
+                stopStaleProcesses(output);
                 cleanOutput(output);
 
                 List<String> command = buildCommand(output);
@@ -110,7 +111,7 @@ public class LocalCameraStreamService {
         command.add("-map");
         command.add("0:a:0?");
         command.add("-vf");
-        command.add("scale=-2:" + properties.getWidth());
+        command.add("fps=15,scale=-2:" + properties.getWidth() + ",format=yuv420p");
         command.add("-r");
         command.add("15");
         command.add("-fps_mode");
@@ -123,6 +124,10 @@ public class LocalCameraStreamService {
         command.add("zerolatency");
         command.add("-profile:v");
         command.add("main");
+        command.add("-x264-params");
+        // Repeat SPS/PPS on every IDR frame so recovered clients do not
+        // display a partial H.264 frame after a transient packet loss.
+        command.add("keyint=15:min-keyint=15:scenecut=0:repeat-headers=1");
         command.add("-pix_fmt");
         command.add("yuv420p");
         command.add("-b:v");
@@ -178,26 +183,84 @@ public class LocalCameraStreamService {
                 if (name.equals("index.m3u8") || name.startsWith("segment-")
                         || name.equals("index.m3u8.tmp") || name.startsWith("segment-" ) && name.endsWith(".tmp")
                         || name.equals("ffmpeg.log") || name.startsWith("ffmpeg-")) {
-                    Files.deleteIfExists(file);
+                    deleteWithRetry(file);
                 }
             }
         }
     }
 
-    private void stopStaleProcess(Path output) {
+    private void deleteWithRetry(Path file) throws IOException {
+        IOException failure = null;
+        for (int attempt = 0; attempt < 6; attempt++) {
+            try {
+                Files.deleteIfExists(file);
+                return;
+            } catch (IOException e) {
+                failure = e;
+                try {
+                    Thread.sleep(250L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        // Windows may keep a handle briefly after taskkill. Do not fail the
+        // camera API just because a stale segment cannot be deleted yet.
+        log.warn("Unable to delete stale camera output {}: {}", file,
+                failure == null ? "unknown" : failure.getMessage());
+    }
+
+    private void stopStaleProcesses(Path output) {
         Path pid = output.resolve("ffmpeg.pid");
-        if (!Files.exists(pid)) return;
+        if (Files.exists(pid)) {
+            try {
+                String value = new String(Files.readAllBytes(pid), StandardCharsets.US_ASCII).trim();
+                if (value.matches("\\d+")) stopPid(Long.parseLong(value));
+            } catch (Exception e) {
+                log.debug("Unable to inspect stale FFmpeg pid file", e);
+            }
+            try { Files.deleteIfExists(pid); } catch (IOException ignored) { }
+        }
+
+        // PID files are unavailable when Java 8 cannot reflect the child PID,
+        // so also scan command lines for FFmpeg instances targeting this HLS
+        // directory. This catches orphaned processes from previous launches.
+        String target = output.toAbsolutePath().normalize().toString().replace("'", "''");
+        String script = "$re=[regex]::Escape('" + target + "'); "
+                + "Get-CimInstance Win32_Process -Filter \"Name = 'ffmpeg.exe'\" "
+                + "| Where-Object { $_.CommandLine -and $_.CommandLine -match $re } "
+                + "| ForEach-Object { $_.ProcessId }";
         try {
-            String value = new String(Files.readAllBytes(pid), StandardCharsets.US_ASCII).trim();
-            long processId = Long.parseLong(value);
-            log.warn("Stopping stale FFmpeg process {} before starting a new bridge", processId);
+            Process scan = new ProcessBuilder("powershell", "-NoProfile", "-Command", script)
+                    .redirectErrorStream(true).start();
+            String text = new String(readAll(scan), StandardCharsets.UTF_8);
+            scan.waitFor(3, TimeUnit.SECONDS);
+            for (String line : text.split("\\r?\\n")) {
+                if (line.trim().matches("\\d+")) stopPid(Long.parseLong(line.trim()));
+            }
+        } catch (Exception e) {
+            log.debug("Unable to scan stale FFmpeg processes", e);
+        }
+    }
+
+    private byte[] readAll(Process process) throws IOException {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] bytes = new byte[256];
+        int count;
+        while ((count = process.getInputStream().read(bytes)) >= 0) buffer.write(bytes, 0, count);
+        return buffer.toByteArray();
+    }
+
+    private void stopPid(long processId) {
+        if (processId <= 0) return;
+        log.warn("Stopping stale FFmpeg process {} before starting a new bridge", processId);
+        try {
             Process killer = new ProcessBuilder("taskkill", "/PID", String.valueOf(processId), "/T", "/F")
                     .redirectErrorStream(true).start();
-            killer.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+            killer.waitFor(3, TimeUnit.SECONDS);
         } catch (Exception e) {
-            log.debug("Unable to inspect stale FFmpeg pid file", e);
-        } finally {
-            try { Files.deleteIfExists(pid); } catch (IOException ignored) { }
+            log.debug("Unable to stop stale FFmpeg process " + processId, e);
         }
     }
 
