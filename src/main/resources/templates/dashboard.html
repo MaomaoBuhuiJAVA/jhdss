@@ -8,6 +8,7 @@
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
+    <script th:src="@{/js/lib/hls.min.js}"></script>
 </head>
 <body>
     <div th:replace="fragments/header::header('dashboard')"></div>
@@ -56,6 +57,12 @@
                 <div class="video-main">
                     <video id="dashboard-video-player" class="dashboard-video-player" autoplay muted playsinline></video>
                     <div class="video-placeholder" id="dashboard-video-placeholder" style="display:none;"><i class="ri-video-line"></i><p>暂无画面，等待信号接入</p></div>
+                    <div class="dashboard-video-controls" aria-label="网页画面缩放">
+                        <button type="button" onclick="adjustDashboardZoom(-0.1)" title="缩小画面" aria-label="缩小画面"><i class="ri-zoom-out-line"></i></button>
+                        <span id="dashboard-zoom-label">100%</span>
+                        <button type="button" onclick="adjustDashboardZoom(0.1)" title="放大画面" aria-label="放大画面"><i class="ri-zoom-in-line"></i></button>
+                        <button type="button" onclick="resetDashboardZoom()" title="恢复画面比例" aria-label="恢复画面比例"><i class="ri-refresh-line"></i></button>
+                    </div>
                 </div>
                 <div class="video-footer"><div class="cam-label">次监控</div><span class="video-time">CH-02 &nbsp; 16:9</span></div>
             </div>
@@ -104,6 +111,8 @@
     <script th:src="@{/js/dashboard.js}"></script>
     <script>
         let dashboardFlvPlayer = null;
+        let dashboardHlsPlayer = null;
+        let dashboardZoom = 1;
         let dashboardVideoReady = false;
         let dashboardLatencyTimer = null;
         let dashboardWatchdogTimer = null;
@@ -133,6 +142,10 @@
                 } catch (e) { /* ignore */ }
                 dashboardFlvPlayer = null;
             }
+            if (dashboardHlsPlayer) {
+                try { dashboardHlsPlayer.destroy(); } catch (e) { /* ignore */ }
+                dashboardHlsPlayer = null;
+            }
             const video = document.getElementById('dashboard-video-player');
             if (video) {
                 video.onplaying = null;
@@ -140,6 +153,10 @@
                 video.ontimeupdate = null;
                 video.onstalled = null;
                 video.onwaiting = null;
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+                applyDashboardZoom();
             }
             dashboardVideoReady = false;
         }
@@ -189,6 +206,45 @@
                     return;
                 }
                 try {
+                    if (/\\.m3u8(?:$|\\?)/i.test(res.data)) {
+                        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                            video.src = res.data;
+                            video.play().catch(function () {});
+                        } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                            dashboardHlsPlayer = new Hls({
+                                enableWorker: true,
+                                lowLatencyMode: true,
+                                backBufferLength: 6,
+                                maxBufferLength: 3,
+                                maxMaxBufferLength: 5,
+                                liveSyncDurationCount: 1,
+                                liveMaxLatencyDurationCount: 2,
+                                manifestLoadingMaxRetry: 3,
+                                fragLoadingMaxRetry: 3
+                            });
+                            dashboardHlsPlayer.on(Hls.Events.ERROR, function (event, data) {
+                                if (!data.fatal) return;
+                                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) dashboardHlsPlayer.startLoad();
+                                else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) dashboardHlsPlayer.recoverMediaError();
+                                else scheduleDashboardRecovery(800);
+                            });
+                            dashboardHlsPlayer.loadSource(res.data);
+                            dashboardHlsPlayer.attachMedia(video);
+                        } else {
+                            throw new Error('浏览器不支持 HLS 播放');
+                        }
+                        video.onplaying = function () {
+                            dashboardVideoReady = true;
+                            dashboardLastProgressAt = Date.now();
+                            startDashboardLatencyMonitor(video);
+                            if (placeholder) placeholder.style.display = 'none';
+                        };
+                        video.onerror = function () { dashboardVideoReady = false; if (placeholder) placeholder.style.display = 'flex'; scheduleDashboardRecovery(800); };
+                        video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); };
+                        video.onstalled = function () { scheduleDashboardRecovery(800); };
+                        video.onwaiting = function () { scheduleDashboardRecovery(1200); };
+                        return;
+                    }
                     if (typeof flvjs === 'undefined') {
                         if (placeholder) { placeholder.innerHTML = '<i class="ri-video-line"></i><p>播放器组件加载失败</p>'; placeholder.style.display = 'flex'; }
                         return;
@@ -240,6 +296,21 @@
         });
         window.addEventListener('pagehide', destroyDashboardPlayer);
         window.addEventListener('beforeunload', destroyDashboardPlayer);
+
+        function applyDashboardZoom() {
+            const video = document.getElementById('dashboard-video-player');
+            const label = document.getElementById('dashboard-zoom-label');
+            if (video) video.style.transform = 'scale(' + dashboardZoom.toFixed(2) + ')';
+            if (label) label.textContent = Math.round(dashboardZoom * 100) + '%';
+        }
+        function adjustDashboardZoom(delta) {
+            dashboardZoom = Math.max(1, Math.min(2, dashboardZoom + delta));
+            applyDashboardZoom();
+        }
+        function resetDashboardZoom() {
+            dashboardZoom = 1;
+            applyDashboardZoom();
+        }
     </script>
 </body>
 </html>

@@ -11,6 +11,24 @@ let cameraLatencyTimer = null;
 let cameraWatchdogTimer = null;
 let cameraLastProgressAt = 0;
 let cameraInitStartedAt = 0;
+let cameraZoom = 1;
+
+function applyCameraZoom() {
+    var video = document.getElementById('video-player');
+    var label = document.getElementById('camera-zoom-label');
+    if (video) video.style.transform = 'scale(' + cameraZoom.toFixed(2) + ')';
+    if (label) label.textContent = Math.round(cameraZoom * 100) + '%';
+}
+
+function adjustCameraZoom(delta) {
+    cameraZoom = Math.max(1, Math.min(2, cameraZoom + delta));
+    applyCameraZoom();
+}
+
+function resetCameraZoom() {
+    cameraZoom = 1;
+    applyCameraZoom();
+}
 
 const PATROL_ALERT_FALLBACK = {
     title: '⚠️花朵数量严重超标！',
@@ -460,6 +478,7 @@ function destroyCameraPlayer() {
         video.pause();
         video.removeAttribute('src');
         video.load();
+        applyCameraZoom();
     }
     patrolVideoReady = false;
 }

@@ -3,8 +3,8 @@
 .patrol-sidebar { width: 280px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; }
 .patrol-video { flex: 1; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-subtle); display: flex; flex-direction: column; position: relative; overflow: hidden; min-height: 400px; min-width: 0; }
 .patrol-video::before { content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 198, 240, 0.5), transparent); pointer-events: none; z-index: 2; opacity: 0.7; }
-.patrol-video-main { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.6) 0%, rgba(5, 12, 22, 0.95) 100%); overflow: hidden; }
-.patrol-video-player { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; }
+.patrol-video-main { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; aspect-ratio: 16 / 9; min-height: 0; background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.6) 0%, rgba(5, 12, 22, 0.95) 100%); overflow: hidden; }
+.patrol-video-player { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; transform: scale(1); transform-origin: center; transition: transform .18s ease; }
 .patrol-video-main .video-placeholder { position: absolute; z-index: 2; }
 .patrol-video-main::before { content: ''; position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-top: 2px solid rgba(0, 198, 240, 0.6); border-left: 2px solid rgba(0, 198, 240, 0.6); pointer-events: none; z-index: 3; }
 .patrol-video-main::after { content: ''; position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; border-bottom: 2px solid rgba(0, 198, 240, 0.6); border-right: 2px solid rgba(0, 198, 240, 0.6); pointer-events: none; z-index: 3; }
@@ -42,6 +42,10 @@
 .audio-btn { position: absolute; right: 12px; top: 12px; z-index: 10; padding: 5px 10px; border: 1px solid rgba(0, 198, 240, 0.45); border-radius: 6px; background: rgba(5, 12, 22, 0.78); color: var(--text-secondary); font: 11px var(--font-mono); cursor: pointer; }
 .audio-btn:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0, 180, 220, 0.14); }
 .audio-btn.enabled { color: var(--accent-secondary); border-color: var(--accent-secondary); }
+.video-view-controls { position: absolute; right: 12px; bottom: 12px; z-index: 10; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid rgba(30, 60, 100, .6); border-radius: 6px; background: rgba(5, 12, 22, .82); color: var(--text-secondary); font: 10px var(--font-mono); }
+.video-view-btn { width: 25px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+.video-view-btn:hover { color: var(--accent-primary); background: rgba(0, 180, 220, .14); }
+.video-view-btn i { font-size: 15px; }
 .camera-connection-status { margin-left: auto; color: var(--text-dim); font-size: 11px; }
 .camera-connection-status.ready { color: var(--accent-secondary); }
 .camera-connection-status.error { color: #ff9aac; }

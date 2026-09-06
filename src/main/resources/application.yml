@@ -121,8 +121,8 @@ camera:
     transport: ${CAMERA_LOCAL_TRANSPORT:udp}
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
-    width: ${CAMERA_LOCAL_WIDTH:640}
-    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:500k}
+    width: ${CAMERA_LOCAL_WIDTH:1080}
+    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:4000k}
     segment-seconds: ${CAMERA_LOCAL_SEGMENT_SECONDS:1}
     list-size: ${CAMERA_LOCAL_LIST_SIZE:3}
 

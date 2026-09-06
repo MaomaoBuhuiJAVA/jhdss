@@ -18,8 +18,8 @@ public class LocalCameraProperties {
     private String transport = "udp";
     private String ffmpegPath = "ffmpeg";
     private String hlsPath = "./work/camera/hls";
-    private int width = 960;
-    private String videoBitrate = "900k";
+    private int width = 1080;
+    private String videoBitrate = "4000k";
     private int segmentSeconds = 1;
     private int listSize = 3;
 }

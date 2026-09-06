@@ -32,6 +32,12 @@
                         <div class="video-placeholder" id="video-placeholder"><i class="ri-camera-lens-line" style="font-size:64px;"></i><p>AI轨道巡检实时画面</p><p id="video-placeholder-message" style="font-size:11px; margin-top:4px; color:var(--text-dim);">正在检查萤石摄像头连接</p></div>
                         <button class="ctrl-btn encode" id="btn-encode" onclick="changeEncodeType()"><i class="ri-settings-4-line"></i>H.264 默认</button>
                         <button class="audio-btn" id="btn-audio" type="button" onclick="toggleCameraAudio()"><i class="ri-volume-up-line"></i>开启声音</button>
+                        <div class="video-view-controls" aria-label="网页画面缩放">
+                            <button type="button" class="video-view-btn" onclick="adjustCameraZoom(-0.1)" title="缩小画面" aria-label="缩小画面"><i class="ri-zoom-out-line"></i></button>
+                            <span id="camera-zoom-label">100%</span>
+                            <button type="button" class="video-view-btn" onclick="adjustCameraZoom(0.1)" title="放大画面" aria-label="放大画面"><i class="ri-zoom-in-line"></i></button>
+                            <button type="button" class="video-view-btn" onclick="resetCameraZoom()" title="恢复画面比例" aria-label="恢复画面比例"><i class="ri-refresh-line"></i></button>
+                        </div>
                     </div>
                     <div class="patrol-controls">
                         <button class="ctrl-btn" id="btn-left" onclick="setPatrolDir('left')"><i class="ri-arrow-left-line"></i>左移</button>

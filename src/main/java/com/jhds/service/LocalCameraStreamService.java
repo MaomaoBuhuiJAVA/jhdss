@@ -85,9 +85,9 @@ public class LocalCameraStreamService {
         command.add("-flags");
         command.add("low_delay");
         command.add("-analyzeduration");
-        command.add("500000");
+        command.add("1000000");
         command.add("-probesize");
-        command.add("500000");
+        command.add("1000000");
         command.add("-i");
         command.add(buildRtspUrl());
         command.add("-map");
@@ -109,9 +109,8 @@ public class LocalCameraStreamService {
         command.add("-maxrate");
         command.add(properties.getVideoBitrate());
         command.add("-bufsize");
-        command.add("450k");
-        // The camera publishes 15 fps. A one-second GOP lets the HLS muxer
-        // close segments promptly instead of waiting for a 1.6s keyframe.
+        command.add("2000k");
+        // The camera publishes 15 fps. A one-second GOP keeps HLS latency low.
         command.add("-g");
         command.add("15");
         command.add("-keyint_min");
@@ -131,7 +130,7 @@ public class LocalCameraStreamService {
         command.add("-hls_list_size");
         command.add(String.valueOf(Math.max(2, properties.getListSize())));
         command.add("-hls_flags");
-        command.add("delete_segments+append_list+independent_segments");
+        command.add("delete_segments+append_list+independent_segments+program_date_time");
         command.add("-hls_segment_filename");
         command.add(output.resolve("segment-%03d.ts").toString());
         command.add(output.resolve("index.m3u8").toString());
