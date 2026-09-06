@@ -12,6 +12,7 @@ let cameraWatchdogTimer = null;
 let cameraLastProgressAt = 0;
 let cameraInitStartedAt = 0;
 let cameraZoom = 1;
+let ptzStopTimer = null;
 
 function applyCameraZoom() {
     var video = document.getElementById('video-player');
@@ -161,6 +162,20 @@ async function stopPtz(direction, button, keepMinimumMotion) {
     else setPtzStatus('云台待命');
 }
 
+function schedulePtzStop(direction, button) {
+    if (ptzStopTimer) {
+        clearTimeout(ptzStopTimer);
+        ptzStopTimer = null;
+    }
+    // A click/touch can emit pointerup before the cloud start response has
+    // arrived. Keep the motor command active briefly so EZVIZ receives a
+    // visible movement instead of an immediate start/stop pair.
+    ptzStopTimer = window.setTimeout(function() {
+        ptzStopTimer = null;
+        stopPtz(direction, button, true);
+    }, 900);
+}
+
 function bindPtzControls() {
     document.querySelectorAll('[data-ptz-direction]').forEach(function(button) {
         const direction = Number(button.dataset.ptzDirection);
@@ -169,11 +184,17 @@ function bindPtzControls() {
             if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
             startPtz(direction, button);
         });
-        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) {
-            button.addEventListener(type, function(event) {
-                event.preventDefault();
-                stopPtz(direction, button, true);
-            });
+        button.addEventListener('pointerup', function(event) {
+            event.preventDefault();
+            schedulePtzStop(direction, button);
+        });
+        button.addEventListener('pointercancel', function(event) {
+            event.preventDefault();
+            stopPtz(direction, button, true);
+        });
+        button.addEventListener('lostpointercapture', function(event) {
+            event.preventDefault();
+            schedulePtzStop(direction, button);
         });
         button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
     });
