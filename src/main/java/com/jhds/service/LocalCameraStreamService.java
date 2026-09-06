@@ -44,6 +44,26 @@ public class LocalCameraStreamService {
         return properties.getHlsPath();
     }
 
+    /** Wait briefly for FFmpeg to publish a usable playlist after startup. */
+    public boolean awaitReady(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
+        Path playlist = outputDirectory().resolve("index.m3u8");
+        while (System.currentTimeMillis() <= deadline) {
+            try {
+                if (Files.exists(playlist) && Files.size(playlist) > 32) return true;
+            } catch (IOException ignored) {
+                // FFmpeg may be replacing the playlist atomically; retry.
+            }
+            try {
+                Thread.sleep(150L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return Files.exists(playlist);
+    }
+
     public void ensureRunning() {
         synchronized (processLock) {
             if (ffmpegProcess != null && ffmpegProcess.isAlive()) {

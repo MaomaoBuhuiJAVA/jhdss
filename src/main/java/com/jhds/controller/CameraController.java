@@ -35,6 +35,9 @@ public class CameraController {
         try {
             if (localCameraStreamService.isEnabled()) {
                 localCameraStreamService.ensureRunning();
+                if (!localCameraStreamService.awaitReady(5000L)) {
+                    return Result.error(503, "本地摄像头流正在启动，请稍后重试");
+                }
                 String url = ServletUriComponentsBuilder.fromCurrentContextPath()
                         .path("/local-camera/index.m3u8")
                         // The playlist is rewritten every second. A cache
