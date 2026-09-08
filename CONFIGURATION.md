@@ -65,7 +65,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `CAMERA_LOCAL_USERNAME/PASSWORD` | `admin`/空 | RTSP 认证；萤石设备通常使用 `admin` 和设备验证码 |
 | `CAMERA_LOCAL_WIDTH/VIDEO_BITRATE` | `1080`/`4000k` | FFmpeg 输出高度和码率，默认 1920×1080 超清；性能不足时可降为 720/2000k |
 | `CAMERA_LOCAL_FFMPEG_PATH` | `ffmpeg` | FFmpeg 可执行文件路径，要求在 PATH 中或填写绝对路径 |
-| `CONTROL_PANEL_BASE_URL` | `http://169.254.240.33` | 蓝牙个人区域网控制面板地址；必须从运行 JHDS 后端的电脑可访问 |
+| `CONTROL_PANEL_BASE_URL` | `http://169.254.240.33` | 控制面板 HTTP 服务地址；控制面板由第三台电脑转发时填写第三台电脑在无网路由器网络中的地址和端口 |
 | `SPRING_DATASOURCE_USERNAME` | `root` | MySQL 登录用户名 |
 | `SPRING_DATASOURCE_PASSWORD` | `a123456` | MySQL 登录密码；必须与目标电脑实际账号密码一致 |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |

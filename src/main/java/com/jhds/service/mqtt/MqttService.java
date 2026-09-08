@@ -240,7 +240,13 @@ public class MqttService implements DisposableBean {
             long timeoutMs = isModbusWriteCommand(commandCode)
                     ? Math.min(Constants.COMMAND_TIMEOUT * 1000L, 5000L)
                     : Constants.COMMAND_TIMEOUT * 1000L;
-            String response = sendHexSync(commandCode, timeoutMs);
+            // Rail motor commands are momentary control actions. QoS 1 may be
+            // queued by the broker while the DTU is offline and replayed when
+            // the device powers on, causing an unexpected limit hit. QoS 0
+            // makes these commands valid only while the device is connected.
+            boolean momentaryMotorCommand = "MOTOR_DIRECTION".equalsIgnoreCase(alias)
+                    || "MOTOR_STATE".equalsIgnoreCase(alias);
+            String response = sendHexSync(commandCode, timeoutMs, momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()));
             boolean success = response != null;
             controlLogService.log(alias, equipment.getName(), value,
                     automatic ? 1 : 0, commandCode, response, success ? 1 : 0);
@@ -337,6 +343,10 @@ public class MqttService implements DisposableBean {
     }
 
     public String sendHexSync(String hexCommand, long timeoutMs) {
+        return sendHexSync(hexCommand, timeoutMs, safeQos(mqttProperties.getCommandQos()));
+    }
+
+    private String sendHexSync(String hexCommand, long timeoutMs, int qos) {
         try {
             if (!isHexCommand(hexCommand)) {
                 log.warn("Invalid hexadecimal serial frame: {}", hexCommand);
@@ -349,7 +359,7 @@ public class MqttService implements DisposableBean {
             String commandTopic = mqttProperties.getTopic().getPrefix() + "/"
                     + mqttProperties.getTopic().getCommandSuffix();
             MqttMessage message = new MqttMessage(ModbusUtil.hexToBytes(hexCommand));
-            message.setQos(safeQos(mqttProperties.getCommandQos()));
+            message.setQos(qos);
             mqttClient.publish(commandTopic, message);
             log.debug("Hex command sent: {}", hexCommand);
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);

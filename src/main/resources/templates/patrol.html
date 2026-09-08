@@ -29,9 +29,28 @@
                     </div>
                     <div class="patrol-video-main">
                         <div class="patrol-scan-line"></div>
-                        <video id="video-player" class="patrol-video-player" autoplay playsinline></video>
+                        <video id="video-player" class="patrol-video-player" autoplay playsinline crossorigin="anonymous" draggable="false"></video>
+                        <canvas id="realtime-detection-canvas" class="realtime-detection-canvas" aria-hidden="true"></canvas>
+                        <div class="realtime-alert-banner" id="realtime-alert-banner" role="alert" hidden>
+                            <i class="ri-alarm-warning-fill"></i>
+                            <div><strong>发现疑似黑天牛</strong><span id="realtime-alert-detail">请立即复核现场画面</span></div>
+                            <button type="button" onclick="dismissRealtimeAlert()" aria-label="关闭警告"><i class="ri-close-line"></i></button>
+                        </div>
                         <div class="video-placeholder" id="video-placeholder"><i class="ri-camera-lens-line" style="font-size:64px;"></i><p>AI轨道巡检实时画面</p><p id="video-placeholder-message" style="font-size:11px; margin-top:4px; color:var(--text-dim);">正在检查萤石摄像头连接</p></div>
-                        <button class="ctrl-btn encode" id="btn-encode" onclick="changeEncodeType()"><i class="ri-settings-4-line"></i>H.264 默认</button>
+                        <div class="camera-stream-tools">
+                            <button class="ctrl-btn encode" id="btn-encode" onclick="changeEncodeType()"><i class="ri-settings-4-line"></i>H.264 默认</button>
+                            <label class="camera-quality-control" for="camera-quality">
+                                <i class="ri-hd-line" aria-hidden="true"></i>
+                                <select id="camera-quality" aria-label="视频清晰度" onchange="changeCameraQuality(this.value)">
+                                    <option value="smooth">流畅 480p</option>
+                                    <option value="hd" selected>高清 720p</option>
+                                    <option value="4k">超清 4K</option>
+                                </select>
+                            </label>
+                            <span class="camera-quality-status" id="camera-quality-status" aria-live="polite">画质待校验</span>
+                            <button class="realtime-detect-toggle" id="realtime-detect-toggle" type="button" disabled aria-pressed="false"><i class="ri-radar-line"></i><span>虫害监测 已关闭</span></button>
+                            <span class="realtime-detect-status" id="realtime-detect-status" aria-live="polite">监测已关闭</span>
+                        </div>
                         <button class="audio-btn" id="btn-audio" type="button" onclick="toggleCameraAudio()"><i class="ri-volume-up-line"></i>开启声音</button>
                         <div class="video-view-controls" aria-label="网页画面缩放">
                             <button type="button" class="video-view-btn" onclick="adjustCameraZoom(-0.1)" title="缩小画面" aria-label="缩小画面"><i class="ri-zoom-out-line"></i></button>
@@ -70,37 +89,36 @@
                 </div>
             </div>
             <div class="patrol-sidebar">
-                <div class="card" style="flex:1; display:flex; flex-direction:column;">
-                    <div class="card-header"><i class="ri-list-check-2"></i><span>AI巡检提示</span></div>
+                <div class="card auto-patrol-card">
+                    <div class="card-header"><i class="ri-route-line"></i><span>自动巡检方案</span><span class="auto-patrol-live" id="auto-patrol-live">待命</span></div>
                     <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
                         <i class="ri-alarm-warning-line"></i>
                         <span id="patrol-warning-text">⚠️花朵数量严重超标！</span>
                         <i class="ri-arrow-right-s-line"></i>
                     </button>
-                    <div class="task-list" id="patrol-tasks"></div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><i class="ri-add-circle-line"></i><span>新增巡逻任务</span></div>
-                    <div style="padding:16px 18px;">
-                        <div class="form-group">
-                            <label class="form-label">任务名称</label>
-                            <input type="text" class="form-input" id="task-name" placeholder="例如：每日生长巡检">
+                    <div class="auto-patrol-body">
+                        <div class="auto-patrol-plans" id="auto-patrol-plans">
+                            <div class="auto-patrol-loading">正在读取巡检方案</div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">执行时间</label>
-                            <input type="time" class="form-input" id="task-time">
+                        <div class="auto-patrol-status" aria-live="polite">
+                            <div class="auto-patrol-phase"><span id="auto-patrol-phase">等待开始</span><strong id="auto-patrol-progress-text">0%</strong></div>
+                            <div class="auto-patrol-progress"><span id="auto-patrol-progress-bar"></span></div>
+                            <div class="auto-patrol-metrics">
+                                <span><i class="ri-layout-row-line"></i><b id="auto-patrol-row">0/0</b> 扫描线</span>
+                                <span><i class="ri-camera-line"></i><b id="auto-patrol-captures">0</b> 张</span>
+                                <span><i class="ri-4k-line"></i><b id="auto-patrol-quality">4K待验证</b> 抓拍</span>
+                            </div>
+                            <div class="auto-patrol-output" id="auto-patrol-output" title="">保存目录检查中</div>
+                            <div class="auto-patrol-message" id="auto-patrol-message" hidden></div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">巡检范围</label>
-                            <select class="form-select" id="task-range">
-                                <option value="all">全部区域</option>
-                                <option value="zone1">种植架1</option>
-                                <option value="zone2">种植架2</option>
-                                <option value="zone3">种植架3</option>
-                                <option value="zone4">种植架4</option>
-                            </select>
+                        <label class="auto-patrol-origin">
+                            <input type="checkbox" id="auto-patrol-origin-confirmed" onchange="updateAutomaticPatrolActions()">
+                            <span>右下安全起点已确认</span>
+                        </label>
+                        <div class="auto-patrol-actions">
+                            <button type="button" class="btn-primary" id="auto-patrol-start" onclick="startAutomaticPatrol()" disabled><i class="ri-play-fill"></i>开始巡检</button>
+                            <button type="button" class="auto-patrol-stop" id="auto-patrol-stop" onclick="stopAutomaticPatrol()" disabled><i class="ri-stop-fill"></i>紧急停止</button>
                         </div>
-                        <button class="btn-primary" onclick="addPatrolTask()"><i class="ri-add-line"></i> 添加任务</button>
                     </div>
                 </div>
             </div>
@@ -170,6 +188,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/patrol.js(v='20260906-camera-watchdog2')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260908-realtime-yolo')}"></script>
 </body>
 </html>

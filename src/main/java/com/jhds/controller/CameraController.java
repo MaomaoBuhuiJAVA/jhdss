@@ -62,6 +62,19 @@ public class CameraController {
         return Result.ok(localCameraStreamService.status());
     }
 
+    @ApiOperation("切换局域网摄像头清晰度")
+    @PutMapping("/local-quality")
+    public Result<Map<String, Object>> changeLocalQuality(@RequestBody Map<String, String> body) {
+        try {
+            String quality = body == null ? null : body.get("quality");
+            return Result.ok(localCameraStreamService.changeQuality(quality));
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头清晰度切换失败：" + errorMessage(e));
+        }
+    }
+
     @ApiOperation("检测萤石账号、设备绑定和播放地址")
     @GetMapping("/stream-check")
     public Result<Map<String, Object>> checkStream(

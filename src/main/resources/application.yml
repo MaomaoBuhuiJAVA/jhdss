@@ -71,7 +71,9 @@ device:
     append-instance-id: ${MQTT_APPEND_INSTANCE_ID:true}
     transparent-mode: ${MQTT_TRANSPARENT_MODE:true}
     ignore-echo: ${MQTT_IGNORE_ECHO:true}
-    command-qos: ${MQTT_COMMAND_QOS:1}
+    # 实时设备动作不能在离线期间排队，否则设备重连后可能执行过期指令。
+    # QoS 0 配合串口响应校验：在线时正常执行，离线时失败并由页面提示重试。
+    command-qos: ${MQTT_COMMAND_QOS:0}
     response-qos: ${MQTT_RESPONSE_QOS:1}
     reconnect-interval-ms: ${MQTT_RECONNECT_INTERVAL_MS:10000}
     reconnect-initial-delay-ms: ${MQTT_RECONNECT_INITIAL_DELAY_MS:10000}
@@ -124,7 +126,8 @@ camera:
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
     width: ${CAMERA_LOCAL_WIDTH:720}
-    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:1800k}
+    video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:2400k}
+    video-buffer-size: ${CAMERA_LOCAL_VIDEO_BUFFER_SIZE:3600k}
     segment-seconds: ${CAMERA_LOCAL_SEGMENT_SECONDS:1}
     list-size: ${CAMERA_LOCAL_LIST_SIZE:3}
     connect-timeout-ms: ${CAMERA_LOCAL_CONNECT_TIMEOUT_MS:8000}
@@ -150,6 +153,19 @@ dashscope:
 
 patrol:
   capture-path: ./captures
+  automatic:
+    output-path: ${PATROL_AUTO_OUTPUT_PATH:E:/LabelImg资料图片/摄像头实际拍摄照片}
+    # 2026-09-07现场标定：右到左有效运动18.422秒，下到上有效运动11.587秒。
+    horizontal-travel-ms: ${PATROL_HORIZONTAL_TRAVEL_MS:18422}
+    vertical-travel-ms: ${PATROL_VERTICAL_TRAVEL_MS:11587}
+    # 避免再次触发硬限位，自动巡检只使用标定行程的92%。
+    coverage-ratio: ${PATROL_COVERAGE_RATIO:0.92}
+    # 右下起步时只做一次小幅取景校准，避免每条扫描线累计云台误差。
+    ptz-pan-direction: ${PATROL_PTZ_PAN_DIRECTION:2}
+    ptz-pan-ms: ${PATROL_PTZ_PAN_MS:350}
+    ptz-tilt-direction: ${PATROL_PTZ_TILT_DIRECTION:0}
+    ptz-tilt-ms: ${PATROL_PTZ_TILT_MS:180}
+    settle-ms: ${PATROL_SETTLE_MS:350}
 
 # Bluetooth PAN irrigation controller. Override on the deployment computer
 # when the controller receives a different link-local address.
@@ -158,6 +174,24 @@ control-panel:
 
 archive:
   upload-path: ./uploads/archive
+
+ai:
+  yolo:
+    enabled: ${AI_YOLO_ENABLED:false}
+    python-path: ${AI_YOLO_PYTHON_PATH:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}
+    model-path: ${AI_YOLO_MODEL_PATH:E:/LabelImg资料图片/yolo_runs/black_longhorn_yolo11s/weights/best.pt}
+    script-path: ${AI_YOLO_SCRIPT_PATH:./scripts/yolo_infer.py}
+    worker-script-path: ${AI_YOLO_WORKER_SCRIPT_PATH:./scripts/yolo_worker.py}
+    upload-path: ${AI_YOLO_UPLOAD_PATH:./uploads/ai-inference}
+    evaluation-path: ${AI_YOLO_EVALUATION_PATH:E:/LabelImg资料图片/yolo_runs/camera_test_eval}
+    evaluation-source-path: ${AI_YOLO_EVALUATION_SOURCE_PATH:E:/LabelImg资料图片/yolo_dataset/camera_test}
+    confidence: ${AI_YOLO_CONFIDENCE:0.25}
+    timeout-seconds: ${AI_YOLO_TIMEOUT_SECONDS:120}
+    realtime-timeout-seconds: ${AI_YOLO_REALTIME_TIMEOUT_SECONDS:20}
+    realtime-interval-ms: ${AI_YOLO_REALTIME_INTERVAL_MS:1000}
+    alarm-cooldown-seconds: ${AI_YOLO_ALARM_COOLDOWN_SECONDS:60}
+    alarm-enabled: ${AI_YOLO_ALARM_ENABLED:true}
+    device: ${AI_YOLO_DEVICE:0}
 
 logging:
   level:

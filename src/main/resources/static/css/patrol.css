@@ -4,7 +4,27 @@
 .patrol-video { flex: 1; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-subtle); display: flex; flex-direction: column; position: relative; overflow: hidden; min-height: 400px; min-width: 0; }
 .patrol-video::before { content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 198, 240, 0.5), transparent); pointer-events: none; z-index: 2; opacity: 0.7; }
 .patrol-video-main { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; aspect-ratio: 16 / 9; min-height: 0; background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.6) 0%, rgba(5, 12, 22, 0.95) 100%); overflow: hidden; }
-.patrol-video-player { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; transform: scale(1); transform-origin: center; transition: transform .18s ease; }
+.patrol-video-player { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; transform: translate3d(0, 0, 0) scale(1); transform-origin: center; transition: transform .12s ease-out; user-select: none; -webkit-user-drag: none; }
+.realtime-detection-canvas { position:absolute; inset:0; width:100%; height:100%; z-index:5; pointer-events:none; transform:translate3d(0,0,0) scale(1); transform-origin:center; transition:transform .12s ease-out; }
+.patrol-video-main.camera-dragging .realtime-detection-canvas { transition:none; }
+.realtime-detect-toggle { height:30px; display:inline-flex; align-items:center; gap:5px; padding:0 9px; border:1px solid rgba(0,198,240,.45); border-radius:6px; background:rgba(5,12,22,.84); color:var(--text-secondary); font:10px var(--font-mono); cursor:pointer; }
+.realtime-detect-toggle.active { color:#8ff2c1; border-color:rgba(0,232,135,.55); background:rgba(0,232,135,.1); box-shadow:0 0 12px rgba(0,232,135,.13); }
+.realtime-detect-toggle:disabled { opacity:.55; cursor:not-allowed; }
+.realtime-detect-toggle i { font-size:14px; }
+.realtime-detect-status { max-width:130px; color:var(--text-dim); font:10px var(--font-mono); white-space:nowrap; }
+.realtime-detect-status.running { color:#8ff2c1; }
+.realtime-detect-status.detected { color:#ff9aac; font-weight:700; }
+.realtime-detect-status.error { color:#ffd58a; }
+.realtime-alert-banner[hidden] { display:none; }
+.realtime-alert-banner { position:absolute; left:50%; bottom:18px; z-index:12; min-width:320px; max-width:calc(100% - 36px); transform:translateX(-50%); display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid rgba(255,77,106,.82); border-radius:9px; background:rgba(74,8,24,.94); color:#ffe6eb; box-shadow:0 0 0 1px rgba(255,77,106,.15),0 12px 38px rgba(0,0,0,.5),0 0 26px rgba(255,77,106,.25); animation:realtimeAlertPulse 1.2s ease-in-out infinite alternate; }
+.realtime-alert-banner > i { color:#ff4d6a; font-size:25px; }
+.realtime-alert-banner div { flex:1; display:flex; flex-direction:column; gap:3px; }
+.realtime-alert-banner strong { font-size:14px; }
+.realtime-alert-banner span { color:#ffb3c0; font-size:11px; }
+.realtime-alert-banner button { width:28px; height:28px; border:0; border-radius:5px; background:rgba(255,255,255,.08); color:#ffdce3; cursor:pointer; }
+@keyframes realtimeAlertPulse { from { border-color:rgba(255,77,106,.55); } to { border-color:#ff4d6a; box-shadow:0 0 0 1px rgba(255,77,106,.2),0 12px 38px rgba(0,0,0,.5),0 0 38px rgba(255,77,106,.38); } }
+.patrol-video-main.camera-pan-enabled .patrol-video-player { cursor: grab; }
+.patrol-video-main.camera-dragging .patrol-video-player { cursor: grabbing; transition: none; }
 .patrol-video-main .video-placeholder { position: absolute; z-index: 2; }
 .patrol-video-main::before { content: ''; position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; border-top: 2px solid rgba(0, 198, 240, 0.6); border-left: 2px solid rgba(0, 198, 240, 0.6); pointer-events: none; z-index: 3; }
 .patrol-video-main::after { content: ''; position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; border-bottom: 2px solid rgba(0, 198, 240, 0.6); border-right: 2px solid rgba(0, 198, 240, 0.6); pointer-events: none; z-index: 3; }
@@ -61,8 +81,19 @@
 .ctrl-btn.encode { border-color: rgba(0, 200, 180, 0.5); }
 .ctrl-btn.encode:hover { background: rgba(0, 200, 180, 0.15); border-color: var(--accent-secondary); box-shadow: 0 0 20px rgba(0, 232, 135, 0.2); }
 .ctrl-btn.encode:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.patrol-video-main .ctrl-btn.encode { position: absolute; top: 12px; left: 12px; z-index: 10; padding: 4px 10px; font-size: 12px; flex: none; border-radius: 6px; gap: 4px; }
+.camera-stream-tools { position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 7px; }
+.patrol-video-main .ctrl-btn.encode { position: static; padding: 4px 10px; font-size: 12px; flex: none; border-radius: 6px; gap: 4px; }
 .patrol-video-main .ctrl-btn.encode i { font-size: 14px; }
+.camera-quality-control { height: 30px; display: flex; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid rgba(0, 198, 240, .45); border-radius: 6px; background: rgba(5, 12, 22, .84); color: var(--accent-primary); }
+.camera-quality-control i { font-size: 15px; }
+.camera-quality-control select { height: 100%; min-width: 92px; padding: 0 20px 0 2px; border: 0; outline: 0; background: transparent; color: var(--text-secondary); font: 11px var(--font-mono); cursor: pointer; }
+.camera-quality-control select option { background: #0b1421; color: #d8e8f3; }
+.camera-quality-control:focus-within, .camera-quality-control:hover { border-color: var(--accent-primary); background: rgba(0, 180, 220, .14); }
+.camera-quality-control select:disabled { cursor: wait; opacity: .65; }
+.camera-quality-status { max-width: 170px; overflow: hidden; color: var(--text-dim); font: 10px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.camera-quality-status.verified { color: #72edb2; }
+.camera-quality-status.warning { color: #ffd58a; }
+.camera-quality-status.error { color: #ff9aac; }
 .audio-btn { position: absolute; right: 12px; top: 12px; z-index: 10; padding: 5px 10px; border: 1px solid rgba(0, 198, 240, 0.45); border-radius: 6px; background: rgba(5, 12, 22, 0.78); color: var(--text-secondary); font: 11px var(--font-mono); cursor: pointer; }
 .audio-btn:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0, 180, 220, 0.14); }
 .audio-btn.enabled { color: var(--accent-secondary); border-color: var(--accent-secondary); }
@@ -108,6 +139,50 @@
 .task-status.completed { color: var(--text-dim); }
 .task-action { color: var(--accent-warn); cursor: pointer; font-size: 16px; padding: 4px; transition: all 0.2s; }
 .task-action:hover { transform: scale(1.2); text-shadow: 0 0 10px rgba(255, 77, 106, 0.5); }
+
+.auto-patrol-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.auto-patrol-card .card-header { flex: 0 0 auto; }
+.auto-patrol-live { margin-left: auto; padding: 3px 7px; border: 1px solid rgba(120, 145, 170, .35); border-radius: 4px; color: var(--text-dim); font: 10px var(--font-mono); }
+.auto-patrol-live.running { color: #62f0ad; border-color: rgba(0, 232, 135, .45); background: rgba(0, 232, 135, .08); }
+.auto-patrol-live.completed { color: #7fdcff; border-color: rgba(0, 198, 240, .45); background: rgba(0, 198, 240, .08); }
+.auto-patrol-live.error { color: #ff9aac; border-color: rgba(255, 77, 106, .45); background: rgba(255, 77, 106, .08); }
+.auto-patrol-body { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 12px; padding: 12px 14px 14px; overflow-y: auto; }
+.auto-patrol-plans { display: grid; gap: 7px; }
+.auto-patrol-loading { padding: 18px 10px; color: var(--text-dim); font-size: 12px; text-align: center; }
+.auto-patrol-loading.error { color: #ff9aac; }
+.auto-patrol-plan { position: relative; min-height: 54px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 10px 9px 34px; border: 1px solid rgba(30, 60, 100, .42); border-radius: 7px; background: rgba(8, 16, 28, .56); cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.auto-patrol-plan:hover { border-color: rgba(0, 198, 240, .55); background: rgba(0, 180, 220, .08); transform: translateY(-1px); }
+.auto-patrol-plan.selected { border-color: rgba(0, 232, 135, .62); background: rgba(0, 232, 135, .08); box-shadow: inset 3px 0 0 rgba(0, 232, 135, .7); }
+.auto-patrol-plan input { position: absolute; left: 11px; width: 14px; height: 14px; accent-color: #00e887; }
+.auto-patrol-plan-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.auto-patrol-plan-main strong { color: #dce8f2; font-size: 12px; font-weight: 600; }
+.auto-patrol-plan-main small { overflow: hidden; color: var(--text-dim); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.auto-patrol-plan-meta { color: var(--accent-primary); font: 10px var(--font-mono); }
+.auto-patrol-plan:has(input:disabled) { cursor: not-allowed; opacity: .64; transform: none; }
+.auto-patrol-status { padding: 10px 0; border-top: 1px solid rgba(30, 60, 100, .34); border-bottom: 1px solid rgba(30, 60, 100, .34); }
+.auto-patrol-phase { display: flex; justify-content: space-between; gap: 10px; color: var(--text-secondary); font-size: 11px; }
+.auto-patrol-phase span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auto-patrol-phase strong { flex: 0 0 auto; color: var(--accent-primary); font: 11px var(--font-mono); }
+.auto-patrol-progress { height: 5px; margin-top: 7px; overflow: hidden; border-radius: 3px; background: rgba(30, 60, 100, .45); }
+.auto-patrol-progress span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #00b8e0, #00e887); transition: width .35s ease; }
+.auto-patrol-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
+.auto-patrol-metrics span { min-width: 0; color: var(--text-dim); font-size: 9px; white-space: nowrap; }
+.auto-patrol-metrics i { margin-right: 3px; color: var(--accent-primary); font-size: 12px; vertical-align: -1px; }
+.auto-patrol-metrics b { color: #dce8f2; font: 10px var(--font-mono); }
+.auto-patrol-output { margin-top: 8px; overflow: hidden; color: #7d91a8; font: 9px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.auto-patrol-message { margin-top: 8px; padding: 7px 8px; border-radius: 5px; font-size: 10px; line-height: 1.45; }
+.auto-patrol-message[hidden] { display: none; }
+.auto-patrol-message.warning { color: #ffd58a; background: rgba(240, 160, 64, .1); }
+.auto-patrol-message.error { color: #ff9aac; background: rgba(255, 77, 106, .1); }
+.auto-patrol-origin { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 11px; cursor: pointer; }
+.auto-patrol-origin input { width: 15px; height: 15px; accent-color: #00e887; }
+.auto-patrol-origin:has(input:disabled) { cursor: not-allowed; opacity: .65; }
+.auto-patrol-actions { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; margin-top: auto; }
+.auto-patrol-actions .btn-primary { min-width: 0; padding: 9px 8px; border-radius: 6px; font-size: 12px; }
+.auto-patrol-actions button:disabled { cursor: not-allowed; opacity: .45; transform: none; box-shadow: none; }
+.auto-patrol-stop { min-width: 0; padding: 9px 8px; border: 1px solid rgba(255, 77, 106, .52); border-radius: 6px; background: rgba(255, 77, 106, .1); color: #ff9aac; font: 600 12px inherit; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.auto-patrol-stop:not(:disabled):hover { border-color: #ff4d6a; background: rgba(255, 77, 106, .18); }
+.auto-patrol-actions i { margin-right: 4px; }
 
 .form-group { margin-bottom: 14px; }
 .form-label { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 6px; letter-spacing: 0.03em; }
@@ -288,4 +363,5 @@
 @media (max-width: 620px) {
     .video-records-btn { padding: 4px 7px; }
     .patrol-records-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+    .auto-patrol-body { padding: 10px; }
 }

@@ -20,6 +20,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${camera.local.hls-path:./work/camera/hls}")
     private String localCameraHlsPath;
 
+    @Value("${ai.yolo.upload-path:./uploads/ai-inference}")
+    private String aiYoloUploadPath;
+
+    @Value("${ai.yolo.evaluation-path:E:/LabelImg资料图片/yolo_runs/camera_test_eval}")
+    private String aiYoloEvaluationPath;
+
+    @Value("${ai.yolo.evaluation-source-path:E:/LabelImg资料图片/yolo_dataset/camera_test}")
+    private String aiYoloEvaluationSourcePath;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")
@@ -34,6 +43,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations(directoryLocation(archiveUploadPath));
         registry.addResourceHandler("/ai-learn-media/**")
                 .addResourceLocations(directoryLocation(aiLearnPhotoPath));
+        registry.addResourceHandler("/ai-inference/**")
+                .addResourceLocations(directoryLocation(aiYoloUploadPath));
+        registry.addResourceHandler("/ai-eval/**")
+                .addResourceLocations(directoryLocation(aiYoloEvaluationPath));
+        registry.addResourceHandler("/ai-eval-source/**")
+                .addResourceLocations(directoryLocation(aiYoloEvaluationSourcePath));
         registry.addResourceHandler("/local-camera/**")
                 .addResourceLocations(directoryLocation(localCameraHlsPath))
                 // Playlists and segments are live resources. A cached m3u8

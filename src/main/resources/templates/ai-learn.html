@@ -13,6 +13,34 @@
 
 <main class="main" id="aiLearnMain">
 
+    <section class="yolo-panel" aria-labelledby="yoloTitle">
+        <div class="yolo-panel-head">
+            <div>
+                <div class="yolo-eyebrow"><i class="ri-radar-line"></i> YOLO 实时识别</div>
+                <h1 id="yoloTitle">黑天牛检测模型</h1>
+                <p>上传一张图片，或查看 45 张摄像头实拍测试结果。</p>
+            </div>
+            <div class="yolo-model-state"><span></span><b>模型在线</b><small>YOLO11s · 1 类</small></div>
+        </div>
+        <input type="file" id="yoloImageInput" accept="image/jpeg,image/png,image/webp,image/bmp" hidden>
+        <div class="yolo-actions">
+            <button class="yolo-button primary" id="yoloUploadButton" type="button"><i class="ri-image-add-line"></i><span>上传图片识别</span></button>
+            <button class="yolo-button" id="yoloEvaluationButton" type="button"><i class="ri-gallery-view-2"></i><span>查看测试集</span></button>
+            <label class="yolo-threshold">置信度 <input id="yoloThreshold" type="range" min="0.1" max="0.9" step="0.05" value="0.25"><output id="yoloThresholdValue">0.25</output></label>
+            <span class="yolo-status" id="yoloStatus" role="status">等待图片</span>
+        </div>
+        <div class="yolo-stats" id="yoloStats" hidden></div>
+        <div class="yolo-single-result" id="yoloSingleResult" hidden></div>
+        <div class="yolo-evaluation" id="yoloEvaluation" hidden>
+            <div class="yolo-filter" role="group" aria-label="测试集筛选">
+                <button type="button" class="active" data-yolo-filter="all">全部</button>
+                <button type="button" data-yolo-filter="detected">已识别</button>
+                <button type="button" data-yolo-filter="undetected">未识别</button>
+            </div>
+            <div class="yolo-evaluation-grid" id="yoloEvaluationGrid"></div>
+        </div>
+    </section>
+
     <!-- 隐藏的 file input，由"选择视频"按钮统一触发 -->
     <input type="file" id="videoFileInput" accept="video/*" hidden>
 
@@ -121,6 +149,7 @@
 </main>
 
 <script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/yolo-learn.js}"></script>
 <script th:src="@{/js/ai-learn.js}"></script>
 </body>
 </html>

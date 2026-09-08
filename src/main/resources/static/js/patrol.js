@@ -13,26 +13,128 @@ let cameraLastProgressAt = 0;
 let cameraInitStartedAt = 0;
 let cameraRecoveryAttempts = 0;
 let cameraZoom = 1;
+let cameraPanX = 0;
+let cameraPanY = 0;
+let cameraDragging = false;
+let cameraDragPointerId = null;
+let cameraDragStartX = 0;
+let cameraDragStartY = 0;
+let cameraDragOriginX = 0;
+let cameraDragOriginY = 0;
 let ptzStopTimer = null;
 let motorRequestId = 0;
 let panelMotionDir = null;
 let panelMotionRequestId = 0;
+let selectedAutomaticPatrolPlan = 'standard';
+let automaticPatrolRunning = false;
+let realtimeDetectionEnabled = false;
+let realtimeDetectionTimer = null;
+let realtimeDetectionInFlight = false;
+let realtimeDetectionErrors = 0;
+let realtimeAlertDismissedAt = 0;
+let realtimeWasDetected = false;
+let realtimeLastSoundAt = 0;
+let realtimeAudioContext = null;
+let realtimeLastDetectionAt = 0;
+let realtimeDetectionInterval = 1000;
+
+function clampCameraPan() {
+    var viewport = document.querySelector('.patrol-video-main');
+    if (!viewport || cameraZoom <= 1) {
+        cameraPanX = 0;
+        cameraPanY = 0;
+        return;
+    }
+    var maxX = viewport.clientWidth * (cameraZoom - 1) / 2;
+    var maxY = viewport.clientHeight * (cameraZoom - 1) / 2;
+    cameraPanX = Math.max(-maxX, Math.min(maxX, cameraPanX));
+    cameraPanY = Math.max(-maxY, Math.min(maxY, cameraPanY));
+}
 
 function applyCameraZoom() {
     var video = document.getElementById('video-player');
     var label = document.getElementById('camera-zoom-label');
-    if (video) video.style.transform = 'scale(' + cameraZoom.toFixed(2) + ')';
+    var viewport = document.querySelector('.patrol-video-main');
+    clampCameraPan();
+    if (video) {
+        video.style.transform = 'translate3d(' + cameraPanX.toFixed(1) + 'px,'
+                + cameraPanY.toFixed(1) + 'px,0) scale(' + cameraZoom.toFixed(2) + ')';
+    }
+    var detectionCanvas = document.getElementById('realtime-detection-canvas');
+    if (detectionCanvas) {
+        detectionCanvas.style.transform = 'translate3d(' + cameraPanX.toFixed(1) + 'px,'
+                + cameraPanY.toFixed(1) + 'px,0) scale(' + cameraZoom.toFixed(2) + ')';
+    }
+    if (viewport) viewport.classList.toggle('camera-pan-enabled', cameraZoom > 1);
     if (label) label.textContent = Math.round(cameraZoom * 100) + '%';
 }
 
-function adjustCameraZoom(delta) {
-    cameraZoom = Math.max(1, Math.min(2, cameraZoom + delta));
+function adjustCameraZoom(delta, focusX, focusY) {
+    var previousZoom = cameraZoom;
+    var nextZoom = Math.max(1, Math.min(4, cameraZoom + delta));
+    if (nextZoom === previousZoom) return;
+    if (typeof focusX === 'number' && typeof focusY === 'number' && previousZoom > 0) {
+        var ratio = nextZoom / previousZoom;
+        cameraPanX = focusX - (focusX - cameraPanX) * ratio;
+        cameraPanY = focusY - (focusY - cameraPanY) * ratio;
+    }
+    cameraZoom = nextZoom;
     applyCameraZoom();
 }
 
 function resetCameraZoom() {
     cameraZoom = 1;
+    cameraPanX = 0;
+    cameraPanY = 0;
     applyCameraZoom();
+}
+
+function bindCameraViewportControls() {
+    var viewport = document.querySelector('.patrol-video-main');
+    var video = document.getElementById('video-player');
+    if (!viewport || !video || viewport.dataset.viewportControlsBound === 'true') return;
+    viewport.dataset.viewportControlsBound = 'true';
+
+    video.addEventListener('wheel', function(event) {
+        event.preventDefault();
+        var rect = viewport.getBoundingClientRect();
+        var focusX = event.clientX - rect.left - rect.width / 2;
+        var focusY = event.clientY - rect.top - rect.height / 2;
+        adjustCameraZoom(event.deltaY < 0 ? 0.1 : -0.1, focusX, focusY);
+    }, { passive: false });
+
+    video.addEventListener('pointerdown', function(event) {
+        if (event.button !== 0 || cameraZoom <= 1) return;
+        event.preventDefault();
+        cameraDragging = true;
+        cameraDragPointerId = event.pointerId;
+        cameraDragStartX = event.clientX;
+        cameraDragStartY = event.clientY;
+        cameraDragOriginX = cameraPanX;
+        cameraDragOriginY = cameraPanY;
+        video.setPointerCapture(event.pointerId);
+        viewport.classList.add('camera-dragging');
+    });
+
+    video.addEventListener('pointermove', function(event) {
+        if (!cameraDragging || event.pointerId !== cameraDragPointerId) return;
+        cameraPanX = cameraDragOriginX + event.clientX - cameraDragStartX;
+        cameraPanY = cameraDragOriginY + event.clientY - cameraDragStartY;
+        applyCameraZoom();
+    });
+
+    function stopDragging(event) {
+        if (!cameraDragging || event.pointerId !== cameraDragPointerId) return;
+        cameraDragging = false;
+        if (video.hasPointerCapture(event.pointerId)) video.releasePointerCapture(event.pointerId);
+        cameraDragPointerId = null;
+        viewport.classList.remove('camera-dragging');
+    }
+    video.addEventListener('pointerup', stopDragging);
+    video.addEventListener('pointercancel', stopDragging);
+    video.addEventListener('dragstart', function(event) { event.preventDefault(); });
+    video.addEventListener('dblclick', resetCameraZoom);
+    window.addEventListener('resize', applyCameraZoom);
 }
 
 const PATROL_ALERT_FALLBACK = {
@@ -136,7 +238,12 @@ async function setPatrolDir(dir) {
         status.className = 'motor-control-status pending';
         status.textContent = dir === 'stop' ? '正在发送停止指令...' : '正在发送 MQTT 电机指令...';
     }
-    const res = await apiPost('/patrol/control', { dir: dir });
+    const res = await apiPost('/patrol/control', {
+        dir: dir,
+        // This value is created only by the user's current button/key action.
+        // The backend rejects movement requests that do not include it.
+        motionConfirmed: dir !== 'stop'
+    });
     // A newer click owns the visible state. Do not let an older response
     // overwrite the direction selected by the user.
     if (requestId !== motorRequestId) return res;
@@ -310,45 +417,138 @@ function bindPtzControls() {
     if (stop) stop.addEventListener('click', function() { stopPtz(activePtzDirection, stop, false); });
 }
 
-async function addPatrolTask() {
-    const name = document.getElementById('task-name').value;
-    const time = document.getElementById('task-time').value;
-    const range = document.getElementById('task-range').value;
-    if (!name || !time) { alert('请填写完整任务信息'); return; }
-    await apiPost('/patrol/task', {
-        taskName: name,
-        executeTime: time + ':00',
-        patrolRange: range
-    });
-    loadPatrolTasks();
-    document.getElementById('task-name').value = '';
-}
-
-async function loadPatrolTasks() {
-    const res = await apiGet('/patrol/tasks');
-    if (!res || !res.data) return;
-    const container = document.getElementById('patrol-tasks');
+async function loadAutomaticPatrolPlans() {
+    const res = await apiGet('/patrol/auto/plans');
+    const container = document.getElementById('auto-patrol-plans');
     if (!container) return;
-    container.innerHTML = '';
-    if (!res.data.length) {
-        container.innerHTML = '<div class="empty-state">暂无巡检任务</div>';
+    if (!res || res.code !== 200 || !Array.isArray(res.data)) {
+        container.innerHTML = '<div class="auto-patrol-loading error">巡检方案读取失败</div>';
         return;
     }
-    res.data.forEach(task => {
-        const statusMap = {0:'○ 待执行',1:'● 执行中',2:'● 已完成',3:'○ 已停用'};
-        const statusClass = {0:'pending',1:'running',2:'completed',3:'pending'};
-        const div = document.createElement('div');
-        div.className = 'task-item';
-        div.innerHTML = '<div class="task-time">' + escapeHtml(String(task.executeTime || '').slice(0, 5)) + '</div>' +
-            '<div class="task-info"><div class="task-name">' + escapeHtml(task.taskName || '') + '</div><div class="task-status ' + statusClass[task.status] + '">' + statusMap[task.status] + '</div></div>' +
-            '<div class="task-action" onclick="deletePatrolTask(' + task.id + ')"><i class="ri-delete-bin-line"></i></div>';
-        container.appendChild(div);
+    container.innerHTML = '';
+    res.data.forEach(function(plan) {
+        const selected = plan.id === selectedAutomaticPatrolPlan;
+        const label = document.createElement('label');
+        label.className = 'auto-patrol-plan' + (selected ? ' selected' : '');
+        label.innerHTML = '<input type="radio" name="auto-patrol-plan" value="' + escapeHtml(plan.id) + '"'
+            + (selected ? ' checked' : '') + '>'
+            + '<span class="auto-patrol-plan-main"><strong>' + escapeHtml(plan.name) + '</strong>'
+            + '<small>' + escapeHtml(plan.description) + '</small></span>'
+            + '<span class="auto-patrol-plan-meta">' + Number(plan.scanRows || 0) + '线</span>';
+        const input = label.querySelector('input');
+        input.addEventListener('change', function() {
+            selectedAutomaticPatrolPlan = plan.id;
+            container.querySelectorAll('.auto-patrol-plan').forEach(function(item) {
+                item.classList.toggle('selected', item.contains(input));
+            });
+            updateAutomaticPatrolActions();
+        });
+        container.appendChild(label);
     });
+    updateAutomaticPatrolActions();
 }
 
-async function deletePatrolTask(id) {
-    await apiDelete('/patrol/task/' + id);
-    loadPatrolTasks();
+function updateAutomaticPatrolActions() {
+    const origin = document.getElementById('auto-patrol-origin-confirmed');
+    const start = document.getElementById('auto-patrol-start');
+    const stop = document.getElementById('auto-patrol-stop');
+    if (origin) origin.disabled = automaticPatrolRunning;
+    if (start) start.disabled = automaticPatrolRunning || !origin || !origin.checked;
+    if (stop) stop.disabled = !automaticPatrolRunning;
+    document.querySelectorAll('[data-motor-direction], [data-panel-direction], [data-ptz-direction], [data-ptz-stop]').forEach(function(button) {
+        button.disabled = automaticPatrolRunning;
+    });
+    document.querySelectorAll('input[name="auto-patrol-plan"]').forEach(function(input) {
+        input.disabled = automaticPatrolRunning;
+    });
+    const quality = document.getElementById('camera-quality');
+    const encode = document.getElementById('btn-encode');
+    if (quality) quality.disabled = automaticPatrolRunning;
+    if (encode) encode.disabled = automaticPatrolRunning;
+}
+
+async function startAutomaticPatrol() {
+    const origin = document.getElementById('auto-patrol-origin-confirmed');
+    if (!origin || !origin.checked) {
+        window.alert('请先确认轨道位于右下安全起点');
+        return;
+    }
+    const res = await apiPost('/patrol/auto/start', {
+        planId: selectedAutomaticPatrolPlan,
+        originConfirmed: true
+    });
+    if (!res || res.code !== 200) {
+        window.alert((res && res.msg) || '自动巡检启动失败');
+        return;
+    }
+    automaticPatrolRunning = true;
+    updateAutomaticPatrolActions();
+    loadAutomaticPatrolStatus();
+}
+
+async function stopAutomaticPatrol() {
+    const stop = document.getElementById('auto-patrol-stop');
+    if (stop) stop.disabled = true;
+    const res = await apiPost('/patrol/auto/stop', {});
+    if (!res || res.code !== 200) {
+        window.alert((res && res.msg) || '停止指令发送失败');
+    }
+    const origin = document.getElementById('auto-patrol-origin-confirmed');
+    if (origin) origin.checked = false;
+    loadAutomaticPatrolStatus();
+}
+
+async function loadAutomaticPatrolStatus() {
+    const res = await apiGet('/patrol/auto/status');
+    if (!res || res.code !== 200 || !res.data) return;
+    const data = res.data;
+    automaticPatrolRunning = !!data.running;
+    const stateClass = automaticPatrolRunning ? 'running'
+        : (data.state === 'COMPLETED' ? 'completed' : ((data.state === 'FAILED' || data.state === 'CANCELLED') ? 'error' : ''));
+    const live = document.getElementById('auto-patrol-live');
+    if (live) {
+        live.textContent = automaticPatrolRunning ? '运行中' : (data.state === 'COMPLETED' ? '已完成' : (data.state === 'FAILED' ? '异常' : (data.state === 'CANCELLED' ? '已停止' : '待命')));
+        live.className = 'auto-patrol-live ' + stateClass;
+    }
+    const phase = document.getElementById('auto-patrol-phase');
+    const progressText = document.getElementById('auto-patrol-progress-text');
+    const progressBar = document.getElementById('auto-patrol-progress-bar');
+    const row = document.getElementById('auto-patrol-row');
+    const captures = document.getElementById('auto-patrol-captures');
+    const output = document.getElementById('auto-patrol-output');
+    const message = document.getElementById('auto-patrol-message');
+    const patrolQuality = document.getElementById('auto-patrol-quality');
+    const progress = Math.max(0, Math.min(100, Number(data.progress || 0)));
+    if (phase) phase.textContent = data.phase || '等待开始';
+    if (progressText) progressText.textContent = progress + '%';
+    if (progressBar) progressBar.style.width = progress + '%';
+    if (row) row.textContent = Number(data.currentRow || 0) + '/' + Number(data.totalRows || 0);
+    if (captures) captures.textContent = Number(data.captureCount || 0);
+    applyCameraQualityStatus(data);
+    if (output) {
+        output.textContent = data.outputPath || '保存目录未配置';
+        output.title = data.outputPath || '';
+    }
+    // A preflight MQTT failure remains in the last-run record. Once the
+    // gateway reconnects, hide that stale message without hiding new errors.
+    const staleMqttError = data.lastError === 'MQTT网关未连接' && data.mqttConnected !== false;
+    const notice = (staleMqttError ? null : data.lastError) || data.warning;
+    if (message) {
+        message.hidden = !notice;
+        message.className = 'auto-patrol-message ' + (data.lastError ? 'error' : 'warning');
+        message.textContent = notice || '';
+    }
+    if (patrolQuality && data.quality) {
+        const width = Number(data.actualWidth || 0);
+        const height = Number(data.actualHeight || 0);
+        patrolQuality.textContent = data.quality === '4k' && data.qualityVerified === true
+            && width === 3840 && height === 2160 ? '真实4K' : '4K待验证';
+    }
+    if (!automaticPatrolRunning && data.state === 'CANCELLED') {
+        const origin = document.getElementById('auto-patrol-origin-confirmed');
+        if (origin) origin.checked = false;
+    }
+    updateAutomaticPatrolActions();
 }
 
 async function loadPatrolRecords() {
@@ -612,6 +812,239 @@ function destroyCameraPlayer() {
     patrolVideoReady = false;
 }
 
+function captureRealtimeFrame() {
+    var video = document.getElementById('video-player');
+    if (!video || !video.videoWidth || video.readyState < 2) return null;
+    var maxSize = 1024;
+    var width = video.videoWidth;
+    var height = video.videoHeight;
+    var ratio = Math.min(1, maxSize / Math.max(width, height));
+    width = Math.max(1, Math.round(width * ratio));
+    height = Math.max(1, Math.round(height * ratio));
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    try {
+        canvas.getContext('2d', { alpha: false }).drawImage(video, 0, 0, width, height);
+        return { image: canvas.toDataURL('image/jpeg', 0.76).split(',')[1], width: width, height: height };
+    } catch (error) {
+        console.warn('实时视频帧截取失败:', error);
+        return null;
+    }
+}
+
+function setRealtimeDetectionStatus(state, text) {
+    var element = document.getElementById('realtime-detect-status');
+    if (!element) return;
+    element.className = 'realtime-detect-status ' + state;
+    element.textContent = text;
+}
+
+function clearRealtimeDetections() {
+    var canvas = document.getElementById('realtime-detection-canvas');
+    if (canvas) {
+        var context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function drawRealtimeDetections(data) {
+    var canvas = document.getElementById('realtime-detection-canvas');
+    var video = document.getElementById('video-player');
+    if (!canvas || !video) return;
+    var cssWidth = canvas.clientWidth;
+    var cssHeight = canvas.clientHeight;
+    if (!cssWidth || !cssHeight || !data.width || !data.height) return;
+    var pixelRatio = window.devicePixelRatio || 1;
+    var targetWidth = Math.round(cssWidth * pixelRatio);
+    var targetHeight = Math.round(cssHeight * pixelRatio);
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+    }
+    var context = canvas.getContext('2d');
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.clearRect(0, 0, cssWidth, cssHeight);
+
+    var sourceRatio = Number(data.width) / Number(data.height);
+    var viewportRatio = cssWidth / cssHeight;
+    var displayWidth;
+    var displayHeight;
+    var offsetX = 0;
+    var offsetY = 0;
+    if (viewportRatio > sourceRatio) {
+        displayHeight = cssHeight;
+        displayWidth = displayHeight * sourceRatio;
+        offsetX = (cssWidth - displayWidth) / 2;
+    } else {
+        displayWidth = cssWidth;
+        displayHeight = displayWidth / sourceRatio;
+        offsetY = (cssHeight - displayHeight) / 2;
+    }
+    var scaleX = displayWidth / Number(data.width);
+    var scaleY = displayHeight / Number(data.height);
+    (data.detections || []).forEach(function(detection) {
+        var box = detection.box || [];
+        if (box.length !== 4) return;
+        var x = offsetX + Number(box[0]) * scaleX;
+        var y = offsetY + Number(box[1]) * scaleY;
+        var width = (Number(box[2]) - Number(box[0])) * scaleX;
+        var height = (Number(box[3]) - Number(box[1])) * scaleY;
+        var score = (Number(detection.confidence || 0) * 100).toFixed(1) + '%';
+        var label = '黑天牛 ' + score;
+        context.lineWidth = Math.max(2, Math.min(4, cssWidth / 280));
+        context.strokeStyle = '#ff365c';
+        context.shadowColor = 'rgba(255,54,92,.85)';
+        context.shadowBlur = 8;
+        context.strokeRect(x, y, width, height);
+        context.shadowBlur = 0;
+        context.font = '600 13px "Microsoft YaHei", sans-serif';
+        var labelWidth = context.measureText(label).width + 14;
+        var labelHeight = 25;
+        var labelY = Math.max(0, y - labelHeight);
+        context.fillStyle = 'rgba(218,18,54,.94)';
+        context.fillRect(x, labelY, labelWidth, labelHeight);
+        context.fillStyle = '#fff';
+        context.fillText(label, x + 7, labelY + 17);
+    });
+}
+
+function showRealtimeAlert(data) {
+    var banner = document.getElementById('realtime-alert-banner');
+    var detail = document.getElementById('realtime-alert-detail');
+    if (!banner || Date.now() - realtimeAlertDismissedAt < 10000) return;
+    var detections = data.detections || [];
+    var maxConfidence = detections.reduce(function(maximum, detection) {
+        return Math.max(maximum, Number(detection.confidence || 0));
+    }, 0);
+    if (detail) detail.textContent = '检测到 ' + detections.length + ' 个目标，最高置信度 '
+            + (maxConfidence * 100).toFixed(1) + '%';
+    banner.hidden = false;
+    realtimeLastDetectionAt = Date.now();
+    if (!realtimeWasDetected || Date.now() - realtimeLastSoundAt > 15000) playRealtimeWarningSound();
+}
+
+function playRealtimeWarningSound() {
+    realtimeLastSoundAt = Date.now();
+    try {
+        var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        realtimeAudioContext = realtimeAudioContext || new AudioContextClass();
+        if (realtimeAudioContext.state === 'suspended') realtimeAudioContext.resume();
+        var oscillator = realtimeAudioContext.createOscillator();
+        var gain = realtimeAudioContext.createGain();
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(880, realtimeAudioContext.currentTime);
+        oscillator.frequency.setValueAtTime(660, realtimeAudioContext.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.0001, realtimeAudioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.16, realtimeAudioContext.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, realtimeAudioContext.currentTime + 0.42);
+        oscillator.connect(gain);
+        gain.connect(realtimeAudioContext.destination);
+        oscillator.start();
+        oscillator.stop(realtimeAudioContext.currentTime + 0.44);
+    } catch (error) {
+        console.debug('浏览器暂未允许告警声音:', error);
+    }
+}
+
+function unlockRealtimeWarningSound() {
+    try {
+        var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        realtimeAudioContext = realtimeAudioContext || new AudioContextClass();
+        if (realtimeAudioContext.state === 'suspended') realtimeAudioContext.resume();
+    } catch (error) { /* visual and persisted warnings remain available */ }
+}
+
+function dismissRealtimeAlert() {
+    realtimeAlertDismissedAt = Date.now();
+    var banner = document.getElementById('realtime-alert-banner');
+    if (banner) banner.hidden = true;
+}
+
+function scheduleRealtimeDetection(delay) {
+    if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer);
+    if (!realtimeDetectionEnabled) return;
+    realtimeDetectionTimer = window.setTimeout(runRealtimeDetection, delay == null ? realtimeDetectionInterval : delay);
+}
+
+async function runRealtimeDetection() {
+    var detectionStartedAt = Date.now();
+    realtimeDetectionTimer = null;
+    if (!realtimeDetectionEnabled || document.hidden || !patrolVideoReady || realtimeDetectionInFlight) {
+        scheduleRealtimeDetection(600);
+        return;
+    }
+    var frame = captureRealtimeFrame();
+    if (!frame) {
+        scheduleRealtimeDetection(800);
+        return;
+    }
+    realtimeDetectionInFlight = true;
+    setRealtimeDetectionStatus('warming', realtimeDetectionErrors ? '识别重试中' : '识别中…');
+    try {
+        var response = await apiPost('/patrol/realtime-detect', {
+            image: frame.image,
+            confidence: 0.25,
+            location: getTrackPosition() || 'AI轨道巡检摄像头'
+        });
+        if (!response || response.code !== 200 || !response.data) {
+            throw new Error(response && response.msg ? response.msg : '实时识别服务无响应');
+        }
+        realtimeDetectionErrors = 0;
+        drawRealtimeDetections(response.data);
+        var detected = !!response.data.detected;
+        if (detected) {
+            setRealtimeDetectionStatus('detected', '发现 ' + response.data.count + ' 个目标');
+            showRealtimeAlert(response.data);
+        } else {
+            setRealtimeDetectionStatus('running', '监测中 · 未发现');
+            var banner = document.getElementById('realtime-alert-banner');
+            if (banner && Date.now() - realtimeLastDetectionAt > 8000) banner.hidden = true;
+        }
+        realtimeWasDetected = detected;
+    } catch (error) {
+        realtimeDetectionErrors++;
+        clearRealtimeDetections();
+        setRealtimeDetectionStatus('error', realtimeDetectionErrors >= 3 ? '模型连接失败' : '模型重连中');
+        console.warn('实时虫害识别失败:', error);
+    } finally {
+        realtimeDetectionInFlight = false;
+        var elapsed = Date.now() - detectionStartedAt;
+        scheduleRealtimeDetection(realtimeDetectionErrors ? 2500 : Math.max(50, realtimeDetectionInterval - elapsed));
+    }
+}
+
+function toggleRealtimeDetection() {
+    if (!realtimeDetectionEnabled) {
+        setRealtimeDetectionStatus('', '监测已关闭');
+        return;
+    }
+    realtimeDetectionEnabled = !realtimeDetectionEnabled;
+    var button = document.getElementById('realtime-detect-toggle');
+    if (button) {
+        button.classList.toggle('active', realtimeDetectionEnabled);
+        button.setAttribute('aria-pressed', realtimeDetectionEnabled ? 'true' : 'false');
+        button.innerHTML = '<i class="ri-radar-line"></i><span>虫害监测 ' + (realtimeDetectionEnabled ? '开' : '关') + '</span>';
+    }
+    if (realtimeDetectionEnabled) {
+        try {
+            var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) realtimeAudioContext = realtimeAudioContext || new AudioContextClass();
+        } catch (error) { /* visual warning remains available */ }
+        setRealtimeDetectionStatus('warming', '模型准备中');
+        scheduleRealtimeDetection(50);
+    } else {
+        if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer);
+        realtimeDetectionTimer = null;
+        realtimeWasDetected = false;
+        clearRealtimeDetections();
+        dismissRealtimeAlert();
+        setRealtimeDetectionStatus('', '监测已关闭');
+    }
+}
+
 function startCameraWatchdog(video) {
     if (cameraWatchdogTimer) clearInterval(cameraWatchdogTimer);
     cameraInitStartedAt = Date.now();
@@ -652,6 +1085,14 @@ function scheduleCameraRecovery(delay, protocol) {
         cameraRecoveryTimer = null;
         initCamera(protocol);
     }, backoff);
+}
+
+function cancelPendingCameraRecovery() {
+    if (cameraRecoveryTimer) {
+        clearTimeout(cameraRecoveryTimer);
+        cameraRecoveryTimer = null;
+    }
+    cameraRecoveryAttempts = 0;
 }
 
 function updateAudioButton() {
@@ -821,13 +1262,14 @@ async function initCamera(protocolOverride) {
         }
         function markCameraPlaying() {
             patrolVideoReady = true;
-            cameraRecoveryAttempts = 0;
+            cancelPendingCameraRecovery();
             cameraLastProgressAt = Date.now();
             startLiveLatencyMonitor(video);
             setCameraStatus('ready', '萤石实时画面已连接');
             updateAudioButton();
             var placeholder = document.getElementById('video-placeholder');
             if (placeholder) placeholder.style.display = 'none';
+            scheduleRealtimeDetection(100);
         }
         video.onplaying = markCameraPlaying;
         video.onloadeddata = markCameraPlaying;
@@ -840,14 +1282,13 @@ async function initCamera(protocolOverride) {
         };
         video.ontimeupdate = function() {
             cameraLastProgressAt = Date.now();
+            if (!video.paused && video.readyState >= 2) cancelPendingCameraRecovery();
         };
         video.onstalled = function() {
             setCameraStatus('loading', '视频流卡顿，正在恢复');
-            scheduleCameraRecovery(1000, cameraPreferredProtocol);
         };
         video.onwaiting = function() {
             setCameraStatus('loading', '视频流等待数据，正在恢复');
-            scheduleCameraRecovery(1800, cameraPreferredProtocol);
         };
     } catch (e) {
         console.error('摄像头初始化失败:', e);
@@ -855,6 +1296,78 @@ async function initCamera(protocolOverride) {
         showCameraPlaceholder('摄像头连接请求失败');
         scheduleCameraRecovery(2000, requestedProtocol);
     }
+}
+
+function labelForCameraQuality(quality) {
+    return quality === 'smooth' ? '480p' : '720p';
+}
+
+function applyCameraQualityStatus(data) {
+    if (!data) return;
+    var select = document.getElementById('camera-quality');
+    var status = document.getElementById('camera-quality-status');
+    var patrolQuality = document.getElementById('auto-patrol-quality');
+    var quality = String(data.quality || (select && select.value) || 'hd').toLowerCase();
+    var width = Number(data.actualWidth || 0);
+    var height = Number(data.actualHeight || 0);
+    var verified = data.qualityVerified === true;
+    var dimensions = width > 0 && height > 0 ? width + 'x' + height : '';
+    var text;
+    var state = 'warning';
+    if (quality === '4k') {
+        var real4k = verified && width === 3840 && height === 2160;
+        text = real4k ? '真实 4K · 3840x2160' : ('4K 未验证' + (dimensions ? ' · ' + dimensions : ''));
+        state = real4k ? 'verified' : 'warning';
+    } else {
+        var label = labelForCameraQuality(quality);
+        text = dimensions ? label + ' · ' + dimensions : label + '待校验';
+        state = verified ? 'verified' : 'warning';
+    }
+    if (select && data.quality) {
+        select.value = quality;
+        select.title = text;
+    }
+    if (status) {
+        status.className = 'camera-quality-status ' + state;
+        status.textContent = text;
+        status.title = text;
+    }
+    if (patrolQuality) {
+        patrolQuality.textContent = quality === '4k'
+            ? (verified && width === 3840 && height === 2160 ? '真实4K' : '4K待验证')
+            : (dimensions || labelForCameraQuality(quality));
+    }
+}
+
+async function loadCameraQuality() {
+    const select = document.getElementById('camera-quality');
+    if (!select) return;
+    const res = await apiGet('/camera/local-status');
+    if (res && res.code === 200 && res.data && res.data.quality) applyCameraQualityStatus(res.data);
+}
+
+async function changeCameraQuality(quality) {
+    const select = document.getElementById('camera-quality');
+    if (!select || select.disabled) return;
+    const previous = select.dataset.current || 'hd';
+    select.disabled = true;
+    destroyCameraPlayer();
+    setCameraStatus('loading', quality === '4k' ? '正在切换 4K 主码流' : '正在切换视频清晰度');
+    showCameraPlaceholder('正在切换清晰度，请稍候');
+    const res = await apiPut('/camera/local-quality', { quality: quality });
+    if (!res || res.code !== 200) {
+        select.value = previous;
+        select.disabled = false;
+        const message = (res && res.msg) || '清晰度切换失败';
+        setCameraStatus('error', message);
+        showCameraPlaceholder(message);
+        scheduleCameraRecovery(1500, 4);
+        return;
+    }
+    select.dataset.current = quality;
+    if (res.data) applyCameraQualityStatus(res.data);
+    select.disabled = false;
+    initCamera(4);
 }
 
 async function changeEncodeType() {
@@ -881,12 +1394,34 @@ async function changeEncodeType() {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('pointerdown', unlockRealtimeWarningSound, { once: true });
     loadPatrolPageAlert();
     window.setInterval(loadPatrolPageAlert, 60000);
-    initCamera();
-    loadPatrolTasks();
+    loadCameraQuality().finally(function() {
+        var quality = document.getElementById('camera-quality');
+        if (quality) quality.dataset.current = quality.value;
+        initCamera();
+    });
+    bindCameraViewportControls();
+    setRealtimeDetectionStatus('', '监测已关闭');
+    apiGet('/patrol/realtime-detect/status').then(function(response) {
+        if (response && response.code === 200 && response.data) {
+            realtimeDetectionInterval = Math.max(500, Math.min(5000, Number(response.data.intervalMs || 1000)));
+            realtimeDetectionEnabled = response.data.enabled === true;
+            var detectButton = document.getElementById('realtime-detect-toggle');
+            if (detectButton) {
+                detectButton.classList.toggle('active', realtimeDetectionEnabled);
+                detectButton.setAttribute('aria-pressed', realtimeDetectionEnabled ? 'true' : 'false');
+                detectButton.innerHTML = '<i class="ri-radar-line"></i><span>虫害监测 ' + (realtimeDetectionEnabled ? '开' : '已关闭') + '</span>';
+            }
+            setRealtimeDetectionStatus(realtimeDetectionEnabled ? 'warming' : '', realtimeDetectionEnabled ? '模型待加载' : '监测已关闭');
+        }
+        if (realtimeDetectionEnabled) scheduleRealtimeDetection(500);
+    });
+    loadAutomaticPatrolPlans();
+    loadAutomaticPatrolStatus();
     loadPatrolRecords();
-    window.setInterval(loadPatrolTasks, 30000);
+    window.setInterval(loadAutomaticPatrolStatus, 1000);
     window.setInterval(loadPatrolRecords, 30000);
     var aiBtn = document.getElementById('btn-ai-capture');
     if (aiBtn) {
@@ -924,5 +1459,8 @@ document.addEventListener('keydown', function(event) {
 window.addEventListener('pageshow', function (event) {
     if (event.persisted) initCamera();
 });
-window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); });
-window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); });
+window.addEventListener('visibilitychange', function() {
+    if (!document.hidden && Date.now() - cameraLastProgressAt > 15000) initCamera(cameraPreferredProtocol);
+});
+window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });
+window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });

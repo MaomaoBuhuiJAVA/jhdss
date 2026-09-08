@@ -172,6 +172,14 @@
             }, backoff);
         }
 
+        function cancelDashboardRecovery() {
+            if (dashboardRecoveryTimer) {
+                clearTimeout(dashboardRecoveryTimer);
+                dashboardRecoveryTimer = null;
+            }
+            dashboardRecoveryAttempts = 0;
+        }
+
         function startDashboardWatchdog(video) {
             if (dashboardWatchdogTimer) clearInterval(dashboardWatchdogTimer);
             dashboardInitStartedAt = Date.now();
@@ -252,15 +260,15 @@
                         }
                         video.onplaying = function () {
                             dashboardVideoReady = true;
-                            dashboardRecoveryAttempts = 0;
+                            cancelDashboardRecovery();
                             dashboardLastProgressAt = Date.now();
                             startDashboardLatencyMonitor(video);
                             if (placeholder) placeholder.style.display = 'none';
                         };
                         video.onerror = function () { dashboardVideoReady = false; if (placeholder) placeholder.style.display = 'flex'; scheduleDashboardRecovery(800); };
-                        video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); };
-                        video.onstalled = function () { scheduleDashboardRecovery(800); };
-                        video.onwaiting = function () { scheduleDashboardRecovery(1200); };
+                        video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); cancelDashboardRecovery(); };
+                        video.onstalled = function () { /* watchdog confirms a persistent stall */ };
+                        video.onwaiting = function () { /* watchdog confirms a persistent stall */ };
                         return;
                     }
                     if (typeof flvjs === 'undefined') {
@@ -289,7 +297,7 @@
                     dashboardFlvPlayer.play();
                     video.onplaying = function () {
                         dashboardVideoReady = true;
-                        dashboardRecoveryAttempts = 0;
+                        cancelDashboardRecovery();
                         dashboardLastProgressAt = Date.now();
                         startDashboardLatencyMonitor(video);
                         if (placeholder) placeholder.style.display = 'none';
@@ -299,9 +307,9 @@
                         if (placeholder) placeholder.style.display = 'flex';
                         scheduleDashboardRecovery(800);
                     };
-                    video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); };
-                    video.onstalled = function () { scheduleDashboardRecovery(800); };
-                    video.onwaiting = function () { scheduleDashboardRecovery(1200); };
+                    video.ontimeupdate = function () { dashboardLastProgressAt = Date.now(); cancelDashboardRecovery(); };
+                    video.onstalled = function () { /* watchdog confirms a persistent stall */ };
+                    video.onwaiting = function () { /* watchdog confirms a persistent stall */ };
                 } catch (e) {
                     console.error('视频初始化失败:', e);
                     if (placeholder) placeholder.style.display = 'flex';
@@ -312,6 +320,9 @@
         window.addEventListener('DOMContentLoaded', initDashboardVideo);
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) initDashboardVideo();
+        });
+        window.addEventListener('visibilitychange', function () {
+            if (!document.hidden && Date.now() - dashboardLastProgressAt > 15000) initDashboardVideo();
         });
         window.addEventListener('pagehide', destroyDashboardPlayer);
         window.addEventListener('beforeunload', destroyDashboardPlayer);

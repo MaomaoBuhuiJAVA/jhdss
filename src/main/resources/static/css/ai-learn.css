@@ -1,4 +1,63 @@
 /* AI 学习页 - 上传视频 AI 分析 */
+.yolo-panel {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 20px 22px 24px;
+    background: rgba(9, 19, 32, 0.88);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.24);
+}
+.yolo-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.yolo-eyebrow { color:var(--accent-primary); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+.yolo-panel h1 { margin-top:6px; color:#e8f4ff; font-size:22px; letter-spacing:.02em; }
+.yolo-panel-head p { margin-top:6px; color:var(--text-secondary); font-size:12px; }
+.yolo-model-state { min-width:145px; display:grid; grid-template-columns:10px 1fr; gap:3px 7px; align-items:center; color:#b9d7e5; font-size:12px; }
+.yolo-model-state span { grid-row:1 / span 2; width:8px; height:8px; border-radius:50%; background:var(--accent-secondary); box-shadow:0 0 10px var(--accent-secondary); }
+.yolo-model-state small { color:var(--text-dim); font-size:10px; }
+.yolo-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; }
+.yolo-button { display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border:1px solid rgba(0,198,240,.35); border-radius:7px; background:rgba(7,22,36,.85); color:var(--text-primary); cursor:pointer; font:inherit; font-size:12px; }
+.yolo-button:hover,.yolo-button.primary { border-color:var(--accent-primary); color:#e8f4ff; background:rgba(0,198,240,.12); }
+.yolo-button[disabled] { opacity:.5; cursor:wait; }
+.yolo-threshold { display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:12px; margin-left:4px; }
+.yolo-threshold input { width:110px; accent-color:var(--accent-primary); }
+.yolo-threshold output { width:34px; color:var(--accent-primary); font-family:var(--font-mono); }
+.yolo-status { margin-left:auto; color:var(--text-dim); font-size:12px; }
+.yolo-status.error { color:var(--accent-warn); }
+.yolo-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:18px; }
+.yolo-stats div { padding:11px 12px; background:rgba(15,31,49,.72); border:1px solid rgba(30,60,100,.65); border-radius:8px; }
+.yolo-stats b { display:block; color:#e8f4ff; font:600 20px var(--font-mono); }
+.yolo-stats span { display:block; margin-top:4px; color:var(--text-secondary); font-size:11px; }
+.yolo-single-result { display:grid; grid-template-columns:minmax(0,2fr) minmax(220px,1fr); gap:18px; margin-top:18px; }
+.yolo-single-image { overflow:hidden; border:1px solid var(--border-subtle); border-radius:8px; background:#06121f; }
+.yolo-single-image img { display:block; width:100%; max-height:560px; object-fit:contain; }
+.yolo-single-meta { padding:10px 4px; }
+.yolo-single-meta h2 { color:#e8f4ff; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.yolo-single-meta strong { display:block; margin-top:16px; font-size:15px; }
+.yolo-single-meta strong.found { color:var(--accent-secondary); }
+.yolo-single-meta strong.empty { color:var(--accent-caution); }
+.yolo-detection-list { display:flex; flex-direction:column; gap:8px; margin-top:14px; color:var(--text-secondary); font:12px var(--font-mono); }
+.yolo-evaluation { margin-top:18px; }
+.yolo-filter { display:flex; gap:6px; margin-bottom:12px; }
+.yolo-filter button { padding:6px 12px; border:1px solid var(--border-subtle); border-radius:6px; background:transparent; color:var(--text-secondary); cursor:pointer; font:inherit; font-size:12px; }
+.yolo-filter button.active { border-color:var(--accent-primary); color:var(--accent-primary); background:rgba(0,198,240,.1); }
+.yolo-evaluation-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.yolo-eval-card { overflow:hidden; border:1px solid var(--border-subtle); border-radius:8px; background:rgba(12,20,35,.86); }
+.yolo-eval-card.is-detected { border-color:rgba(0,232,135,.25); }
+.yolo-eval-card.is-empty { border-color:rgba(240,160,64,.35); }
+.yolo-eval-card a { display:block; background:#06121f; }
+.yolo-eval-card img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; }
+.yolo-eval-caption { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:8px 9px; font-size:10px; }
+.yolo-eval-caption span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary); font-family:var(--font-mono); }
+.yolo-eval-caption b { flex:none; color:var(--accent-secondary); font-size:10px; font-weight:500; }
+.is-empty .yolo-eval-caption b { color:var(--accent-caution); }
+
+.main { flex-direction:column; overflow-y:auto; }
+.ai-learn-wrap { min-height:560px; height:auto; flex:0 0 auto; }
+
+@media (max-width: 1100px) { .yolo-evaluation-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } .yolo-stats { grid-template-columns:repeat(3,1fr); } }
+@media (max-width: 720px) { .yolo-panel-head { flex-direction:column; } .yolo-model-state { align-self:flex-start; } .yolo-status { width:100%; margin-left:0; } .yolo-single-result { grid-template-columns:1fr; } .yolo-evaluation-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .yolo-stats { grid-template-columns:repeat(2,1fr); } }
+
 .ai-learn-wrap {
     display: flex;
     align-items: center;

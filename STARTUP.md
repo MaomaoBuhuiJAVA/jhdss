@@ -41,6 +41,13 @@ start-jhds.bat
 
 脚本会自动切换到项目目录、加载本地变量、检查 Java、Maven、MySQL 和 Redis，并通过 `mvn spring-boot:run` 启动当前源码。若需要生成可部署 JAR，请单独执行 `mvn -DskipTests package`。
 
+## 两台电脑加控制面板电脑
+
+- 第二台电脑运行 JHDS，并连接摄像头所在网络；在第二台电脑的 `.env.local.bat` 中配置 `CAMERA_LOCAL_HOST`、`CAMERA_LOCAL_PASSWORD` 和 `CAMERA_LOCAL_ENABLED=true`。
+- 第三台电脑连接无网路由器及控制面板，并运行控制面板 HTTP 服务。第二台电脑将 `CONTROL_PANEL_BASE_URL` 设置为第三台电脑在该路由器网络中的地址，例如 `http://192.168.10.3:8999`。
+- 第二台电脑必须能访问第三台电脑的控制面板根地址和接口；先在第二台电脑执行 `curl http://第三台电脑地址/` 验证，再启动 JHDS。
+- 轨道和控制面板未确认安全起点前，不要勾选页面中的“右下安全起点已确认”；首次只验证视频、状态和手动停止接口。
+
 ## 启动前准备
 
 1. 安装并加入 PATH：JDK 8+、Maven 3.6+。

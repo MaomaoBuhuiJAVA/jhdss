@@ -23,3 +23,5 @@ Thumbs.db
 # Temporary review and preview artifacts
 _docx_review/
 preview/
+__pycache__/
+*.pyc

@@ -146,6 +146,19 @@ public class PatrolService {
     }
 
     public String control(String dir) {
+        return control(dir, false);
+    }
+
+    /**
+     * Controls the horizontal rail. Every movement command must come from an
+     * explicitly confirmed user action or an already-confirmed patrol run.
+     * Stop remains available without confirmation so safety paths can always
+     * de-energize the controller.
+     */
+    public String control(String dir, boolean motionConfirmed) {
+        if (!"stop".equals(dir) && !motionConfirmed) {
+            throw new IllegalStateException("轨道移动未获本次操作确认，已拒绝执行");
+        }
         String alias;
         String value;
         switch (dir) {

@@ -22,7 +22,8 @@ public class LocalCameraProperties {
     private String ffmpegPath = "ffmpeg";
     private String hlsPath = "./work/camera/hls";
     private int width = 720;
-    private String videoBitrate = "1800k";
+    private String videoBitrate = "2400k";
+    private String videoBufferSize = "3600k";
     private int segmentSeconds = 1;
     private int listSize = 3;
     private int connectTimeoutMs = 8000;
