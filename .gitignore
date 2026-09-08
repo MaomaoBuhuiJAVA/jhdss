@@ -6,6 +6,9 @@ uploads/
 work/
 photo/
 
+# Large local training assets and camera photo archive; copy separately per machine
+LabelImg资料图片/
+
 # Local credentials and machine-specific overrides
 .env.local.bat
 .env

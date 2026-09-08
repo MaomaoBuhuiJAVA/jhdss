@@ -154,7 +154,7 @@ dashscope:
 patrol:
   capture-path: ./captures
   automatic:
-    output-path: ${PATROL_AUTO_OUTPUT_PATH:E:/LabelImg资料图片/摄像头实际拍摄照片}
+    output-path: ${PATROL_AUTO_OUTPUT_PATH:./LabelImg资料图片/摄像头实际拍摄照片}
     # 2026-09-07现场标定：右到左有效运动18.422秒，下到上有效运动11.587秒。
     horizontal-travel-ms: ${PATROL_HORIZONTAL_TRAVEL_MS:18422}
     vertical-travel-ms: ${PATROL_VERTICAL_TRAVEL_MS:11587}

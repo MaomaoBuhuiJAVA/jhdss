@@ -45,7 +45,7 @@ public class AutomaticPatrolService {
     @Autowired
     private YsjProperties ysjProperties;
 
-    @Value("${patrol.automatic.output-path:E:/LabelImg资料图片/摄像头实际拍摄照片}")
+    @Value("${patrol.automatic.output-path:./LabelImg资料图片/摄像头实际拍摄照片}")
     private String outputPath;
     @Value("${patrol.automatic.horizontal-travel-ms:18422}")
     private long horizontalTravelMs;
@@ -85,6 +85,7 @@ public class AutomaticPatrolService {
     private volatile String lastError;
     private volatile String warning;
     private volatile String capturePrefix;
+    private volatile boolean outputPathFallbackLogged;
 
     public List<Map<String, Object>> plans() {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -161,7 +162,7 @@ public class AutomaticPatrolService {
         result.put("qualityVerified", camera.get("qualityVerified"));
         result.put("capturesPerLine", 3);
         result.put("scanPattern", "bottom-to-top");
-        result.put("outputPath", Paths.get(outputPath).toAbsolutePath().normalize().toString());
+        result.put("outputPath", outputDirectory().toString());
         result.put("horizontalCalibrationMs", horizontalTravelMs);
         result.put("verticalCalibrationMs", verticalTravelMs);
         result.put("workingHorizontalMs", workingHorizontalMs());
@@ -239,7 +240,14 @@ public class AutomaticPatrolService {
         if (!awaitControlPanel()) {
             throw new IllegalStateException("蓝牙控制面板未连接");
         }
-        Files.createDirectories(Paths.get(outputPath).toAbsolutePath().normalize());
+        Path captureDirectory = outputDirectory();
+        try {
+            Files.createDirectories(captureDirectory);
+        } catch (Exception e) {
+            throw new IllegalStateException("巡检照片目录无法创建：" + captureDirectory
+                    + "；请将 PATROL_AUTO_OUTPUT_PATH 设置为项目内相对路径，例如"
+                    + " .\\LabelImg资料图片\\摄像头实际拍摄照片", e);
+        }
         localCameraStreamService.changeQuality("4k");
         if (!localCameraStreamService.awaitReady(60000L)) {
             throw new IllegalStateException("4K本地视频流未就绪");
@@ -274,7 +282,7 @@ public class AutomaticPatrolService {
     private void captureFrame(int row, String point) {
         checkCancelled();
         int sequence = fileSequence.incrementAndGet();
-        Path file = Paths.get(outputPath, capturePrefix + "_line" + String.format("%02d", row)
+        Path file = outputDirectory().resolve(capturePrefix + "_line" + String.format("%02d", row)
                 + "_" + point + "_" + String.format("%06d", sequence) + ".jpg");
         localCameraStreamService.captureLatestFrame(file);
         captureCount++;
@@ -410,6 +418,25 @@ public class AutomaticPatrolService {
 
     private double safeCoverageRatio() {
         return Math.max(0.50, Math.min(0.97, coverageRatio));
+    }
+
+    private Path outputDirectory() {
+        String configured = outputPath == null || outputPath.trim().isEmpty()
+                ? "./LabelImg资料图片/摄像头实际拍摄照片" : outputPath.trim();
+        Path configuredDirectory = Paths.get(configured).toAbsolutePath().normalize();
+        Path portableDirectory = Paths.get("./LabelImg资料图片/摄像头实际拍摄照片")
+                .toAbsolutePath().normalize();
+        if (Paths.get(configured).isAbsolute()
+                && !Files.exists(configuredDirectory.getParent())
+                && Files.exists(portableDirectory.getParent())) {
+            if (!outputPathFallbackLogged) {
+                log.warn("Configured patrol output path does not exist; using project-relative path {}",
+                        portableDirectory);
+                outputPathFallbackLogged = true;
+            }
+            return portableDirectory;
+        }
+        return configuredDirectory;
     }
 
     private String directionLabel(String direction) {
