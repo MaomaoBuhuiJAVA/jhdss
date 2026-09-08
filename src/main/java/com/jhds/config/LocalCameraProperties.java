@@ -30,4 +30,5 @@ public class LocalCameraProperties {
     private int startupTimeoutMs = 30000;
     private int staleTimeoutMs = 30000;
     private int restartCooldownMs = 10000;
+    private int captureSegmentTimeoutMs = 30000;
 }

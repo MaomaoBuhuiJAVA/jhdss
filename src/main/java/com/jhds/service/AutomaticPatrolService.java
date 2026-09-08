@@ -162,7 +162,9 @@ public class AutomaticPatrolService {
         result.put("qualityVerified", camera.get("qualityVerified"));
         result.put("capturesPerLine", 3);
         result.put("scanPattern", "bottom-to-top");
-        result.put("outputPath", outputDirectory().toString());
+        // Keep the API display portable; filesystem operations still use the
+        // normalized absolute path returned by outputDirectory().
+        result.put("outputPath", configuredOutputPath());
         result.put("horizontalCalibrationMs", horizontalTravelMs);
         result.put("verticalCalibrationMs", verticalTravelMs);
         result.put("workingHorizontalMs", workingHorizontalMs());
@@ -437,6 +439,11 @@ public class AutomaticPatrolService {
             return portableDirectory;
         }
         return configuredDirectory;
+    }
+
+    private String configuredOutputPath() {
+        return outputPath == null || outputPath.trim().isEmpty()
+                ? "./LabelImg资料图片/摄像头实际拍摄照片" : outputPath.trim();
     }
 
     private String directionLabel(String direction) {

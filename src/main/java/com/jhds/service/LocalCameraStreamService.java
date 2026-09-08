@@ -536,76 +536,97 @@ public class LocalCameraStreamService {
         if (destination == null) {
             throw new IllegalArgumentException("截图保存路径不能为空");
         }
-        ensureRunning();
-        if (!awaitReady(8000L)) {
-            throw new IllegalStateException("本地摄像头视频流尚未就绪");
-        }
-
-        // Quality changes restart FFmpeg, but Windows can retain completed HLS
-        // segments from the previous process briefly. Never use those stale
-        // segments for a patrol capture.
-        Path segment = newestStableSegment(startedAt);
-        if (segment == null) {
-            throw new IllegalStateException("没有可用于截图的完整视频分片");
-        }
-
-        Path target = destination.toAbsolutePath().normalize();
-        Path parent = target.getParent();
-        if (parent == null) {
-            throw new IllegalArgumentException("截图保存路径无效");
-        }
-        Path temporary = target.resolveSibling(target.getFileName().toString() + ".tmp.jpg");
-        Process process = null;
-        try {
-            Files.createDirectories(parent);
-            Files.deleteIfExists(temporary);
-            List<String> command = new ArrayList<>();
-            command.add(properties.getFfmpegPath());
-            command.add("-hide_banner");
-            command.add("-loglevel");
-            command.add("error");
-            command.add("-y");
-            command.add("-i");
-            command.add(segment.toString());
-            command.add("-frames:v");
-            command.add("1");
-            // FFmpeg 8 rejects limited-range H.264 frames when the MJPEG
-            // encoder expects full-range input unless the conversion is
-            // explicit. One encoder thread also avoids a 4K MJPEG init bug
-            // observed on the Windows deployment build.
-            if (streamQuality != StreamQuality.UHD_4K) {
-            command.add("-vf");
-                command.add("fps=15,scale=-2:" + targetHeight() + ",format=yuv420p");
+        // Keep the stream generation stable while selecting and reading a
+        // segment. The watchdog can otherwise restart FFmpeg between those
+        // two operations after a transient RTSP disconnect.
+        synchronized (processLock) {
+            Path segment = awaitStableSegment();
+            if (segment == null) {
+                throw new IllegalStateException("没有可用于截图的完整视频分片");
             }
-            command.add("-q:v");
-            command.add("2");
-            command.add("-threads");
-            command.add("1");
-            command.add("-update");
-            command.add("1");
-            command.add(temporary.toString());
 
-            process = new ProcessBuilder(command).redirectErrorStream(true).start();
-            if (!process.waitFor(15, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("4K截图处理超时");
+            Path target = destination.toAbsolutePath().normalize();
+            Path parent = target.getParent();
+            if (parent == null) {
+                throw new IllegalArgumentException("截图保存路径无效");
             }
-            String output = new String(readAll(process), StandardCharsets.UTF_8).trim();
-            if (process.exitValue() != 0 || !Files.exists(temporary) || Files.size(temporary) < 1024L) {
-                throw new IllegalStateException("4K截图失败" + (output.isEmpty() ? "" : "：" + output));
+            Path temporary = target.resolveSibling(target.getFileName().toString() + ".tmp.jpg");
+            Process process = null;
+            try {
+                Files.createDirectories(parent);
+                Files.deleteIfExists(temporary);
+                List<String> command = new ArrayList<>();
+                command.add(properties.getFfmpegPath());
+                command.add("-hide_banner");
+                command.add("-loglevel");
+                command.add("error");
+                command.add("-y");
+                command.add("-i");
+                command.add(segment.toString());
+                command.add("-frames:v");
+                command.add("1");
+                // FFmpeg 8 rejects limited-range H.264 frames when the MJPEG
+                // encoder expects full-range input unless the conversion is
+                // explicit. One encoder thread also avoids a 4K MJPEG init bug
+                // observed on the Windows deployment build.
+                if (streamQuality != StreamQuality.UHD_4K) {
+                    command.add("-vf");
+                    command.add("fps=15,scale=-2:" + targetHeight() + ",format=yuv420p");
+                }
+                command.add("-q:v");
+                command.add("2");
+                command.add("-threads");
+                command.add("1");
+                command.add("-update");
+                command.add("1");
+                command.add(temporary.toString());
+
+                process = new ProcessBuilder(command).redirectErrorStream(true).start();
+                if (!process.waitFor(15, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    throw new IllegalStateException("4K截图处理超时");
+                }
+                String output = new String(readAll(process), StandardCharsets.UTF_8).trim();
+                if (process.exitValue() != 0 || !Files.exists(temporary) || Files.size(temporary) < 1024L) {
+                    throw new IllegalStateException("4K截图失败" + (output.isEmpty() ? "" : "：" + output));
+                }
+                validateCapturedFrame(temporary);
+                Files.move(temporary, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                return target;
+            } catch (IOException e) {
+                throw new IllegalStateException("4K截图保存失败：" + e.getMessage(), e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("4K截图被中断", e);
+            } finally {
+                if (process != null && process.isAlive()) process.destroyForcibly();
+                try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
             }
-            validateCapturedFrame(temporary);
-            Files.move(temporary, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            return target;
-        } catch (IOException e) {
-            throw new IllegalStateException("4K截图保存失败：" + e.getMessage(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("4K截图被中断", e);
-        } finally {
-            if (process != null && process.isAlive()) process.destroyForcibly();
-            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
         }
+    }
+
+    /**
+     * Waits for a completed HLS segment from the current FFmpeg generation.
+     * RTSP reconnects can leave the playlist alive while the first new segment
+     * is still being decoded, so a single directory scan is too eager here.
+     */
+    private Path awaitStableSegment() {
+        long timeout = Math.max(3000L, properties.getCaptureSegmentTimeoutMs());
+        long deadline = System.currentTimeMillis() + timeout;
+        while (System.currentTimeMillis() <= deadline) {
+            ensureRunning();
+            Path segment = newestStableSegment(startedAt);
+            if (segment != null) return segment;
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0L) break;
+            try {
+                Thread.sleep(Math.min(250L, remaining));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("等待视频分片时被中断", e);
+            }
+        }
+        return null;
     }
 
     /** Select a segment old enough that FFmpeg has closed it, but still inside the HLS retention window. */

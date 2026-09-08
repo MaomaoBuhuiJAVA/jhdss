@@ -31,15 +31,15 @@ public class YoloInferenceService {
 
     @Value("${ai.yolo.python-path:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}")
     private String pythonPath;
-    @Value("${ai.yolo.model-path:E:/LabelImg资料图片/yolo_runs/black_longhorn_yolo11s/weights/best.pt}")
+    @Value("${ai.yolo.model-path:./LabelImg资料图片/yolo_runs/black_longhorn_yolo11s/weights/best.pt}")
     private String modelPath;
     @Value("${ai.yolo.script-path:./scripts/yolo_infer.py}")
     private String scriptPath;
     @Value("${ai.yolo.upload-path:./uploads/ai-inference}")
     private String uploadPath;
-    @Value("${ai.yolo.evaluation-path:E:/LabelImg资料图片/yolo_runs/camera_test_eval}")
+    @Value("${ai.yolo.evaluation-path:./LabelImg资料图片/yolo_runs/camera_test_eval}")
     private String evaluationPath;
-    @Value("${ai.yolo.evaluation-source-path:E:/LabelImg资料图片/yolo_dataset/camera_test}")
+    @Value("${ai.yolo.evaluation-source-path:./LabelImg资料图片/yolo_dataset/camera_test}")
     private String evaluationSourcePath;
     @Value("${ai.yolo.confidence:0.25}")
     private double confidence;

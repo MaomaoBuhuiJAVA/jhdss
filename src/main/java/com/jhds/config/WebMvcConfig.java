@@ -23,10 +23,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${ai.yolo.upload-path:./uploads/ai-inference}")
     private String aiYoloUploadPath;
 
-    @Value("${ai.yolo.evaluation-path:E:/LabelImg资料图片/yolo_runs/camera_test_eval}")
+    @Value("${ai.yolo.evaluation-path:./LabelImg资料图片/yolo_runs/camera_test_eval}")
     private String aiYoloEvaluationPath;
 
-    @Value("${ai.yolo.evaluation-source-path:E:/LabelImg资料图片/yolo_dataset/camera_test}")
+    @Value("${ai.yolo.evaluation-source-path:./LabelImg资料图片/yolo_dataset/camera_test}")
     private String aiYoloEvaluationSourcePath;
 
     @Override
