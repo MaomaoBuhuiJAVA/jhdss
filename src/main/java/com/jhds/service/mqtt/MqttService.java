@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
@@ -53,13 +54,18 @@ public class MqttService implements DisposableBean {
     @Value("${device.commands.motor-state-close:}")
     private String motorStateClose;
 
-    private MqttClient mqttClient;
+    private volatile MqttClient mqttClient;
     private volatile String effectiveClientId;
     private volatile String lastDisconnectReason;
     private volatile String lastConnectionError;
     private volatile long lastConnectedAt;
     private volatile long lastDisconnectedAt;
+    private volatile long lastConnectionAttemptAt;
+    private volatile boolean responseSubscribed;
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingCommands = new ConcurrentHashMap<>();
+    private final Object connectionLock = new Object();
+    private final AtomicBoolean reconnectInProgress = new AtomicBoolean(false);
+    private volatile boolean shuttingDown;
 
     private final ReentrantLock sequentialLock = new ReentrantLock();
     private final BlockingQueue<String> sequentialResponseQueue = new LinkedBlockingQueue<>();
@@ -79,24 +85,100 @@ public class MqttService implements DisposableBean {
             log.warn("MQTT is disabled by configuration");
             return;
         }
+        shuttingDown = false;
+        connectClient();
+    }
+
+    /**
+     * Connects one client at a time. A failed initial connect leaves a Paho
+     * client in a state where a later reconnect is not always reliable, so the
+     * failed instance is closed and recreated on the next attempt.
+     */
+    private void connectClient() {
+        synchronized (connectionLock) {
+            if (shuttingDown || !mqttProperties.isEnabled() || isConnected()) {
+                return;
+            }
+            lastConnectionAttemptAt = System.currentTimeMillis();
+            MqttClient client = mqttClient;
+            try {
+                if (client == null) {
+                    String configuredClientId = requireValue(mqttProperties.getClientId(), "client-id");
+                    String clientId = mqttProperties.isAppendInstanceId()
+                            ? configuredClientId + "-" + System.currentTimeMillis() : configuredClientId;
+                    effectiveClientId = clientId;
+                    client = new MqttClient(requireValue(mqttProperties.getBrokerUrl(), "broker-url"),
+                            clientId, new MemoryPersistence());
+                    client.setCallback(new MqttCallbackHandler(this));
+                    mqttClient = client;
+                }
+                client.connect(connectOptions());
+                log.info("MQTT connect request succeeded, clientId={}, broker={}",
+                        effectiveClientId, client.getCurrentServerURI());
+            } catch (Exception e) {
+                lastConnectionError = describeException(e);
+                log.error("MQTT connection attempt failed: {}", lastConnectionError);
+                closeFailedClient(client);
+            }
+        }
+    }
+
+    private MqttConnectOptions connectOptions() {
+        MqttConnectOptions options = new MqttConnectOptions();
+        String username = mqttProperties.getUsername();
+        String password = mqttProperties.getPassword();
+        if (username != null && !username.trim().isEmpty()) {
+            options.setUserName(username.trim());
+        }
+        if (password != null) {
+            options.setPassword(password.toCharArray());
+        }
+        options.setConnectionTimeout(Math.max(3, mqttProperties.getConnectionTimeout()));
+        options.setKeepAliveInterval(Math.max(15, mqttProperties.getKeepaliveInterval()));
+        options.setAutomaticReconnect(true);
+        options.setCleanSession(mqttProperties.isCleanSession());
+        return options;
+    }
+
+    private String requireValue(String value, String name) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("MQTT " + name + " is empty");
+        }
+        return value.trim();
+    }
+
+    private String describeException(Throwable error) {
+        Throwable root = error;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        StringBuilder message = new StringBuilder(root.getClass().getSimpleName());
+        if (root instanceof MqttException) {
+            message.append(" reasonCode=").append(((MqttException) root).getReasonCode());
+        }
+        if (root.getMessage() != null && !root.getMessage().trim().isEmpty()) {
+            message.append(": ").append(root.getMessage().trim());
+        }
+        return message.toString();
+    }
+
+    private void closeFailedClient(MqttClient client) {
+        if (client == null) {
+            mqttClient = null;
+            return;
+        }
         try {
-            String configuredClientId = mqttProperties.getClientId();
-            String clientId = mqttProperties.isAppendInstanceId()
-                    ? configuredClientId + "-" + System.currentTimeMillis() : configuredClientId;
-            effectiveClientId = clientId;
-            mqttClient = new MqttClient(mqttProperties.getBrokerUrl(), clientId, new MemoryPersistence());
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setUserName(mqttProperties.getUsername());
-            options.setPassword(mqttProperties.getPassword().toCharArray());
-            options.setConnectionTimeout(mqttProperties.getConnectionTimeout());
-            options.setKeepAliveInterval(mqttProperties.getKeepaliveInterval());
-            options.setAutomaticReconnect(true);
-            options.setCleanSession(mqttProperties.isCleanSession());
-            mqttClient.setCallback(new MqttCallbackHandler(this));
-            mqttClient.connect(options);
-        } catch (Exception e) {
-            lastConnectionError = e.getMessage();
-            log.error("MQTT init error", e);
+            if (client.isConnected()) {
+                client.disconnectForcibly();
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            client.close();
+        } catch (Exception ignored) {
+        }
+        if (mqttClient == client) {
+            mqttClient = null;
         }
     }
 
@@ -106,6 +188,7 @@ public class MqttService implements DisposableBean {
             String responseTopic = mqttProperties.getTopic().getPrefix() + "/" + mqttProperties.getTopic().getResponseSuffix();
             if (mqttClient != null && mqttClient.isConnected()) {
                 mqttClient.subscribe(responseTopic, safeQos(mqttProperties.getResponseQos()));
+                responseSubscribed = true;
                 lastConnectedAt = System.currentTimeMillis();
                 lastConnectionError = null;
                 log.info("MQTT {}connected, clientId={}, subscribed to: {}",
@@ -118,6 +201,7 @@ public class MqttService implements DisposableBean {
     }
 
     public void handleConnectionLost(Throwable cause) {
+        responseSubscribed = false;
         lastDisconnectedAt = System.currentTimeMillis();
         lastDisconnectReason = cause == null ? "unknown" : cause.toString();
         log.error("MQTT connection lost, clientId={}, reason={}", effectiveClientId, lastDisconnectReason);
@@ -309,6 +393,7 @@ public class MqttService implements DisposableBean {
         status.put("lastConnectionError", lastConnectionError);
         status.put("lastConnectedAt", lastConnectedAt == 0 ? null : new Date(lastConnectedAt));
         status.put("lastDisconnectedAt", lastDisconnectedAt == 0 ? null : new Date(lastDisconnectedAt));
+        status.put("lastConnectionAttemptAt", lastConnectionAttemptAt == 0 ? null : new Date(lastConnectionAttemptAt));
         return status;
     }
 
@@ -325,7 +410,13 @@ public class MqttService implements DisposableBean {
             fixedDelayString = "${device.mqtt.reconnect-interval-ms:10000}",
             initialDelayString = "${device.mqtt.reconnect-initial-delay-ms:10000}")
     public void ensureConnected() {
-        if (!mqttProperties.isEnabled() || isConnected()) {
+        if (!mqttProperties.isEnabled()) {
+            return;
+        }
+        if (isConnected()) {
+            if (!responseSubscribed) {
+                handleConnected(true, mqttClient.getCurrentServerURI());
+            }
             return;
         }
         reconnect();
@@ -445,23 +536,39 @@ public class MqttService implements DisposableBean {
     }
 
     public void reconnect() {
+        if (!reconnectInProgress.compareAndSet(false, true)) {
+            log.debug("MQTT reconnect already in progress");
+            return;
+        }
         try {
-            if (mqttClient == null) {
-                // The first client construction can fail before a broker is
-                // reachable. Re-run initialization so the scheduled retry can
-                // recover without restarting the whole web application.
-                init();
-            } else if (!mqttClient.isConnected()) {
-                mqttClient.reconnect();
-                log.info("MQTT reconnected");
+            synchronized (connectionLock) {
+                if (shuttingDown || !mqttProperties.isEnabled() || isConnected()) {
+                    return;
+                }
+                lastConnectionAttemptAt = System.currentTimeMillis();
+                MqttClient client = mqttClient;
+                try {
+                    if (client == null) {
+                        // Recreate clients whose initial connection failed.
+                        connectClient();
+                    } else {
+                        client.reconnect();
+                        log.info("MQTT reconnect request sent, clientId={}", effectiveClientId);
+                    }
+                } catch (Exception e) {
+                    lastConnectionError = describeException(e);
+                    log.warn("MQTT reconnect failed: {}", lastConnectionError);
+                    closeFailedClient(client);
+                }
             }
-        } catch (Exception e) {
-            log.error("MQTT reconnect error", e);
+        } finally {
+            reconnectInProgress.set(false);
         }
     }
 
     @Override
     public void destroy() {
+        shuttingDown = true;
         try {
             if (mqttClient != null && mqttClient.isConnected()) {
                 mqttClient.disconnect();

@@ -24,6 +24,8 @@ set "MQTT_CLIENT_ID=jhdss-web-control"
 set "MQTT_USERNAME=mqttuser"
 set "MQTT_PASSWORD=有人云MQTT密码"
 set "MQTT_CLEAN_SESSION=false"
+set "MQTT_RECONNECT_INTERVAL_MS=10000"
+set "MQTT_RECONNECT_INITIAL_DELAY_MS=10000"
 set "MQTT_TRANSPARENT_MODE=true"
 set "MQTT_IGNORE_ECHO=true"
 rem 按电机控制器说明书填写四个实际串口十六进制帧
@@ -86,7 +88,7 @@ start-jhds.bat
 - `Could not resolve placeholder`：五个必填变量必须全部存在。
 - `Communications link failure`：MySQL 未启动、端口或密码不匹配。
 - Redis connection refused：Redis 未启动或地址不正确。
-- MQTT 连接失败：现场设备不可用时设置 `-Ddevice.mqtt.enabled=false`。
+- MQTT 连接失败：访问 `http://localhost:9117/jhds/api/iot/mqtt-status` 查看 `lastConnectionError`、`lastConnectionAttemptAt` 和 `lastDisconnectReason`；确认 Broker 的 DNS、TCP 1883 端口、防火墙及账号密码。现场设备不可用时设置 `-Ddevice.mqtt.enabled=false`。
 - MQTT 已连接但电机不动作：确认 `equipment` 表或四个 `MOTOR_*_HEX` 环境变量已填写电机控制器的真实串口帧；纯透传模式无法自动猜测协议。
 - Maven 不可用：安装 Maven 并将其加入 PATH；需要 JAR 部署时先执行 `mvn -DskipTests package`。
 

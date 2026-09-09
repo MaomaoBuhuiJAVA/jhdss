@@ -56,6 +56,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `device.mqtt.ignore-echo` | `true` | 过滤查询等非写入帧的有人云回显；Modbus 写入帧（05/06/15/16）的同帧回显会作为确认 |
 | `device.mqtt.command-qos/response-qos` | `1/1` | 命令和响应主题 QoS |
 | `MQTT_RECONNECT_INTERVAL_MS` | `10000` | 连接失败或断开后的后台重试间隔（毫秒）；Paho 自动重连仍会处理已建立连接的短暂断线 |
+| `MQTT_RECONNECT_INITIAL_DELAY_MS` | `10000` | 应用启动后的首次重试延迟（毫秒）；首次连接失败不会阻止 Web 服务启动 |
 | `MQTT_CLIENT_ID` | `jhdss-web-control` | 后端 MQTT 客户端基础 ID；必须与 DTU 的 `jhdskouhong` 不同；程序默认追加实例 ID，避免多台电脑互相踢下线 |
 | `MQTT_APPEND_INSTANCE_ID` | `true` | 为每个后端实例追加唯一后缀；两台电脑同时运行时必须开启 |
 | `ys7.force-h264` | `true` | 获取播放地址前请求萤石云将主/子码流切换为 H.264 |
@@ -127,4 +128,4 @@ set "JAVA_OPTS=-Ddevice.mqtt.enabled=false"
 - 数据库连接失败：确认 MySQL 已启动、数据库已初始化，并检查 `spring.datasource.*`。
 - Redis 连接失败：确认 Redis 在 `127.0.0.1:6379` 监听，或用 `JAVA_OPTS` 覆盖 `spring.redis.host/port`。
 - AI 本地调用失败：确认 Ollama 已运行并执行 `ollama pull qwen2.5vl:7b`；也可改用 DashScope。
-- MQTT 连接失败：检查网络、Broker 地址和账号；仅做页面开发时可关闭 `device.mqtt.enabled`。
+- MQTT 连接失败：先访问 `/api/iot/mqtt-status`，查看 `lastConnectionError`、`lastConnectionAttemptAt` 和 `lastDisconnectReason`；再确认 Broker 的 DNS、TCP 1883 端口、防火墙、账号密码。仅做页面开发时可关闭 `device.mqtt.enabled`。
