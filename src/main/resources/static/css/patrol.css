@@ -35,6 +35,8 @@
 .motor-control-status.pending { color: var(--accent-primary); }
 .motor-control-status.success { color: var(--accent-secondary); }
 .motor-control-status.error { color: var(--accent-warn); }
+.ctrl-btn.soft-limited { opacity: .45; cursor: not-allowed; border-color: rgba(255, 176, 32, .5); }
+.ctrl-btn.soft-limited:disabled { pointer-events: none; }
 .panel-motion-controls { margin: 0 20px 12px; padding: 12px; border: 1px solid rgba(64, 122, 168, .35); border-radius: 10px; background: rgba(8, 22, 36, .62); }
 .panel-motion-title { display: flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; margin-bottom: 9px; }
 .panel-motion-title > i { color: #5dd8ff; font-size: 16px; }

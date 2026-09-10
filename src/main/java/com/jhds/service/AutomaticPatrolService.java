@@ -35,6 +35,8 @@ public class AutomaticPatrolService {
     @Autowired
     private PatrolService patrolService;
     @Autowired
+    private RailPositionService railPositionService;
+    @Autowired
     private MqttService mqttService;
     @Autowired
     private ControlPanelService controlPanelService;
@@ -53,7 +55,7 @@ public class AutomaticPatrolService {
     private long verticalTravelMs;
     @Value("${patrol.automatic.coverage-ratio:0.92}")
     private double coverageRatio;
-    @Value("${patrol.automatic.horizontal-coverage-ratio:0.75}")
+    @Value("${patrol.automatic.horizontal-coverage-ratio:0.80}")
     private double horizontalCoverageRatio;
     @Value("${patrol.automatic.ptz-pan-direction:2}")
     private int ptzPanDirection;
@@ -101,6 +103,9 @@ public class AutomaticPatrolService {
         if (!originConfirmed) {
             throw new IllegalArgumentException("请先确认轨道位于右下安全起点");
         }
+        // The operator just confirmed the rail sits on the rightmost origin,
+        // so re-zero the dead-reckoned soft-limit position before this run.
+        patrolService.markRightOrigin();
         Map<String, Object> selected = findPlan(requestedPlanId);
         synchronized (stateLock) {
             if (running) {
@@ -172,6 +177,12 @@ public class AutomaticPatrolService {
         result.put("workingHorizontalMs", workingHorizontalMs());
         result.put("workingVerticalMs", workingVerticalMs());
         result.put("coveragePercent", Math.round(safeCoverageRatio() * 100.0));
+        // Rail soft-limit telemetry: the left end is capped at
+        // patrol.automatic.horizontal-coverage-ratio of the calibrated travel.
+        Map<String, Object> rail = railPositionService.status();
+        result.put("rail", rail);
+        result.put("railLeftLimitPercent", rail.get("safeRatioPercent"));
+        result.put("railAtLeftLimit", rail.get("atLeftLimit"));
         result.put("startedAt", startedAt == 0L ? null : startedAt);
         result.put("endedAt", endedAt == 0L ? null : endedAt);
         result.put("lastError", lastError);
@@ -317,13 +328,19 @@ public class AutomaticPatrolService {
 
     private void moveHorizontal(String direction, long durationMs) {
         checkCancelled();
+        // Never let a timed step cross the leftward soft limit. The right end
+        // stays fully reachable, so only left travel is trimmed here.
+        long allowedMs = railPositionService.clampHorizontalDuration(direction, durationMs);
+        if ("left".equals(direction) && allowedMs <= 0L) {
+            throw new IllegalStateException("已达到左侧 80% 软限位，无法继续向左巡检");
+        }
         // start() accepted the operator's right-bottom origin confirmation;
         // authorize only this bounded movement step.
         String response = patrolService.control(direction, true);
         if (response == null) {
             throw new IllegalStateException("轨道" + directionLabel(direction) + "指令未收到响应");
         }
-        long deadline = System.currentTimeMillis() + durationMs;
+        long deadline = System.currentTimeMillis() + allowedMs;
         try {
             waitUntil(deadline);
         } finally {

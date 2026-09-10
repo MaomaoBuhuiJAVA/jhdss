@@ -30,8 +30,16 @@ let cameraDragOriginX = 0;
 let cameraDragOriginY = 0;
 let ptzStopTimer = null;
 let motorRequestId = 0;
+let motorStopTimer = null;
+let motorCommandChain = Promise.resolve();
+let motorMotionGeneration = 0;
+let motorMotionActive = false;
 let panelMotionDir = null;
 let panelMotionRequestId = 0;
+let panelMotionActive = false;
+let panelMotionTimer = null;
+let panelMotionChain = Promise.resolve();
+let panelMotionGeneration = 0;
 let selectedAutomaticPatrolPlan = 'standard';
 let automaticPatrolRunning = false;
 let automaticPatrolSpeechEnabled = false;
@@ -232,6 +240,37 @@ function patrolKeyTargetIsEditable(target) {
     return target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 }
 
+// The rail has no position sensor, so the backend dead-reckons travel from the
+// confirmed rightmost origin and caps leftward motion. Mirror that soft limit
+// here so "left" visibly disables instead of failing silently on click.
+let railLeftLimitPercent = 80;
+let railAtLeftLimit = false;
+
+function applyRailLimitStatus(data) {
+    if (!data) return;
+    if (data.railLeftLimitPercent !== undefined && data.railLeftLimitPercent !== null) {
+        railLeftLimitPercent = Number(data.railLeftLimitPercent) || railLeftLimitPercent;
+    }
+    const atLimit = data.railAtLeftLimit === true;
+    if (atLimit !== railAtLeftLimit) {
+        railAtLeftLimit = atLimit;
+        if (railAtLeftLimit && currentDir === 'left') setPatrolDir('stop');
+    }
+    const leftButton = document.querySelector('[data-motor-direction="left"]');
+    if (leftButton) {
+        leftButton.disabled = railAtLeftLimit;
+        leftButton.classList.toggle('soft-limited', railAtLeftLimit);
+        leftButton.title = railAtLeftLimit
+            ? '已到达左侧 ' + railLeftLimitPercent + '% 软限位，只能向右移动'
+            : '向左移动';
+    }
+    const status = document.getElementById('motor-control-status');
+    if (status && railAtLeftLimit && !status.classList.contains('pending')) {
+        status.className = 'motor-control-status error';
+        status.textContent = '已达到左侧 ' + railLeftLimitPercent + '% 软限位，只能向右移动';
+    }
+}
+
 function updateMotorButtonState(dir, pending) {
     document.querySelectorAll('[data-motor-direction]').forEach(function(btn) {
         const active = dir !== 'stop' && btn.dataset.motorDirection === dir;
@@ -242,11 +281,17 @@ function updateMotorButtonState(dir, pending) {
 }
 
 function togglePatrolDir(dir) {
+    // Fallback for programmatic/click callers. Direction buttons are bound
+    // as long-press controls in bindMotorHoldControls below.
     setPatrolDir(currentDir === dir ? 'stop' : dir);
 }
 
 async function setPatrolDir(dir) {
     const requestId = ++motorRequestId;
+    if (motorStopTimer) {
+        clearTimeout(motorStopTimer);
+        motorStopTimer = null;
+    }
     const status = document.getElementById('motor-control-status');
     currentDir = dir;
     updateMotorButtonState(dir, true);
@@ -288,6 +333,38 @@ async function setPatrolDir(dir) {
     }
 }
 
+function startPatrolHold(dir) {
+    if (automaticPatrolRunning) return;
+    if (motorStopTimer) {
+        clearTimeout(motorStopTimer);
+        motorStopTimer = null;
+    }
+    const generation = ++motorMotionGeneration;
+    motorMotionActive = true;
+    // Queue the start behind any in-flight command so a release cannot send
+    // stop before the start request reaches the controller.
+    motorCommandChain = motorCommandChain.then(function() {
+        if (generation !== motorMotionGeneration) return;
+        return setPatrolDir(dir);
+    });
+}
+
+function stopPatrolHold() {
+    if (!motorMotionActive) return;
+    motorMotionActive = false;
+    if (motorStopTimer) clearTimeout(motorStopTimer);
+    // Delay the stop long enough for very short taps to be collapsed into a
+    // single no-op by the generation guard instead of a start/stop pair.
+    motorStopTimer = window.setTimeout(function() {
+        motorStopTimer = null;
+        const generation = ++motorMotionGeneration;
+        motorCommandChain = motorCommandChain.then(function() {
+            if (generation !== motorMotionGeneration) return;
+            return setPatrolDir('stop');
+        });
+    }, 120);
+}
+
 function updatePanelMotionButtons(dir, pending) {
     document.querySelectorAll('[data-panel-direction]').forEach(function (btn) {
         const active = dir !== null && btn.dataset.panelDirection === dir;
@@ -305,20 +382,103 @@ function setPanelMotionStatus(message, error) {
 }
 
 async function togglePanelMotion(direction) {
-    const enabled = panelMotionDir !== direction;
-    const requestId = ++panelMotionRequestId;
-    updatePanelMotionButtons(enabled ? direction : null, true);
-    setPanelMotionStatus(enabled ? '正在发送控制面板指令...' : '正在发送停止指令...');
-    const res = await apiPost('/control-panel/move', { direction: direction, enabled: enabled });
-    if (requestId !== panelMotionRequestId) return;
-    if (!res || res.code !== 200) {
-        updatePanelMotionButtons(panelMotionDir, false);
-        setPanelMotionStatus((res && res.msg) || '控制面板指令失败', true);
-        return;
+    return setPanelMotion(direction, panelMotionDir !== direction);
+}
+
+function setPanelMotion(direction, enabled) {
+    if (panelMotionTimer) {
+        clearTimeout(panelMotionTimer);
+        panelMotionTimer = null;
     }
-    panelMotionDir = enabled ? direction : null;
-    updatePanelMotionButtons(panelMotionDir, false);
-    setPanelMotionStatus(enabled ? (direction === 'forward' ? '控制面板上移中' : '控制面板下移中') : '控制面板已停止');
+    const generation = ++panelMotionGeneration;
+    panelMotionChain = panelMotionChain.then(function() {
+        if (generation !== panelMotionGeneration) return;
+        const requestId = ++panelMotionRequestId;
+        updatePanelMotionButtons(enabled ? direction : null, true);
+        setPanelMotionStatus(enabled ? '正在发送控制面板指令...' : '正在发送停止指令...');
+        return apiPost('/control-panel/move', { direction: direction, enabled: enabled }).then(function(res) {
+            if (requestId !== panelMotionRequestId) return res;
+            if (!res || res.code !== 200) {
+                updatePanelMotionButtons(panelMotionDir, false);
+                setPanelMotionStatus((res && res.msg) || '控制面板指令失败', true);
+                panelMotionActive = false;
+                return res;
+            }
+            panelMotionDir = enabled ? direction : null;
+            panelMotionActive = enabled;
+            updatePanelMotionButtons(panelMotionDir, false);
+            setPanelMotionStatus(enabled ? (direction === 'forward' ? '控制面板上移中' : '控制面板下移中') : '控制面板已停止');
+            return res;
+        });
+    });
+}
+
+function startPanelMotionHold(direction) {
+    if (automaticPatrolRunning) return;
+    if (panelMotionTimer) {
+        clearTimeout(panelMotionTimer);
+        panelMotionTimer = null;
+    }
+    panelMotionActive = true;
+    setPanelMotion(direction, true);
+}
+
+function stopPanelMotionHold(direction) {
+    if (!panelMotionActive) return;
+    panelMotionActive = false;
+    if (panelMotionTimer) clearTimeout(panelMotionTimer);
+    panelMotionTimer = window.setTimeout(function() {
+        panelMotionTimer = null;
+        setPanelMotion(direction || panelMotionDir || 'forward', false);
+    }, 120);
+}
+
+function bindMotorHoldControls() {
+    document.querySelectorAll('[data-motor-direction]').forEach(function(button) {
+        const direction = button.dataset.motorDirection;
+        button.addEventListener('pointerdown', function(event) {
+            if (event.button !== undefined && event.button !== 0) return;
+            event.preventDefault();
+            if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+            startPatrolHold(direction);
+        });
+        button.addEventListener('pointerup', function(event) {
+            event.preventDefault();
+            stopPatrolHold();
+        });
+        button.addEventListener('pointercancel', function(event) {
+            event.preventDefault();
+            stopPatrolHold();
+        });
+        button.addEventListener('lostpointercapture', function(event) {
+            event.preventDefault();
+            stopPatrolHold();
+        });
+        button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+    });
+
+    document.querySelectorAll('[data-panel-direction]').forEach(function(button) {
+        const direction = button.dataset.panelDirection;
+        button.addEventListener('pointerdown', function(event) {
+            if (event.button !== undefined && event.button !== 0) return;
+            event.preventDefault();
+            if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+            startPanelMotionHold(direction);
+        });
+        button.addEventListener('pointerup', function(event) {
+            event.preventDefault();
+            stopPanelMotionHold(direction);
+        });
+        button.addEventListener('pointercancel', function(event) {
+            event.preventDefault();
+            stopPanelMotionHold(direction);
+        });
+        button.addEventListener('lostpointercapture', function(event) {
+            event.preventDefault();
+            stopPanelMotionHold(direction);
+        });
+        button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+    });
 }
 
 async function loadControlPanelStatus() {
@@ -692,6 +852,7 @@ async function loadAutomaticPatrolStatus() {
         const origin = document.getElementById('auto-patrol-origin-confirmed');
         if (origin) origin.checked = false;
     }
+    applyRailLimitStatus(data);
     updateAutomaticPatrolActions();
 }
 
@@ -1787,6 +1948,7 @@ window.addEventListener('DOMContentLoaded', function() {
     if (aiBtn) {
         aiBtn.addEventListener('click', triggerAiCapture);
     }
+    bindMotorHoldControls();
     bindPtzControls();
     loadControlPanelStatus();
     window.setInterval(loadControlPanelStatus, 15000);

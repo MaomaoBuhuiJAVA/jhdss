@@ -89,7 +89,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `dashscope.model` | `kimi-k2.7-code` | 云端模型 |
 | `patrol.capture-path` | `./captures` | 巡逻图片保存目录 |
 | `PATROL_COVERAGE_RATIO` | `0.92` | 垂直（升降）行程安全覆盖率；垂直方向单条扫描线仍需从底部上升到顶部并最终返回安全高度，因此仅保留 92% 标定行程，避免触发上下硬限位 |
-| `PATROL_HORIZONTAL_COVERAGE_RATIO` | `0.75` | 水平（轨道）行程安全覆盖率；蛇形（serpentine）扫描时每条扫描线结束后仅横移到下一列，不再强制回到底部，水平累计运动距离比老式逐列回底模式更短，因此可以将水平安全比例从统一值拆分出来，默认降到 75% 以在轨道限位开关触发前保留更大的冗余缓冲，尤其适合多线（7 线精细巡检）场景 |
+| `PATROL_HORIZONTAL_COVERAGE_RATIO` | `0.80` | 水平（轨道）行程安全覆盖率，同时也是轨道**左侧软限位**：以最右端为 0%、完整右到左行程为 100%，自动巡检与手动"左移"都不会越过 80%，最右端仍可正常到达。该值须与 `PATROL_HORIZONTAL_TRAVEL_MS` 匹配，调小可留出更大冗余缓冲 |
 | `logging.level.com.jhds` | `debug` | 应用日志级别，生产建议改为 `info` |
 
 可通过 `JAVA_OPTS` 传入任意 Spring 覆盖项，例如 `-Dspring.redis.host=192.168.1.20`、`-Ddevice.mqtt.enabled=false`。

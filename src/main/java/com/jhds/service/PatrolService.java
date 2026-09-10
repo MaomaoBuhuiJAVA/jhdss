@@ -40,6 +40,8 @@ public class PatrolService {
     private MqttService mqttService;
     @Autowired
     private DashScopeApiService dashScopeApiService;
+    @Autowired
+    private RailPositionService railPositionService;
 
     @Value("${patrol.capture-path:./captures}")
     private String capturePath;
@@ -69,6 +71,20 @@ public class PatrolService {
             Files.createDirectories(Paths.get(capturePath));
         } catch (IOException e) {
             log.error("Failed to create capture directory: {}", capturePath, e);
+        }
+        railPositionService.setLeftLimitStopAction(this::stopForSoftLimit);
+    }
+
+    private long softLimitPercent() {
+        return Math.round(railPositionService.safeRatio() * 100.0);
+    }
+
+    private void stopForSoftLimit() {
+        try {
+            String response = mqttService.sendCommand("MOTOR_STATE", "close", false);
+            log.info("Rail soft-limit stop issued; MOTOR_STATE response={}", response);
+        } catch (RuntimeException e) {
+            log.error("Failed to issue rail soft-limit stop", e);
         }
     }
 
@@ -159,38 +175,60 @@ public class PatrolService {
         if (!"stop".equals(dir) && !motionConfirmed) {
             throw new IllegalStateException("轨道移动未获本次操作确认，已拒绝执行");
         }
-        String alias;
-        String value;
+
+        if ("stop".equals(dir)) {
+            railPositionService.endMove();
+            return mqttService.sendCommand("MOTOR_STATE", "close", false);
+        }
+
+        // Only the leftward direction has a soft limit. The rightmost end stays
+        // a legal destination, so jogging right to re-find the origin still works.
+        if ("left".equals(dir) && railPositionService.remainingLeftMs() <= 0L) {
+            throw new IllegalStateException("已达到左侧 " + softLimitPercent() + "% 软限位，只能向右移动");
+        }
+
         switch (dir) {
             case "left":
-                alias = "MOTOR_DIRECTION";
-                // JinHua controller sheet: left = 00 FF (open_code),
-                // right = FF 00 (close_code).
-                value = "open";
-                break;
             case "right":
-                alias = "MOTOR_DIRECTION";
-                value = "close";
-                break;
-            case "stop":
-                alias = "MOTOR_STATE";
-                value = "close";
-                break;
+                return startRailMove(dir);
             default:
                 log.warn("Unknown patrol direction: {}", dir);
                 return null;
         }
+    }
+
+    /** Re-zeroes the soft-limit tracker once the operator confirms the rightmost origin. */
+    public void markRightOrigin() {
+        railPositionService.markRightOrigin();
+    }
+
+    /**
+     * Starts the rail direction coil only after committing the soft-limit
+     * tracker, so the fallback stop scheduler covers the exact elapsed travel
+     * from the moment the motor is authorized.
+     */
+    private String startRailMove(String direction) {
+        String alias = "MOTOR_DIRECTION";
+        String value = "left".equals(direction) ? "open" : "close";
         String response = mqttService.sendCommand(alias, value, false);
-        if (response == null || !"MOTOR_DIRECTION".equals(alias)) {
+        if (response == null) {
             return response;
         }
-
-        // Some controller revisions require a separate run coil after the
-        // direction coil is selected. Only send it when MOTOR_STATE.open_code
-        // (or MOTOR_STATE_OPEN_HEX) is actually configured; the JinHua sheet
-        // uses a single direction frame, so an absent run frame remains valid.
+        long allowed = railPositionService.beginMove(direction, Long.MAX_VALUE);
+        if (allowed < 0L) {
+            // The scheduler reached the limit in the gap between the guard and
+            // this start; de-energize the direction coil immediately.
+            stopForSoftLimit();
+            return null;
+        }
+        // Only the leftward direction has a soft limit; rightward jogging stays
+        // fully permitted and continues until the operator releases the button.
         String runResponse = mqttService.sendCommand("MOTOR_STATE", "open", false);
         return runResponse == null ? response : runResponse;
+    }
+
+    public RailPositionService railPositionService() {
+        return railPositionService;
     }
 
     public void addTask(PatrolTask task) {

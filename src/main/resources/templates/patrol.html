@@ -63,10 +63,10 @@
                         <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
                             <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><span class="panel-motion-connection" id="panel-motion-connection">控制面板检查中</span></div>
                             <div class="motor-direction-grid">
-                                <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" onclick="togglePatrolDir('left')"><i class="ri-arrow-left-line"></i><span>左移</span></button>
-                                <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" onclick="togglePatrolDir('right')"><i class="ri-arrow-right-line"></i><span>右移</span></button>
-                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-forward" data-panel-direction="forward" aria-pressed="false" onclick="togglePanelMotion('forward')"><i class="ri-arrow-up-line"></i><span>上移</span></button>
-                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-backward" data-panel-direction="backward" aria-pressed="false" onclick="togglePanelMotion('backward')"><i class="ri-arrow-down-line"></i><span>下移</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false"><i class="ri-arrow-left-line"></i><span>左移</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false"><i class="ri-arrow-right-line"></i><span>右移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-forward" data-panel-direction="forward" aria-pressed="false"><i class="ri-arrow-up-line"></i><span>上移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-backward" data-panel-direction="backward" aria-pressed="false"><i class="ri-arrow-down-line"></i><span>下移</span></button>
                             </div>
                             <div class="control-card-actions">
                                 <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i><span>停止电机</span></button>
@@ -188,6 +188,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/patrol.js(v='20260910-browser-speech')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260910-rail-soft-limit')}"></script>
 </body>
 </html>
