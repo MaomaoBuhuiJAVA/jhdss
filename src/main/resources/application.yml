@@ -138,7 +138,8 @@ camera:
     restart-cooldown-ms: ${CAMERA_LOCAL_RESTART_COOLDOWN_MS:10000}
     capture-segment-timeout-ms: ${CAMERA_LOCAL_CAPTURE_SEGMENT_TIMEOUT_MS:30000}
   speech:
-    connection-announcements-enabled: ${CAMERA_SPEECH_CONNECTION_ANNOUNCEMENTS_ENABLED:true}
+    broadcast-enabled: ${CAMERA_SPEECH_BROADCAST_ENABLED:false}
+    connection-announcements-enabled: ${CAMERA_SPEECH_CONNECTION_ANNOUNCEMENTS_ENABLED:false}
     connection-initial-delay-ms: ${CAMERA_SPEECH_CONNECTION_INITIAL_DELAY_MS:5000}
     connection-check-interval-ms: ${CAMERA_SPEECH_CONNECTION_CHECK_INTERVAL_MS:10000}
 

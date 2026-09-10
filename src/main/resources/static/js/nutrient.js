@@ -195,21 +195,40 @@ let controlPanelPumpState = false;
 let nutrientSpeechQueue = [];
 let nutrientSpeechPlaying = false;
 
+function unlockNutrientSpeechAudio() {
+    const audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+    audio.volume = 0;
+    const playback = audio.play();
+    if (playback && typeof playback.catch === 'function') playback.catch(function() {});
+}
+
 async function playNextNutrientSpeech() {
     if (nutrientSpeechPlaying || nutrientSpeechQueue.length === 0) return;
     nutrientSpeechPlaying = true;
     const text = nutrientSpeechQueue.shift();
+    let audioUrl = null;
     try {
-        const response = await fetch(API_BASE + '/speech/broadcast', {
+        const response = await fetch(API_BASE + '/speech/synthesize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
         });
-        const result = await response.json();
-        if (!response.ok || !apiSucceeded(result)) throw new Error((result && result.msg) || '摄像头语音播报失败');
+        const contentType = response.headers.get('Content-Type') || '';
+        if (!response.ok || !/audio\/wav/i.test(contentType)) throw new Error('讯飞语音合成请求失败');
+        const audioBlob = await response.blob();
+        audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.volume = 1;
+        await new Promise(function(resolve, reject) {
+            audio.addEventListener('ended', resolve, { once: true });
+            audio.addEventListener('error', function() { reject(new Error('讯飞语音音频播放失败')); }, { once: true });
+            const playback = audio.play();
+            if (playback && typeof playback.catch === 'function') playback.catch(reject);
+        });
     } catch (error) {
         console.warn('营养设备语音播报失败:', error);
     } finally {
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
         nutrientSpeechPlaying = false;
         playNextNutrientSpeech();
     }
@@ -441,11 +460,13 @@ document.addEventListener('DOMContentLoaded', function () {
         grid.addEventListener('change', function (event) {
             const panelInput = event.target.closest('.toggle-switch input[data-control-panel-pump]');
             if (panelInput) {
+                unlockNutrientSpeechAudio();
                 controlPanelPump(panelInput);
                 return;
             }
             const input = event.target.closest('.toggle-switch input[data-alias]');
             if (input) {
+                unlockNutrientSpeechAudio();
                 controlPump(input.dataset.alias, input.checked, input);
             }
         });

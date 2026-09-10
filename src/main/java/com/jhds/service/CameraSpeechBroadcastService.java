@@ -1,6 +1,7 @@
 package com.jhds.service;
 
 import com.jhds.config.YsjProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /** Synthesizes approved announcements and plays them through the EZVIZ camera speaker. */
@@ -15,6 +16,9 @@ public class CameraSpeechBroadcastService {
     private final EzvizService ezvizService;
     private final YsjProperties ysjProperties;
 
+    @Value("${camera.speech.broadcast-enabled:false}")
+    private boolean enabled;
+
     public CameraSpeechBroadcastService(XfyunTtsService xfyunTtsService,
                                         EzvizService ezvizService,
                                         YsjProperties ysjProperties) {
@@ -24,6 +28,7 @@ public class CameraSpeechBroadcastService {
     }
 
     public synchronized void broadcast(String sourceText) {
+        if (!enabled) throw new IllegalStateException("摄像头扬声器播报未启用");
         String text = xfyunTtsService.validateMessage(sourceText);
         byte[] wav = xfyunTtsService.synthesize(text);
         sendWithResourceBusyRetry(wav);

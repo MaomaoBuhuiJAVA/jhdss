@@ -52,7 +52,6 @@
                             <span class="realtime-detect-status" id="realtime-detect-status" aria-live="polite">监测已关闭</span>
                         </div>
                         <button class="audio-btn" id="btn-audio" type="button" onclick="toggleCameraAudio()"><i class="ri-volume-up-line"></i>开启声音</button>
-                        <button class="voice-broadcast-btn" id="btn-voice-broadcast" type="button" onclick="openVoiceBroadcast()"><i class="ri-broadcast-line"></i>语音播报</button>
                         <div class="video-view-controls" aria-label="网页画面缩放">
                             <button type="button" class="video-view-btn" onclick="adjustCameraZoom(-0.1)" title="缩小画面" aria-label="缩小画面"><i class="ri-zoom-out-line"></i></button>
                             <span id="camera-zoom-label">100%</span>
@@ -140,33 +139,6 @@
         </section>
     </div>
 
-    <div class="voice-broadcast-overlay" id="voiceBroadcastOverlay" hidden>
-        <section class="voice-broadcast-modal" role="dialog" aria-modal="true" aria-labelledby="voice-broadcast-title">
-            <header class="voice-broadcast-header">
-                <h2 id="voice-broadcast-title"><i class="ri-broadcast-line"></i>自定义语音播报</h2>
-                <button type="button" onclick="closeVoiceBroadcast()" aria-label="关闭"><i class="ri-close-line"></i></button>
-            </header>
-            <div class="voice-broadcast-body">
-                <div class="voice-source-actions">
-                    <button type="button" class="voice-source-btn" id="voice-record-btn" onclick="toggleVoiceRecording()"><i class="ri-mic-line"></i><span>开始录音</span></button>
-                    <button type="button" class="voice-source-btn" onclick="document.getElementById('voice-file-input').click()"><i class="ri-folder-music-line"></i><span>选择WAV</span></button>
-                    <input id="voice-file-input" type="file" accept="audio/wav,.wav" hidden onchange="selectVoiceFile(this.files[0])">
-                </div>
-                <div class="voice-record-progress" id="voice-record-progress" hidden><span></span><strong id="voice-record-time">00:00</strong></div>
-                <div class="voice-selection" id="voice-selection">
-                    <i class="ri-sound-module-line"></i>
-                    <div><strong id="voice-file-name">尚未选择语音</strong><span id="voice-file-detail">可现场录制，最长30秒；也可选择20MB以内的WAV文件</span></div>
-                </div>
-                <audio id="voice-preview" controls hidden></audio>
-                <div class="voice-broadcast-status" id="voice-broadcast-status" aria-live="polite">设备支持自定义语音播报</div>
-            </div>
-            <footer class="voice-broadcast-footer">
-                <button type="button" class="voice-cancel-btn" onclick="closeVoiceBroadcast()">取消</button>
-                <button type="button" class="voice-send-btn" id="voice-send-btn" onclick="sendVoiceBroadcast()" disabled><i class="ri-send-plane-2-line"></i>发送到摄像头</button>
-            </footer>
-        </section>
-    </div>
-
     <!-- AI拍照识别结果弹窗 -->
     <div class="ai-capture-overlay" id="aiCaptureOverlay" style="display:none;">
         <div class="ai-capture-modal">
@@ -216,6 +188,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/patrol.js(v='20260910-xfyun-xiaolu')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260910-browser-speech')}"></script>
 </body>
 </html>

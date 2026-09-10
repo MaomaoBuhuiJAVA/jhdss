@@ -497,6 +497,13 @@ function stopPatrolSpeechPlayback() {
     automaticPatrolSpeechPlaying = false;
 }
 
+function unlockPatrolSpeechAudio() {
+    const audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+    audio.volume = 0;
+    const playback = audio.play();
+    if (playback && typeof playback.catch === 'function') playback.catch(function() {});
+}
+
 async function playNextPatrolSpeech() {
     if (!automaticPatrolSpeechEnabled || automaticPatrolSpeechPlaying || automaticPatrolSpeechQueue.length === 0) return;
     automaticPatrolSpeechPlaying = true;
@@ -504,20 +511,32 @@ async function playNextPatrolSpeech() {
     const text = automaticPatrolSpeechQueue.shift();
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     automaticPatrolSpeechRequest = controller;
+    let audioUrl = null;
     try {
-        const response = await fetch(API_BASE + '/speech/broadcast', {
+        const response = await fetch(API_BASE + '/speech/synthesize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text }),
             signal: controller ? controller.signal : undefined
         });
-        const result = await response.json();
-        if (!response.ok || !result || result.code !== 200) {
-            throw new Error((result && result.msg) || '摄像头语音播报失败');
-        }
+        const contentType = response.headers.get('Content-Type') || '';
+        if (!response.ok || !/audio\/wav/i.test(contentType)) throw new Error('讯飞语音合成请求失败');
+        const audioBlob = await response.blob();
+        audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.volume = 1;
+        automaticPatrolSpeechAudio = audio;
+        await new Promise(function(resolve, reject) {
+            automaticPatrolSpeechFinish = resolve;
+            audio.addEventListener('ended', resolve, { once: true });
+            audio.addEventListener('error', function() { reject(new Error('讯飞语音音频播放失败')); }, { once: true });
+            const playback = audio.play();
+            if (playback && typeof playback.catch === 'function') playback.catch(reject);
+        });
     } catch (error) {
         if (!error || error.name !== 'AbortError') console.warn('巡检语音播报失败:', error);
     } finally {
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
         if (generation !== automaticPatrolSpeechGeneration) return;
         automaticPatrolSpeechFinish = null;
         automaticPatrolSpeechRequest = null;
@@ -582,6 +601,7 @@ async function startAutomaticPatrol() {
         window.alert('请先确认轨道位于右下安全起点');
         return;
     }
+    unlockPatrolSpeechAudio();
     automaticPatrolSpeechEnabled = true;
     automaticPatrolLastSpokenPhase = '';
     automaticPatrolLastSpokenState = '';
@@ -1731,7 +1751,6 @@ async function changeEncodeType() {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
-    if (window.location.hash === '#voice-broadcast') openVoiceBroadcast();
     document.addEventListener('pointerdown', unlockRealtimeWarningSound, { once: true });
     loadPatrolPageAlert();
     window.setInterval(loadPatrolPageAlert, 60000);
@@ -1780,19 +1799,12 @@ window.addEventListener('DOMContentLoaded', function() {
             if (event.target === recordsOverlay) closePatrolRecords();
         });
     }
-    var voiceOverlay = document.getElementById('voiceBroadcastOverlay');
-    if (voiceOverlay) {
-        voiceOverlay.addEventListener('click', function(event) {
-            if (event.target === voiceOverlay) closeVoiceBroadcast();
-        });
-    }
 });
 
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closePatrolWarning();
         closePatrolRecords();
-        closeVoiceBroadcast();
         return;
     }
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
