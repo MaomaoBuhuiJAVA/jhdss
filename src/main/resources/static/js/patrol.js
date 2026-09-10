@@ -5,6 +5,13 @@ let activePtzDirection = null;
 let activePtzStartPromise = null;
 let activePtzStartedAt = 0;
 let cameraAudioEnabled = false;
+let voiceBroadcastFile = null;
+let voicePreviewUrl = null;
+let voiceMediaRecorder = null;
+let voiceMediaStream = null;
+let voiceRecordChunks = [];
+let voiceRecordStartedAt = 0;
+let voiceRecordTimer = null;
 let cameraRecoveryTimer = null;
 let cameraPreferredProtocol = 4;
 let cameraLatencyTimer = null;
@@ -27,6 +34,15 @@ let panelMotionDir = null;
 let panelMotionRequestId = 0;
 let selectedAutomaticPatrolPlan = 'standard';
 let automaticPatrolRunning = false;
+let automaticPatrolSpeechEnabled = false;
+let automaticPatrolLastSpokenPhase = '';
+let automaticPatrolLastSpokenState = '';
+let automaticPatrolSpeechQueue = [];
+let automaticPatrolSpeechPlaying = false;
+let automaticPatrolSpeechAudio = null;
+let automaticPatrolSpeechRequest = null;
+let automaticPatrolSpeechFinish = null;
+let automaticPatrolSpeechGeneration = 0;
 let realtimeDetectionEnabled = false;
 let realtimeDetectionTimer = null;
 let realtimeDetectionInFlight = false;
@@ -467,17 +483,120 @@ function updateAutomaticPatrolActions() {
     if (encode) encode.disabled = automaticPatrolRunning;
 }
 
+function stopPatrolSpeechPlayback() {
+    automaticPatrolSpeechGeneration++;
+    if (automaticPatrolSpeechRequest) automaticPatrolSpeechRequest.abort();
+    automaticPatrolSpeechRequest = null;
+    if (automaticPatrolSpeechAudio) {
+        automaticPatrolSpeechAudio.pause();
+        automaticPatrolSpeechAudio.src = '';
+    }
+    if (automaticPatrolSpeechFinish) automaticPatrolSpeechFinish();
+    automaticPatrolSpeechFinish = null;
+    automaticPatrolSpeechAudio = null;
+    automaticPatrolSpeechPlaying = false;
+}
+
+async function playNextPatrolSpeech() {
+    if (!automaticPatrolSpeechEnabled || automaticPatrolSpeechPlaying || automaticPatrolSpeechQueue.length === 0) return;
+    automaticPatrolSpeechPlaying = true;
+    const generation = automaticPatrolSpeechGeneration;
+    const text = automaticPatrolSpeechQueue.shift();
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    automaticPatrolSpeechRequest = controller;
+    try {
+        const response = await fetch(API_BASE + '/speech/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text }),
+            signal: controller ? controller.signal : undefined
+        });
+        const result = await response.json();
+        if (!response.ok || !result || result.code !== 200) {
+            throw new Error((result && result.msg) || '摄像头语音播报失败');
+        }
+    } catch (error) {
+        if (!error || error.name !== 'AbortError') console.warn('巡检语音播报失败:', error);
+    } finally {
+        if (generation !== automaticPatrolSpeechGeneration) return;
+        automaticPatrolSpeechFinish = null;
+        automaticPatrolSpeechRequest = null;
+        automaticPatrolSpeechAudio = null;
+        automaticPatrolSpeechPlaying = false;
+        playNextPatrolSpeech();
+    }
+}
+
+function speakPatrolInstruction(text, interrupt) {
+    if (!automaticPatrolSpeechEnabled || !text) return;
+    if (interrupt) {
+        automaticPatrolSpeechQueue = [];
+        stopPatrolSpeechPlayback();
+    }
+    if (automaticPatrolSpeechQueue[automaticPatrolSpeechQueue.length - 1] !== text) {
+        automaticPatrolSpeechQueue.push(text);
+    }
+    playNextPatrolSpeech();
+}
+
+function patrolSpeechForStatus(data) {
+    const state = String(data.state || '');
+    const phase = String(data.phase || '');
+    if (state === 'FAILED') return '巡检发生异常，已执行紧急停止，请检查设备连接';
+    if (state === 'CANCELLED') return '自动巡检已停止，请重新确认设备位置后再启动';
+    if (state === 'STOPPING') return '收到急停指令，正在停止全部设备';
+    if (state === 'COMPLETED') return '自动巡检完成，设备已停止，当前位置已回到底部安全高度';
+    if (state === 'QUEUED') return '巡检任务已提交，正在准备设备';
+    if (/检查视频、MQTT和控制面板/.test(phase)) return '正在检查摄像头、轨道电机和升降控制面板，请稍候';
+    if (/控制设备已就绪/.test(phase)) return '设备检查完成，自动巡检准备就绪';
+    if (/调整云台/.test(phase)) return '正在调整摄像云台至巡检视角';
+    let match = phase.match(/向左步进到第(\d+)条扫描线/);
+    if (match) return '轨道电机启动，正在向左移动至第' + match[1] + '条扫描线';
+    match = phase.match(/第(\d+)条扫描线(底部|中点|顶部)抓拍/);
+    if (match) return '到达第' + match[1] + '条扫描线' + match[2] + '，正在抓拍巡检图像';
+    match = phase.match(/第(\d+)条扫描线上移至(中点|顶部)/);
+    if (match) return '升降电机启动，正在沿第' + match[1] + '条扫描线上移至' + match[2];
+    match = phase.match(/第(\d+)条扫描线返回底部/);
+    if (match) return '升降电机反向启动，第' + match[1] + '条扫描线正在返回底部';
+    return phase;
+}
+
+function announceAutomaticPatrolStatus(data) {
+    if (!automaticPatrolSpeechEnabled || !data) return;
+    const phase = String(data.phase || '');
+    const state = String(data.state || '');
+    if (phase && phase !== automaticPatrolLastSpokenPhase) {
+        automaticPatrolLastSpokenPhase = phase;
+        speakPatrolInstruction(patrolSpeechForStatus(data), state === 'FAILED' || state === 'CANCELLED' || state === 'STOPPING');
+    }
+    if (state === automaticPatrolLastSpokenState) return;
+    automaticPatrolLastSpokenState = state;
+    if (!phase && state !== 'IDLE') {
+        speakPatrolInstruction(patrolSpeechForStatus(data), state === 'FAILED' || state === 'CANCELLED' || state === 'STOPPING');
+    }
+}
+
 async function startAutomaticPatrol() {
     const origin = document.getElementById('auto-patrol-origin-confirmed');
     if (!origin || !origin.checked) {
         window.alert('请先确认轨道位于右下安全起点');
         return;
     }
+    automaticPatrolSpeechEnabled = true;
+    automaticPatrolLastSpokenPhase = '';
+    automaticPatrolLastSpokenState = '';
+    const selectedPlan = document.querySelector('input[name="auto-patrol-plan"]:checked');
+    const selectedPlanName = selectedPlan && selectedPlan.closest('.auto-patrol-plan')
+        ? selectedPlan.closest('.auto-patrol-plan').querySelector('strong') : null;
+    speakPatrolInstruction('开始执行' + (selectedPlanName ? selectedPlanName.textContent : '自动巡检')
+        + '方案，请确保轨道和种植架周围无人', true);
     const res = await apiPost('/patrol/auto/start', {
         planId: selectedAutomaticPatrolPlan,
         originConfirmed: true
     });
     if (!res || res.code !== 200) {
+        speakPatrolInstruction('自动巡检启动失败，请检查设备连接', true);
+        automaticPatrolSpeechEnabled = false;
         window.alert((res && res.msg) || '自动巡检启动失败');
         return;
     }
@@ -489,6 +608,7 @@ async function startAutomaticPatrol() {
 async function stopAutomaticPatrol() {
     const stop = document.getElementById('auto-patrol-stop');
     if (stop) stop.disabled = true;
+    speakPatrolInstruction('收到停止指令，正在停止轨道电机、升降电机和摄像云台', true);
     const res = await apiPost('/patrol/auto/stop', {});
     if (!res || res.code !== 200) {
         window.alert((res && res.msg) || '停止指令发送失败');
@@ -503,6 +623,7 @@ async function loadAutomaticPatrolStatus() {
     if (!res || res.code !== 200 || !res.data) return;
     const data = res.data;
     automaticPatrolRunning = !!data.running;
+    announceAutomaticPatrolStatus(data);
     const stateClass = automaticPatrolRunning ? 'running'
         : (data.state === 'COMPLETED' ? 'completed' : ((data.state === 'FAILED' || data.state === 'CANCELLED') ? 'error' : ''));
     const live = document.getElementById('auto-patrol-live');
@@ -1119,6 +1240,222 @@ function toggleCameraAudio() {
     });
 }
 
+function setVoiceBroadcastStatus(message, state) {
+    const status = document.getElementById('voice-broadcast-status');
+    if (!status) return;
+    status.className = 'voice-broadcast-status' + (state ? ' ' + state : '');
+    status.textContent = message;
+}
+
+function openVoiceBroadcast() {
+    const overlay = document.getElementById('voiceBroadcastOverlay');
+    if (overlay) overlay.hidden = false;
+}
+
+function closeVoiceBroadcast() {
+    const overlay = document.getElementById('voiceBroadcastOverlay');
+    if (overlay) overlay.hidden = true;
+    if (voiceMediaRecorder && voiceMediaRecorder.state === 'recording') stopVoiceRecording();
+}
+
+function updateVoiceRecordingTime() {
+    const elapsed = Math.min(30, Math.floor((Date.now() - voiceRecordStartedAt) / 1000));
+    const label = document.getElementById('voice-record-time');
+    const progress = document.querySelector('#voice-record-progress span');
+    if (label) label.textContent = '00:' + String(elapsed).padStart(2, '0');
+    if (progress) progress.style.width = (elapsed / 30 * 100) + '%';
+    if (elapsed >= 30) stopVoiceRecording();
+}
+
+async function toggleVoiceRecording() {
+    if (voiceMediaRecorder && voiceMediaRecorder.state === 'recording') {
+        stopVoiceRecording();
+        return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setVoiceBroadcastStatus('当前浏览器不支持录音，请选择WAV文件', 'error');
+        return;
+    }
+    try {
+        voiceMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+        const mimeType = mimeTypes.find(function(type) { return MediaRecorder.isTypeSupported(type); });
+        voiceRecordChunks = [];
+        voiceMediaRecorder = mimeType
+            ? new MediaRecorder(voiceMediaStream, { mimeType: mimeType })
+            : new MediaRecorder(voiceMediaStream);
+        voiceMediaRecorder.ondataavailable = function(event) {
+            if (event.data && event.data.size) voiceRecordChunks.push(event.data);
+        };
+        voiceMediaRecorder.onstop = finishVoiceRecording;
+        voiceMediaRecorder.start();
+        voiceRecordStartedAt = Date.now();
+        const button = document.getElementById('voice-record-btn');
+        const progress = document.getElementById('voice-record-progress');
+        if (button) {
+            button.classList.add('recording');
+            button.innerHTML = '<i class="ri-stop-circle-line"></i><span>结束录音</span>';
+        }
+        if (progress) progress.hidden = false;
+        updateVoiceRecordingTime();
+        voiceRecordTimer = window.setInterval(updateVoiceRecordingTime, 250);
+        setVoiceBroadcastStatus('正在录音，结束后会生成可预览的WAV', 'recording');
+    } catch (error) {
+        releaseVoiceMicrophone();
+        setVoiceBroadcastStatus(error && error.name === 'NotAllowedError'
+            ? '未获得麦克风权限，请允许访问后重试'
+            : '无法启动录音，请检查麦克风', 'error');
+    }
+}
+
+function stopVoiceRecording() {
+    if (voiceMediaRecorder && voiceMediaRecorder.state === 'recording') voiceMediaRecorder.stop();
+}
+
+function releaseVoiceMicrophone() {
+    if (voiceRecordTimer) {
+        clearInterval(voiceRecordTimer);
+        voiceRecordTimer = null;
+    }
+    if (voiceMediaStream) {
+        voiceMediaStream.getTracks().forEach(function(track) { track.stop(); });
+        voiceMediaStream = null;
+    }
+}
+
+async function finishVoiceRecording() {
+    const button = document.getElementById('voice-record-btn');
+    const progress = document.getElementById('voice-record-progress');
+    if (button) {
+        button.classList.remove('recording');
+        button.innerHTML = '<i class="ri-mic-line"></i><span>重新录音</span>';
+    }
+    if (progress) progress.hidden = true;
+    releaseVoiceMicrophone();
+    try {
+        setVoiceBroadcastStatus('正在处理录音', 'sending');
+        const recorded = new Blob(voiceRecordChunks, {
+            type: (voiceMediaRecorder && voiceMediaRecorder.mimeType) || 'audio/webm'
+        });
+        const wav = await convertRecordedAudioToWav(recorded);
+        selectVoiceFile(new File([wav], 'voice-' + Date.now() + '.wav', { type: 'audio/wav' }));
+    } catch (error) {
+        console.warn('Voice recording conversion failed:', error);
+        setVoiceBroadcastStatus('录音转换失败，请改用WAV文件', 'error');
+    } finally {
+        voiceMediaRecorder = null;
+        voiceRecordChunks = [];
+    }
+}
+
+async function convertRecordedAudioToWav(blob) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error('AudioContext unavailable');
+    const context = new AudioContextClass();
+    try {
+        const source = await context.decodeAudioData(await blob.arrayBuffer());
+        const targetRate = 16000;
+        const ratio = source.sampleRate / targetRate;
+        const frameCount = Math.max(1, Math.floor(source.length / ratio));
+        const samples = new Float32Array(frameCount);
+        const channels = [];
+        for (let channel = 0; channel < source.numberOfChannels; channel++) {
+            channels.push(source.getChannelData(channel));
+        }
+        for (let i = 0; i < frameCount; i++) {
+            const position = i * ratio;
+            const left = Math.floor(position);
+            const right = Math.min(source.length - 1, left + 1);
+            const fraction = position - left;
+            let mixed = 0;
+            channels.forEach(function(data) {
+                mixed += data[left] + (data[right] - data[left]) * fraction;
+            });
+            samples[i] = mixed / channels.length;
+        }
+        return encodePcmWav(samples, targetRate);
+    } finally {
+        context.close().catch(function() {});
+    }
+}
+
+function encodePcmWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    function writeText(offset, text) {
+        for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+    }
+    writeText(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeText(8, 'WAVE');
+    writeText(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeText(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    for (let i = 0; i < samples.length; i++) {
+        const sample = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
+    }
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function selectVoiceFile(file) {
+    if (!file) return;
+    if (!/\.wav$/i.test(file.name || '')) {
+        setVoiceBroadcastStatus('仅支持WAV语音文件', 'error');
+        return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+        setVoiceBroadcastStatus('语音文件不能超过20MB', 'error');
+        return;
+    }
+    voiceBroadcastFile = file;
+    if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+    voicePreviewUrl = URL.createObjectURL(file);
+    const preview = document.getElementById('voice-preview');
+    const name = document.getElementById('voice-file-name');
+    const detail = document.getElementById('voice-file-detail');
+    const send = document.getElementById('voice-send-btn');
+    if (preview) {
+        preview.src = voicePreviewUrl;
+        preview.hidden = false;
+    }
+    if (name) name.textContent = file.name;
+    if (detail) detail.textContent = (file.size / 1024).toFixed(1) + ' KB · WAV';
+    if (send) send.disabled = false;
+    setVoiceBroadcastStatus('语音已就绪，可试听后发送', 'ready');
+}
+
+async function sendVoiceBroadcast() {
+    if (!voiceBroadcastFile) return;
+    const button = document.getElementById('voice-send-btn');
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="ri-loader-4-line"></i>正在发送';
+    }
+    setVoiceBroadcastStatus('正在通过萤石云下发到摄像头', 'sending');
+    try {
+        const body = new FormData();
+        body.append('voiceFile', voiceBroadcastFile, voiceBroadcastFile.name || 'voice.wav');
+        const response = await fetch(API_BASE + '/camera/voice/broadcast', { method: 'POST', body: body });
+        const result = await response.json();
+        if (!result || result.code !== 200) throw new Error((result && result.msg) || '语音下发失败');
+        setVoiceBroadcastStatus('播报指令已发送，摄像头正在播放', 'success');
+        if (button) button.innerHTML = '<i class="ri-check-line"></i>已发送';
+    } catch (error) {
+        setVoiceBroadcastStatus(error.message || '语音下发失败', 'error');
+        if (button) button.innerHTML = '<i class="ri-send-plane-2-line"></i>重新发送';
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
 function playCameraVideo(video) {
     // Browsers block autoplay with sound until a user gesture. Start muted,
     // then let the user explicitly enable audio with the button.
@@ -1394,6 +1731,7 @@ async function changeEncodeType() {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+    if (window.location.hash === '#voice-broadcast') openVoiceBroadcast();
     document.addEventListener('pointerdown', unlockRealtimeWarningSound, { once: true });
     loadPatrolPageAlert();
     window.setInterval(loadPatrolPageAlert, 60000);
@@ -1442,12 +1780,19 @@ window.addEventListener('DOMContentLoaded', function() {
             if (event.target === recordsOverlay) closePatrolRecords();
         });
     }
+    var voiceOverlay = document.getElementById('voiceBroadcastOverlay');
+    if (voiceOverlay) {
+        voiceOverlay.addEventListener('click', function(event) {
+            if (event.target === voiceOverlay) closeVoiceBroadcast();
+        });
+    }
 });
 
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closePatrolWarning();
         closePatrolRecords();
+        closeVoiceBroadcast();
         return;
     }
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
@@ -1462,5 +1807,5 @@ window.addEventListener('pageshow', function (event) {
 window.addEventListener('visibilitychange', function() {
     if (!document.hidden && Date.now() - cameraLastProgressAt > 15000) initCamera(cameraPreferredProtocol);
 });
-window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });
-window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });
+window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); releaseVoiceMicrophone(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });
+window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); releaseVoiceMicrophone(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });

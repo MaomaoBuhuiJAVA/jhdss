@@ -6,6 +6,7 @@ import com.jhds.config.YsjProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -27,6 +28,7 @@ public class EzvizService {
     private static final String CAMERA_LIST_URL = "https://open.ys7.com/api/lapp/device/camera/list";
     private static final String PTZ_START_URL = "https://open.ys7.com/api/lapp/device/ptz/start";
     private static final String PTZ_STOP_URL = "https://open.ys7.com/api/lapp/device/ptz/stop";
+    private static final String VOICE_SEND_ONCE_URL = "https://open.ys7.com/api/lapp/voice/sendonce";
     private static final String REDIS_KEY = "jhds:ys7:access_token";
     /** 设备编码本地缓存前缀: jhds:ys7:encode:{deviceSerial}:{channelNo}:{streamType} */
     private static final String ENCODE_CACHE_PREFIX = "jhds:ys7:encode";
@@ -380,6 +382,51 @@ public class EzvizService {
         } catch (Exception e) {
             log.error("Error getting YS7 device list", e);
             throw new RuntimeException("获取设备列表异常", e);
+        }
+    }
+
+    /** Send one WAV file to the camera speaker through EZVIZ voice broadcast. */
+    public void sendVoiceOnce(String deviceSerial, Integer channelNo, byte[] wavBytes, String filename) {
+        String accessToken = getAccessToken();
+        String serial = requireDeviceSerial(deviceSerial);
+        int channel = channelNo == null ? 1 : channelNo;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        HttpHeaders fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(MediaType.parseMediaType("audio/wav"));
+        ByteArrayResource resource = new ByteArrayResource(wavBytes) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        };
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("accessToken", accessToken);
+        body.add("deviceSerial", serial);
+        body.add("channelNo", String.valueOf(channel));
+        body.add("voiceFile", new HttpEntity<>(resource, fileHeaders));
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    VOICE_SEND_ONCE_URL, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+            JSONObject json = JSONObject.parseObject(response.getBody());
+            if (!"200".equals(json.getString("code"))) {
+                log.error("Failed to send EZVIZ voice broadcast: {}", json);
+                throw new RuntimeException("语音下发失败（" + json.getString("code") + "）: " + json.getString("msg"));
+            }
+            log.info("EZVIZ voice broadcast sent: device={}, channel={}, bytes={}", serial, channel, wavBytes.length);
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("EZVIZ voice broadcast HTTP error: status={}, body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("萤石云请求失败: " + e.getResponseBodyAsString(), e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error sending EZVIZ voice broadcast: device={}, channel={}", serial, channel, e);
+            throw new RuntimeException("语音下发异常", e);
         }
     }
 

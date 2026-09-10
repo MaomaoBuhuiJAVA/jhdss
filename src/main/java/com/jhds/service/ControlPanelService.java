@@ -1,14 +1,15 @@
 package com.jhds.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import javax.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -23,8 +24,11 @@ public class ControlPanelService {
 
     @Value("${control-panel.base-url:http://169.254.240.33}")
     private String baseUrl;
+    @Value("${control-panel.connect-timeout-ms:1200}")
+    private int connectTimeoutMs;
+    @Value("${control-panel.read-timeout-ms:3000}")
+    private int readTimeoutMs;
 
-    @Autowired
     private RestTemplate restTemplate;
 
     private volatile boolean reachable;
@@ -33,6 +37,14 @@ public class ControlPanelService {
     private volatile boolean forwardActive;
     private volatile boolean backwardActive;
     private volatile boolean pumpActive;
+
+    @PostConstruct
+    public void initRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Math.max(250, connectTimeoutMs));
+        factory.setReadTimeout(Math.max(500, readTimeoutMs));
+        restTemplate = new RestTemplate(factory);
+    }
 
     public Map<String, Object> connectionStatus() {
         Map<String, Object> status = new LinkedHashMap<>();

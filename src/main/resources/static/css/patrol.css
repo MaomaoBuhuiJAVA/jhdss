@@ -97,6 +97,8 @@
 .audio-btn { position: absolute; right: 12px; top: 12px; z-index: 10; padding: 5px 10px; border: 1px solid rgba(0, 198, 240, 0.45); border-radius: 6px; background: rgba(5, 12, 22, 0.78); color: var(--text-secondary); font: 11px var(--font-mono); cursor: pointer; }
 .audio-btn:hover { color: var(--accent-primary); border-color: var(--accent-primary); background: rgba(0, 180, 220, 0.14); }
 .audio-btn.enabled { color: var(--accent-secondary); border-color: var(--accent-secondary); }
+.voice-broadcast-btn { position: absolute; right: 12px; top: 48px; z-index: 10; padding: 5px 10px; border: 1px solid rgba(0, 232, 135, .48); border-radius: 6px; background: rgba(5, 12, 22, .82); color: #8fe6bb; font: 11px var(--font-mono); cursor: pointer; }
+.voice-broadcast-btn:hover { color: #d8fff0; border-color: var(--accent-secondary); background: rgba(0, 200, 150, .14); }
 .video-view-controls { position: absolute; right: 12px; bottom: 12px; z-index: 10; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid rgba(30, 60, 100, .6); border-radius: 6px; background: rgba(5, 12, 22, .82); color: var(--text-secondary); font: 10px var(--font-mono); }
 .video-view-btn { width: 25px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
 .video-view-btn:hover { color: var(--accent-primary); background: rgba(0, 180, 220, .14); }
@@ -123,10 +125,45 @@
 .patrol-warning-images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 18px; overflow-y: auto; }
 .patrol-warning-images img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 6px; border: 1px solid rgba(30, 60, 100, 0.5); background: #07101a; }
 
+.voice-broadcast-overlay { position: fixed; inset: 0; z-index: 1120; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .74); backdrop-filter: blur(5px); }
+.voice-broadcast-overlay[hidden] { display: none; }
+.voice-broadcast-modal { box-sizing: border-box; width: min(480px, calc(100vw - 40px)); max-width: 100%; overflow: hidden; border: 1px solid rgba(0, 198, 240, .48); border-radius: 8px; background: #0b1421; box-shadow: 0 24px 70px rgba(0, 0, 0, .65); }
+.voice-broadcast-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(30, 60, 100, .48); }
+.voice-broadcast-header h2 { display: flex; align-items: center; gap: 7px; color: var(--accent-primary); font-size: 15px; }
+.voice-broadcast-header button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--text-secondary); font-size: 19px; cursor: pointer; }
+.voice-broadcast-header button:hover { color: var(--accent-warn); background: rgba(255, 77, 106, .12); }
+.voice-broadcast-body { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.voice-source-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.voice-source-btn { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(30, 60, 100, .58); border-radius: 6px; background: rgba(8, 16, 28, .72); color: var(--text-secondary); font: 12px inherit; cursor: pointer; }
+.voice-source-btn:hover { border-color: var(--accent-primary); color: var(--text-primary); background: rgba(0, 180, 220, .1); }
+.voice-source-btn.recording { border-color: #ff6680; color: #ff9aac; background: rgba(255, 77, 106, .12); }
+.voice-record-progress { height: 23px; position: relative; overflow: hidden; border: 1px solid rgba(255, 77, 106, .36); border-radius: 5px; background: rgba(255, 77, 106, .06); }
+.voice-record-progress span { display: block; width: 0; height: 100%; background: rgba(255, 77, 106, .18); transition: width .2s linear; }
+.voice-record-progress strong { position: absolute; inset: 0; display: grid; place-items: center; color: #ffb0bd; font: 10px var(--font-mono); }
+.voice-selection { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid rgba(30, 60, 100, .38); border-radius: 6px; background: rgba(5, 12, 22, .55); }
+.voice-selection > i { flex: 0 0 auto; color: var(--accent-primary); font-size: 22px; }
+.voice-selection > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.voice-selection strong, .voice-selection span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-selection strong { color: #dce8f2; font-size: 12px; }
+.voice-selection span { color: var(--text-dim); font-size: 10px; }
+#voice-preview { width: 100%; height: 36px; }
+.voice-broadcast-status { min-height: 18px; color: var(--text-dim); font-size: 11px; }
+.voice-broadcast-status.ready, .voice-broadcast-status.success { color: #72edb2; }
+.voice-broadcast-status.recording { color: #ff9aac; }
+.voice-broadcast-status.sending { color: #7fdcff; }
+.voice-broadcast-status.error { color: #ff9aac; }
+.voice-broadcast-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid rgba(30, 60, 100, .42); }
+.voice-cancel-btn, .voice-send-btn { min-height: 36px; padding: 0 14px; border-radius: 6px; font: 600 12px inherit; cursor: pointer; }
+.voice-cancel-btn { border: 1px solid rgba(30, 60, 100, .5); background: rgba(8, 16, 28, .7); color: var(--text-secondary); }
+.voice-send-btn { border: 1px solid rgba(0, 232, 135, .55); background: rgba(0, 200, 150, .14); color: #a5f2cb; }
+.voice-send-btn:disabled { cursor: not-allowed; opacity: .45; }
+.voice-send-btn i { margin-right: 5px; }
+
 @media (max-width: 620px) {
     .patrol-warning-images { grid-template-columns: 1fr; }
     .ptz-controls { flex-wrap: wrap; padding-left: 14px; padding-right: 14px; }
     .ptz-status { margin-left: 0; width: 100%; }
+    .voice-source-actions { grid-template-columns: 1fr; }
 }
 .task-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; border: 1px solid rgba(30, 60, 100, 0.3); margin-bottom: 10px; background: rgba(15, 25, 42, 0.5); transition: all 0.3s ease; }
 .task-item:hover { border-color: rgba(0, 190, 220, 0.4); box-shadow: 0 0 15px rgba(0, 180, 220, 0.1); }

@@ -53,6 +53,8 @@ public class MqttService implements DisposableBean {
     private String motorStateOpen;
     @Value("${device.commands.motor-state-close:}")
     private String motorStateClose;
+    @Value("${device.commands.motor-confirmation-timeout-ms:1200}")
+    private long motorConfirmationTimeoutMs;
 
     private volatile MqttClient mqttClient;
     private volatile String effectiveClientId;
@@ -321,15 +323,17 @@ public class MqttService implements DisposableBean {
             // A transparent MQTT write should be acknowledged immediately by
             // the DTU echo or the controller. Cap the wait so an unrelated
             // serial frame cannot make a button appear hung for 30 seconds.
-            long timeoutMs = isModbusWriteCommand(commandCode)
+            boolean momentaryMotorCommand = "MOTOR_DIRECTION".equalsIgnoreCase(alias)
+                    || "MOTOR_STATE".equalsIgnoreCase(alias);
+            long timeoutMs = momentaryMotorCommand
+                    ? Math.max(250L, Math.min(5000L, motorConfirmationTimeoutMs))
+                    : isModbusWriteCommand(commandCode)
                     ? Math.min(Constants.COMMAND_TIMEOUT * 1000L, 5000L)
                     : Constants.COMMAND_TIMEOUT * 1000L;
             // Rail motor commands are momentary control actions. QoS 1 may be
             // queued by the broker while the DTU is offline and replayed when
             // the device powers on, causing an unexpected limit hit. QoS 0
             // makes these commands valid only while the device is connected.
-            boolean momentaryMotorCommand = "MOTOR_DIRECTION".equalsIgnoreCase(alias)
-                    || "MOTOR_STATE".equalsIgnoreCase(alias);
             String response = sendHexSync(commandCode, timeoutMs, momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()));
             boolean success = response != null;
             controlLogService.log(alias, equipment.getName(), value,

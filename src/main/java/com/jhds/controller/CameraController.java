@@ -8,10 +8,13 @@ import com.jhds.service.EzvizService.EncodeTarget;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Api(tags = "萤石摄像头模块")
@@ -176,6 +179,33 @@ public class CameraController {
         return Result.ok(devices);
     }
 
+    @ApiOperation("向摄像头下发一次自定义WAV语音播报")
+    @PostMapping(value = "/voice/broadcast", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Void> broadcastVoice(
+            @RequestParam("voiceFile") MultipartFile voiceFile,
+            @RequestParam(required = false) String deviceSerial,
+            @RequestParam(required = false) Integer channelNo) {
+        try {
+            validateVoiceFile(voiceFile);
+            String filename = voiceFile.getOriginalFilename();
+            if (filename == null || filename.trim().isEmpty()) {
+                filename = "voice.wav";
+            } else {
+                filename = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+            }
+            ezvizService.sendVoiceOnce(resolveDeviceSerial(deviceSerial),
+                    channelNo == null ? ysjProperties.getChannelNo() : channelNo,
+                    voiceFile.getBytes(), filename);
+            return Result.ok();
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (RuntimeException e) {
+            return Result.error(502, "摄像头语音播报失败：" + errorMessage(e));
+        } catch (Exception e) {
+            return Result.error(500, "读取语音文件失败");
+        }
+    }
+
     @ApiOperation("获取NVR设备下的通道列表")
     @GetMapping("/{deviceSerial}/channels")
     public Result<JSONArray> getChannels(@PathVariable String deviceSerial) {
@@ -220,6 +250,29 @@ public class CameraController {
             throw new IllegalArgumentException("请配置 YS7_DEVICE_SERIAL");
         }
         return serial.trim();
+    }
+
+    private void validateVoiceFile(MultipartFile file) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("请选择或录制WAV语音");
+        }
+        if (file.getSize() > 20L * 1024L * 1024L) {
+            throw new IllegalArgumentException("语音文件不能超过20MB");
+        }
+        String name = file.getOriginalFilename();
+        if (name != null && !name.toLowerCase(Locale.ROOT).endsWith(".wav")) {
+            throw new IllegalArgumentException("仅支持WAV语音文件");
+        }
+        byte[] header = new byte[12];
+        try (java.io.InputStream input = file.getInputStream()) {
+            int read = input.read(header);
+            boolean wav = read == 12
+                    && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F'
+                    && header[8] == 'W' && header[9] == 'A' && header[10] == 'V' && header[11] == 'E';
+            if (!wav) {
+                throw new IllegalArgumentException("文件不是有效的WAV音频");
+            }
+        }
     }
 
     private String errorMessage(RuntimeException error) {

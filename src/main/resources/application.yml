@@ -6,8 +6,8 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 11MB
+      max-file-size: 20MB
+      max-request-size: 21MB
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/jhds?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
@@ -83,6 +83,8 @@ device:
     motor-direction-close: ${MOTOR_DIRECTION_CLOSE_HEX:}
     motor-state-open: ${MOTOR_STATE_OPEN_HEX:}
     motor-state-close: ${MOTOR_STATE_CLOSE_HEX:}
+    # 轨道电机使用短确认窗口，避免一次动作因串口回执缺失等待 5 秒。
+    motor-confirmation-timeout-ms: ${MOTOR_CONFIRMATION_TIMEOUT_MS:1200}
 
 custom:
   redis:
@@ -135,6 +137,10 @@ camera:
     stale-timeout-ms: ${CAMERA_LOCAL_STALE_TIMEOUT_MS:30000}
     restart-cooldown-ms: ${CAMERA_LOCAL_RESTART_COOLDOWN_MS:10000}
     capture-segment-timeout-ms: ${CAMERA_LOCAL_CAPTURE_SEGMENT_TIMEOUT_MS:30000}
+  speech:
+    connection-announcements-enabled: ${CAMERA_SPEECH_CONNECTION_ANNOUNCEMENTS_ENABLED:true}
+    connection-initial-delay-ms: ${CAMERA_SPEECH_CONNECTION_INITIAL_DELAY_MS:5000}
+    connection-check-interval-ms: ${CAMERA_SPEECH_CONNECTION_CHECK_INTERVAL_MS:10000}
 
 ollama:
   base-url: http://localhost:11434
@@ -151,6 +157,19 @@ dashscope:
   options:
     temperature: 0.1
     max-tokens: 2048
+
+xfyun:
+  tts:
+    enabled: ${XFYUN_TTS_ENABLED:false}
+    app-id: ${XFYUN_TTS_APP_ID:}
+    api-key: ${XFYUN_TTS_API_KEY:}
+    api-secret: ${XFYUN_TTS_API_SECRET:}
+    websocket-url: ${XFYUN_TTS_WEBSOCKET_URL:https://tts-api.xfyun.cn/v2/tts}
+    voice-name: ${XFYUN_TTS_VOICE_NAME:x4_yezi}
+    speed: ${XFYUN_TTS_SPEED:50}
+    volume: ${XFYUN_TTS_VOLUME:100}
+    pitch: ${XFYUN_TTS_PITCH:50}
+    timeout-ms: ${XFYUN_TTS_TIMEOUT_MS:15000}
 
 patrol:
   capture-path: ./captures
@@ -172,6 +191,8 @@ patrol:
 # when the controller receives a different link-local address.
 control-panel:
   base-url: ${CONTROL_PANEL_BASE_URL:http://169.254.240.33}
+  connect-timeout-ms: ${CONTROL_PANEL_CONNECT_TIMEOUT_MS:1200}
+  read-timeout-ms: ${CONTROL_PANEL_READ_TIMEOUT_MS:3000}
 
 archive:
   upload-path: ./uploads/archive

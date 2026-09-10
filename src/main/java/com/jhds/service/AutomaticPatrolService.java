@@ -265,14 +265,14 @@ public class AutomaticPatrolService {
     }
 
     private boolean awaitControlPanel() {
-        for (int attempt = 0; attempt < 3; attempt++) {
+        for (int attempt = 0; attempt < 2; attempt++) {
             checkCancelled();
             try {
                 Map<String, Object> panel = controlPanelService.connectionStatus();
                 if (Boolean.TRUE.equals(panel.get("reachable"))) return true;
             } catch (RuntimeException ignored) {
             }
-            if (attempt < 2) waitInterruptibly(1200L);
+            if (attempt < 1) waitInterruptibly(400L);
         }
         return false;
     }
@@ -293,13 +293,13 @@ public class AutomaticPatrolService {
 
     private void moveHorizontal(String direction, long durationMs) {
         checkCancelled();
-        long deadline = System.currentTimeMillis() + durationMs;
         // start() accepted the operator's right-bottom origin confirmation;
         // authorize only this bounded movement step.
         String response = patrolService.control(direction, true);
         if (response == null) {
             throw new IllegalStateException("轨道" + directionLabel(direction) + "指令未收到响应");
         }
+        long deadline = System.currentTimeMillis() + durationMs;
         try {
             waitUntil(deadline);
         } finally {

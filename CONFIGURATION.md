@@ -6,7 +6,7 @@
 - Maven 3.6+
 - MySQL 5.7/8.x，默认连接 `127.0.0.1:3306/jhds`
 - Redis 5+，默认连接 `127.0.0.1:6379`、数据库 0
-- 可选外部服务：MQTT、虫情灯云平台、萤石云、Ollama、阿里云百炼 DashScope
+- 可选外部服务：MQTT、虫情灯云平台、萤石云、讯飞在线语音合成、Ollama、阿里云百炼 DashScope
 
 ## 2. 配置文件位置
 
@@ -34,6 +34,11 @@ set JAVA_OPTS=-Dserver.port=9118
 | `YS7_CHANNEL_NO` | 否 | `1` | 摄像头通道号 |
 | `DASHSCOPE_API_KEY` | 是 | 无 | DashScope Bearer Token；当前 YAML 无默认值，缺失会阻止 Spring 启动 |
 | `DASHSCOPE_BASE_URL` | 否 | `https://dashscope.aliyuncs.com` | DashScope API 根地址 |
+| `XFYUN_TTS_ENABLED` | 否 | `false` | 启用讯飞在线语音合成；预设播报通过萤石摄像头扬声器播放 |
+| `XFYUN_TTS_APP_ID` | 启用语音时必填 | 无 | 讯飞 WebSocket 服务 APPID，仅保存在本机环境变量 |
+| `XFYUN_TTS_API_KEY` | 启用语音时必填 | 无 | 讯飞 WebSocket 服务 APIKey，仅保存在本机环境变量 |
+| `XFYUN_TTS_API_SECRET` | 启用语音时必填 | 无 | 讯飞 WebSocket 服务 APISecret，仅保存在本机环境变量 |
+| `XFYUN_TTS_VOICE_NAME` | 否 | `x4_yezi` | 讯飞语音合成音色；`x4_yezi` 为讯飞小露 |
 
 注意：`application.yml` 中的 `insect.api.username/password`、`ys7.app-key/app-secret`、`dashscope.api-key` 使用无默认值占位符，缺少任意一个都会导致 Spring 启动阶段因无法解析占位符而失败。
 
@@ -71,6 +76,11 @@ set JAVA_OPTS=-Dserver.port=9118
 | `SPRING_DATASOURCE_PASSWORD` | `a123456` | MySQL 登录密码；必须与目标电脑实际账号密码一致 |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
 | `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧；若配置了启动帧，左右移动会在方向帧后自动发送 |
+| `MOTOR_CONFIRMATION_TIMEOUT_MS` | `1200` | 轨道电机串口回执等待上限（毫秒），用于减少启动指令的等待时间 |
+| `CONTROL_PANEL_CONNECT_TIMEOUT_MS` / `CONTROL_PANEL_READ_TIMEOUT_MS` | `1200` / `3000` | 巡检控制面板的连接/读取超时（毫秒），设备离线时快速结束预检 |
+| `xfyun.tts.voice-name` | `x4_yezi` | 自动巡检语音播报音色（讯飞小露） |
+| `xfyun.tts.speed/volume/pitch` | `50/100/50` | 讯飞在线合成的语速、音量和音调；音量默认最大 |
+| `CAMERA_SPEECH_CONNECTION_ANNOUNCEMENTS_ENABLED` | `true` | MQTT 与蓝牙控制面板首次连接或断线重连成功时通过摄像头播报 |
 
 有人云 DTU 配置为“纯透传”时，网页只负责发布原始串口字节，不能根据设备编号自动推断电机协议。请将电机控制器说明书中的实际十六进制帧（例如 `01 05 00 00 FF 00 8C 3A`）填入上述环境变量，或直接写入 `equipment.open_code` / `equipment.close_code`。没有这些帧时，网页会显示 MQTT 已连接，但不会发送危险的猜测指令。
 | `ollama.base-url` | `http://localhost:11434` | 本地 Ollama 地址 |
@@ -107,6 +117,12 @@ set "YS7_VERIFY_CODE=your-device-verification-code"
 set "YS7_DEVICE_SERIAL=BG9980884"
 set "YS7_CHANNEL_NO=1"
 set "DASHSCOPE_API_KEY=your-dashscope-key"
+set "XFYUN_TTS_ENABLED=true"
+set "XFYUN_TTS_APP_ID=your-xfyun-app-id"
+set "XFYUN_TTS_API_KEY=your-xfyun-api-key"
+set "XFYUN_TTS_API_SECRET=your-xfyun-api-secret"
+set "XFYUN_TTS_VOICE_NAME=x4_yezi"
+set "XFYUN_TTS_VOLUME=100"
 ```
 
 4. 双击 `start-jhds.bat`，或在命令行执行它。

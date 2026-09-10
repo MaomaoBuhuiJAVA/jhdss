@@ -192,6 +192,43 @@ function pumpStatusId(alias) {
 }
 
 let controlPanelPumpState = false;
+let nutrientSpeechQueue = [];
+let nutrientSpeechPlaying = false;
+
+async function playNextNutrientSpeech() {
+    if (nutrientSpeechPlaying || nutrientSpeechQueue.length === 0) return;
+    nutrientSpeechPlaying = true;
+    const text = nutrientSpeechQueue.shift();
+    try {
+        const response = await fetch(API_BASE + '/speech/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+        const result = await response.json();
+        if (!response.ok || !apiSucceeded(result)) throw new Error((result && result.msg) || '摄像头语音播报失败');
+    } catch (error) {
+        console.warn('营养设备语音播报失败:', error);
+    } finally {
+        nutrientSpeechPlaying = false;
+        playNextNutrientSpeech();
+    }
+}
+
+function speakNutrientPump(alias, enabled) {
+    const normalizedAlias = String(alias || '').toUpperCase();
+    let name = null;
+    if (normalizedAlias === 'PUMP_CO2') name = '气肥';
+    if (normalizedAlias === 'PUMP_CIRCULATION') name = '循环灌溉泵';
+    if (!name) return;
+    nutrientSpeechQueue.push(name + (enabled ? '已开启' : '已关闭'));
+    playNextNutrientSpeech();
+}
+
+function speakFoliarPump(enabled) {
+    nutrientSpeechQueue.push('叶面肥' + (enabled ? '已开启' : '已关闭'));
+    playNextNutrientSpeech();
+}
 
 function isControlPanelPump(pump) {
     const name = String((pump && pump.name) || '');
@@ -254,6 +291,7 @@ async function controlPump(alias, checked, input) {
         statusElement.textContent = checked ? '运行中' : '已关闭';
         statusElement.style.color = checked ? 'var(--accent-secondary)' : 'var(--text-secondary)';
     }
+    if (apiSucceeded(res)) speakNutrientPump(alias, checked);
     if (input) input.disabled = false;
 }
 
@@ -394,6 +432,7 @@ async function controlPanelPump(input) {
         return;
     }
     renderControlPanelPumpStatus(next ? '运行中' : '已关闭');
+    speakFoliarPump(next);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -406,7 +445,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             const input = event.target.closest('.toggle-switch input[data-alias]');
-            if (input) controlPump(input.dataset.alias, input.checked, input);
+            if (input) {
+                controlPump(input.dataset.alias, input.checked, input);
+            }
         });
     }
     document.querySelectorAll('.freq-chip').forEach(function (chip) {
