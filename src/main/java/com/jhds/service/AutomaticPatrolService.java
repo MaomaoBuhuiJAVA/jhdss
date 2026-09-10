@@ -53,6 +53,8 @@ public class AutomaticPatrolService {
     private long verticalTravelMs;
     @Value("${patrol.automatic.coverage-ratio:0.92}")
     private double coverageRatio;
+    @Value("${patrol.automatic.horizontal-coverage-ratio:0.75}")
+    private double horizontalCoverageRatio;
     @Value("${patrol.automatic.ptz-pan-direction:2}")
     private int ptzPanDirection;
     @Value("${patrol.automatic.ptz-pan-ms:350}")
@@ -161,7 +163,7 @@ public class AutomaticPatrolService {
         result.put("actualHeight", camera.get("actualHeight"));
         result.put("qualityVerified", camera.get("qualityVerified"));
         result.put("capturesPerLine", 3);
-        result.put("scanPattern", "bottom-to-top");
+        result.put("scanPattern", "serpentine");
         // Keep the API display portable; filesystem operations still use the
         // normalized absolute path returned by outputDirectory().
         result.put("outputPath", configuredOutputPath());
@@ -190,34 +192,56 @@ public class AutomaticPatrolService {
 
             updateState("PTZ_AIMING", "调整云台至苗木取景方向", 5);
             aimPtz();
+            boolean endedAtTop = false;
             for (int row = 0; row < totalRows; row++) {
                 checkCancelled();
                 currentRow = row + 1;
+                boolean evenColumn = (row % 2 == 0);
                 if (row > 0) {
                     updateState("SHIFTING", "向左步进到第" + currentRow + "条扫描线", scanProgress(row, 0));
                     moveHorizontal("left", horizontalStepMs);
                     waitInterruptibly(settleMs);
                 }
 
-                updateState("CAPTURING", "第" + currentRow + "条扫描线底部抓拍", scanProgress(row, 8));
-                captureFrame(row + 1, "bottom");
-                checkCancelled();
-                updateState("SCANNING", "第" + currentRow + "条扫描线上移至中点", scanProgress(row, 35));
-                moveVertical("forward", verticalMidMs);
-                waitInterruptibly(settleMs);
-                updateState("CAPTURING", "第" + currentRow + "条扫描线中点抓拍", scanProgress(row, 48));
-                captureFrame(row + 1, "middle");
-                checkCancelled();
-                updateState("SCANNING", "第" + currentRow + "条扫描线上移至顶部", scanProgress(row, 70));
-                moveVertical("forward", verticalTopMs);
-                waitInterruptibly(settleMs);
-                updateState("CAPTURING", "第" + currentRow + "条扫描线顶部抓拍", scanProgress(row, 82));
-                captureFrame(row + 1, "top");
-                checkCancelled();
-                updateState("SCANNING", "第" + currentRow + "条扫描线返回底部", scanProgress(row, 94));
+                if (evenColumn) {
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线底部抓拍", scanProgress(row, 8));
+                    captureFrame(row + 1, "bottom");
+                    checkCancelled();
+                    updateState("SCANNING", "第" + currentRow + "条扫描线上移至中点", scanProgress(row, 35));
+                    moveVertical("forward", verticalMidMs);
+                    waitInterruptibly(settleMs);
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线中点抓拍", scanProgress(row, 48));
+                    captureFrame(row + 1, "middle");
+                    checkCancelled();
+                    updateState("SCANNING", "第" + currentRow + "条扫描线上移至顶部", scanProgress(row, 70));
+                    moveVertical("forward", verticalTopMs);
+                    waitInterruptibly(settleMs);
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线顶部抓拍", scanProgress(row, 82));
+                    captureFrame(row + 1, "top");
+                    endedAtTop = true;
+                } else {
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线顶部抓拍", scanProgress(row, 8));
+                    captureFrame(row + 1, "top");
+                    checkCancelled();
+                    updateState("SCANNING", "第" + currentRow + "条扫描线下移至中点", scanProgress(row, 35));
+                    moveVertical("backward", verticalTopMs);
+                    waitInterruptibly(settleMs);
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线中点抓拍", scanProgress(row, 48));
+                    captureFrame(row + 1, "middle");
+                    checkCancelled();
+                    updateState("SCANNING", "第" + currentRow + "条扫描线下移至底部", scanProgress(row, 70));
+                    moveVertical("backward", verticalMidMs);
+                    waitInterruptibly(settleMs);
+                    updateState("CAPTURING", "第" + currentRow + "条扫描线底部抓拍", scanProgress(row, 82));
+                    captureFrame(row + 1, "bottom");
+                    endedAtTop = false;
+                }
+                progress = scanProgress(row, 100);
+            }
+            if (endedAtTop) {
+                updateState("SCANNING", "巡检结束，下移返回底部安全高度", 97);
                 moveVertical("backward", verticalMs);
                 waitInterruptibly(settleMs);
-                progress = scanProgress(row, 100);
             }
             updateState("COMPLETED", "巡检完成，当前位置已回到底部安全高度", 100);
         } catch (PatrolCancelledException e) {
@@ -411,7 +435,11 @@ public class AutomaticPatrolService {
     }
 
     private long workingHorizontalMs() {
-        return Math.max(1000L, Math.round(horizontalTravelMs * safeCoverageRatio()));
+        return Math.max(1000L, Math.round(horizontalTravelMs * safeHorizontalCoverageRatio()));
+    }
+
+    private double safeHorizontalCoverageRatio() {
+        return Math.max(0.50, Math.min(0.97, horizontalCoverageRatio));
     }
 
     private long workingVerticalMs() {
@@ -466,7 +494,7 @@ public class AutomaticPatrolService {
         plan.put("scanRows", scanRows);
         plan.put("quality", "4K");
         plan.put("capturesPerLine", 3);
-        plan.put("scanPattern", "bottom-to-top-return");
+        plan.put("scanPattern", "serpentine");
         return plan;
     }
 

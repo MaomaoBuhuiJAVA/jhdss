@@ -179,8 +179,9 @@ patrol:
     # 2026-09-07现场标定：右到左有效运动18.422秒，下到上有效运动11.587秒。
     horizontal-travel-ms: ${PATROL_HORIZONTAL_TRAVEL_MS:18422}
     vertical-travel-ms: ${PATROL_VERTICAL_TRAVEL_MS:11587}
-    # 避免再次触发硬限位，自动巡检只使用标定行程的92%。
+    # 避免再次触发硬限位，垂直行程使用92%安全比例；水平行程因蛇形折返无需回底，独立使用75%。
     coverage-ratio: ${PATROL_COVERAGE_RATIO:0.92}
+    horizontal-coverage-ratio: ${PATROL_HORIZONTAL_COVERAGE_RATIO:0.75}
     # 右下起步时默认将云台向下校准到最低视角，避免每条扫描线累计云台误差。
     ptz-pan-direction: ${PATROL_PTZ_PAN_DIRECTION:2}
     ptz-pan-ms: ${PATROL_PTZ_PAN_MS:350}

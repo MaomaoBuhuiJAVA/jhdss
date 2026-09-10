@@ -569,12 +569,15 @@ function patrolSpeechForStatus(data) {
     if (/检查视频、MQTT和控制面板/.test(phase)) return '正在检查摄像头、轨道电机和升降控制面板，请稍候';
     if (/控制设备已就绪/.test(phase)) return '设备检查完成，自动巡检准备就绪';
     if (/调整云台/.test(phase)) return '正在调整摄像云台至巡检视角';
+    if (/巡检结束，下移返回底部安全高度/.test(phase)) return '蛇形扫描结束，升降电机启动，正在下移返回底部安全高度';
     let match = phase.match(/向左步进到第(\d+)条扫描线/);
     if (match) return '轨道电机启动，正在向左移动至第' + match[1] + '条扫描线';
     match = phase.match(/第(\d+)条扫描线(底部|中点|顶部)抓拍/);
     if (match) return '到达第' + match[1] + '条扫描线' + match[2] + '，正在抓拍巡检图像';
     match = phase.match(/第(\d+)条扫描线上移至(中点|顶部)/);
     if (match) return '升降电机启动，正在沿第' + match[1] + '条扫描线上移至' + match[2];
+    match = phase.match(/第(\d+)条扫描线下移至(中点|底部)/);
+    if (match) return '升降电机反向启动，正在沿第' + match[1] + '条扫描线下移至' + match[2];
     match = phase.match(/第(\d+)条扫描线返回底部/);
     if (match) return '升降电机反向启动，第' + match[1] + '条扫描线正在返回底部';
     return phase;
