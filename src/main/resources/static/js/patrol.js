@@ -728,7 +728,7 @@ function patrolSpeechForStatus(data) {
     if (state === 'QUEUED') return '巡检任务已提交，正在准备设备';
     if (/检查视频、MQTT和控制面板/.test(phase)) return '正在检查摄像头、轨道电机和升降控制面板，请稍候';
     if (/控制设备已就绪/.test(phase)) return '设备检查完成，自动巡检准备就绪';
-    if (/调整云台/.test(phase)) return '正在调整摄像云台至巡检视角';
+
     if (/巡检结束，下移返回底部安全高度/.test(phase)) return '蛇形扫描结束，升降电机启动，正在下移返回底部安全高度';
     let match = phase.match(/向左步进到第(\d+)条扫描线/);
     if (match) return '轨道电机启动，正在向左移动至第' + match[1] + '条扫描线';

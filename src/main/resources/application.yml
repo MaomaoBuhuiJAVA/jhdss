@@ -183,11 +183,7 @@ patrol:
     # 自动巡检和手动左右移动都不会越过它，最右侧端点仍可到达。
     coverage-ratio: ${PATROL_COVERAGE_RATIO:0.92}
     horizontal-coverage-ratio: ${PATROL_HORIZONTAL_COVERAGE_RATIO:0.80}
-    # 右下起步时默认将云台向下校准到最低视角，避免每条扫描线累计云台误差。
-    ptz-pan-direction: ${PATROL_PTZ_PAN_DIRECTION:2}
-    ptz-pan-ms: ${PATROL_PTZ_PAN_MS:350}
-    ptz-tilt-direction: ${PATROL_PTZ_TILT_DIRECTION:1}
-    ptz-tilt-ms: ${PATROL_PTZ_TILT_MS:180}
+    # 云台保持手动设置的默认取景位置，自动巡检不自动调整云台。
     settle-ms: ${PATROL_SETTLE_MS:350}
 
 # Bluetooth PAN irrigation controller. Override on the deployment computer

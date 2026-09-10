@@ -1,5 +1,6 @@
 package com.jhds.service;
 
+
 import com.jhds.config.YsjProperties;
 import com.jhds.service.mqtt.MqttService;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,7 @@ public class AutomaticPatrolService {
     @Autowired
     private YsjProperties ysjProperties;
 
+
     @Value("${patrol.automatic.output-path:./LabelImg资料图片/摄像头实际拍摄照片}")
     private String outputPath;
     @Value("${patrol.automatic.horizontal-travel-ms:18422}")
@@ -57,14 +59,6 @@ public class AutomaticPatrolService {
     private double coverageRatio;
     @Value("${patrol.automatic.horizontal-coverage-ratio:0.80}")
     private double horizontalCoverageRatio;
-    @Value("${patrol.automatic.ptz-pan-direction:2}")
-    private int ptzPanDirection;
-    @Value("${patrol.automatic.ptz-pan-ms:350}")
-    private long ptzPanMs;
-    @Value("${patrol.automatic.ptz-tilt-direction:0}")
-    private int ptzTiltDirection;
-    @Value("${patrol.automatic.ptz-tilt-ms:180}")
-    private long ptzTiltMs;
     @Value("${patrol.automatic.settle-ms:350}")
     private long settleMs;
 
@@ -201,8 +195,6 @@ public class AutomaticPatrolService {
             long verticalMidMs = Math.max(250L, verticalMs / 2L);
             long verticalTopMs = Math.max(250L, verticalMs - verticalMidMs);
 
-            updateState("PTZ_AIMING", "调整云台至苗木取景方向", 5);
-            aimPtz();
             boolean endedAtTop = false;
             for (int row = 0; row < totalRows; row++) {
                 checkCancelled();
@@ -363,31 +355,6 @@ public class AutomaticPatrolService {
         }
     }
 
-    private void aimPtz() {
-        int[] directions = new int[]{ptzPanDirection, ptzTiltDirection};
-        long[] durations = new long[]{ptzPanMs, ptzTiltMs};
-        for (int i = 0; i < directions.length; i++) {
-            if (durations[i] <= 0L) continue;
-            checkCancelled();
-            int direction = directions[i];
-            try {
-                ezvizService.startPtz(ysjProperties.getDeviceSerial(), ysjProperties.getChannelNo(), direction, 1);
-                waitInterruptibly(durations[i]);
-            } catch (PatrolCancelledException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                warning = "云台取景调整暂不可用，轨道巡检继续：" + e.getMessage();
-                log.warn("PTZ sweep step failed: {}", e.getMessage());
-                return;
-            } finally {
-                try {
-                    ezvizService.stopPtz(ysjProperties.getDeviceSerial(), ysjProperties.getChannelNo(), direction);
-                } catch (RuntimeException ignored) {
-                }
-            }
-            waitInterruptibly(Math.min(250L, settleMs));
-        }
-    }
 
     private void emergencyStop() {
         List<Future<?>> stops = new ArrayList<>();
