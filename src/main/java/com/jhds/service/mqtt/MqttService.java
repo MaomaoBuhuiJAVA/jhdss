@@ -372,7 +372,10 @@ public class MqttService implements DisposableBean {
             // queued by the broker while the DTU is offline and replayed when
             // the device powers on, causing an unexpected limit hit. QoS 0
             // makes these commands valid only while the device is connected.
-            String response = sendHexSync(commandCode, timeoutMs, momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()));
+            boolean allowRailDirectionSuffix = "MOTOR_DIRECTION".equalsIgnoreCase(alias);
+            String response = sendHexSync(commandCode, timeoutMs,
+                    momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()),
+                    allowRailDirectionSuffix);
             if (response == null && momentaryMotorCommand) {
                 response = retryMotorFrameThroughModbus(alias, commandCode);
             }
@@ -734,6 +737,11 @@ public class MqttService implements DisposableBean {
     }
 
     private String sendHexSync(String hexCommand, long timeoutMs, int qos) {
+        return sendHexSync(hexCommand, timeoutMs, qos, false);
+    }
+
+    private String sendHexSync(String hexCommand, long timeoutMs, int qos,
+                               boolean allowRailDirectionSuffix) {
         try {
             if (!isHexCommand(hexCommand)) {
                 log.warn("Invalid hexadecimal serial frame: {}", hexCommand);
@@ -772,6 +780,12 @@ public class MqttService implements DisposableBean {
                     continue;
                 }
                 if (writeCommand && !isMatchingModbusWriteResponse(hexCommand, response)) {
+                    if (allowRailDirectionSuffix
+                            && isMatchingDeployedRailSuffixResponse(hexCommand, response)) {
+                        log.warn("Accepted deployed rail acknowledgement with missing prefix: command={}, response={}",
+                                hexCommand, response);
+                        return response;
+                    }
                     // Sensor polling and a motor command share the transparent
                     // response topic. Do not consume an unrelated frame and
                     // report a false motor success.
@@ -835,6 +849,28 @@ public class MqttService implements DisposableBean {
             if (deployedRailStatusAck) return true;
 
             return request[4] == reply[4] && request[5] == reply[5];
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * The deployed DTU occasionally publishes only data + CRC for the rail
+     * direction write. Accept that exact four-byte suffix only for the known
+     * slave/function/address and only when the complete command has a valid
+     * CRC. This avoids replaying a movement command that already took effect.
+     */
+    private boolean isMatchingDeployedRailSuffixResponse(String hexCommand, String response) {
+        try {
+            byte[] request = ModbusUtil.hexToBytes(hexCommand);
+            byte[] reply = ModbusUtil.hexToBytes(response);
+            if (request.length != 8 || reply.length != 4 || !ModbusUtil.verifyCRC(request)) return false;
+            if ((request[0] & 0xFF) != 3 || (request[1] & 0xFF) != 5) return false;
+            if ((request[2] & 0xFF) != 0 || (request[3] & 0xFF) != 1) return false;
+            for (int index = 0; index < reply.length; index++) {
+                if (reply[index] != request[request.length - reply.length + index]) return false;
+            }
+            return true;
         } catch (RuntimeException e) {
             return false;
         }

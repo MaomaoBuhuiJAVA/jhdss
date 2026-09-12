@@ -86,6 +86,63 @@ public class MqttModbusFallbackTest {
     }
 
     @Test
+    public void connectedMqttAcceptsExactRailDirectionSuffixWithoutReplayingTheCommand() throws Exception {
+        MqttService mqtt = new MqttService();
+        MqttProperties properties = new MqttProperties();
+        RecordingTransport transport = new RecordingTransport();
+        MqttClient client = mock(MqttClient.class);
+        EquipmentMapper equipmentMapper = mock(EquipmentMapper.class);
+        ControlLogService controlLogService = mock(ControlLogService.class);
+        Equipment equipment = new Equipment();
+        String command = "03 05 00 01 00 FF DD A8";
+        String suffixResponse = "00 FF DD A8";
+        equipment.setName("轨道电机方向");
+        equipment.setAlias("MOTOR_DIRECTION");
+        equipment.setOpenCode(command);
+        when(client.isConnected()).thenReturn(true);
+        when(equipmentMapper.selectByAlias("MOTOR_DIRECTION")).thenReturn(equipment);
+
+        ReflectionTestUtils.setField(mqtt, "mqttProperties", properties);
+        ReflectionTestUtils.setField(mqtt, "mqttClient", client);
+        ReflectionTestUtils.setField(mqtt, "modbusTcpTransport", transport);
+        ReflectionTestUtils.setField(mqtt, "equipmentMapper", equipmentMapper);
+        ReflectionTestUtils.setField(mqtt, "controlLogService", controlLogService);
+        ReflectionTestUtils.setField(mqtt, "deviceTwinState", new DeviceTwinState());
+        ReflectionTestUtils.setField(mqtt, "motorConfirmationTimeoutMs", 250L);
+        doAnswer(call -> {
+            mqtt.handleResponse(properties.getTopic().getPrefix() + "/"
+                    + properties.getTopic().getResponseSuffix(), suffixResponse);
+            return null;
+        }).when(client).publish(anyString(), any(MqttMessage.class));
+
+        String response = mqtt.sendCommand("MOTOR_DIRECTION", "open", true);
+
+        assertEquals(suffixResponse, response);
+        assertEquals(null, transport.command);
+        verify(client, times(1)).publish(anyString(), any(MqttMessage.class));
+        verify(equipmentMapper).updateById(equipment);
+    }
+
+    @Test
+    public void railSuffixCompatibilityRejectsOtherDevicesAndMismatchedCrcSuffixes() {
+        MqttService mqtt = new MqttService();
+
+        Boolean differentSlave = ReflectionTestUtils.invokeMethod(mqtt,
+                "isMatchingDeployedRailSuffixResponse",
+                "01 05 00 01 00 FF DD FA", "00 FF DD FA");
+        Boolean mismatchedSuffix = ReflectionTestUtils.invokeMethod(mqtt,
+                "isMatchingDeployedRailSuffixResponse",
+                "03 05 00 01 00 FF DD A8", "00 FF DC A8");
+        Boolean exactObservedSuffix = ReflectionTestUtils.invokeMethod(mqtt,
+                "isMatchingDeployedRailSuffixResponse",
+                "03 05 00 01 00 FF DD A8", "00 FF DD A8");
+
+        assertFalse(differentSlave);
+        assertFalse(mismatchedSuffix);
+        assertTrue(exactObservedSuffix);
+    }
+
+    @Test
     public void delayedStopAcknowledgementUsesTheDedicatedTimeoutWithoutModbusFallback() throws Exception {
         MqttService mqtt = new MqttService();
         MqttProperties properties = new MqttProperties();
