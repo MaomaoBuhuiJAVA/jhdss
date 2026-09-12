@@ -2,6 +2,11 @@
 
 ## 1. 运行环境
 
+Windows 下运行 `start-jhds.bat` 会自动检查并补齐缺失的本地运行环境。便携版 Java、
+Maven、FFmpeg 和 Python 保存在项目的 `.jhds-runtime` 中；MySQL 与 Memurai 以 Windows
+服务安装。设置 `JHDS_AUTO_INSTALL=false` 可禁用下载，只执行检查。已有数据库不会覆盖，
+只有空的 `jhds` 数据库会自动初始化。
+
 - JDK 8（`pom.xml` 声明的 Java 版本为 8；JDK 17+ 也包含 JAXB 兼容依赖）
 - Maven 3.6+
 - MySQL 5.7/8.x，默认连接 `127.0.0.1:3306/jhds`
@@ -87,6 +92,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
 | `MOTOR_STATE_OPEN_HEX` / `MOTOR_STATE_CLOSE_HEX` | 空 | 巡检电机启动/停止串口帧；若配置了启动帧，左右移动会在方向帧后自动发送 |
 | `MOTOR_CONFIRMATION_TIMEOUT_MS` | `1200` | 轨道电机串口回执等待上限（毫秒），用于减少启动指令的等待时间 |
+| `MOTOR_STOP_CONFIRMATION_TIMEOUT_MS` | `3500` | 轨道停止指令的独立回执等待上限（毫秒），容纳现场 MQTT/串口链路的延迟回执，避免巡检中途误判失败 |
 | `CONTROL_PANEL_CONNECT_TIMEOUT_MS` / `CONTROL_PANEL_READ_TIMEOUT_MS` | `1200` / `3000` | 巡检控制面板的连接/读取超时（毫秒），设备离线时快速结束预检 |
 | `xfyun.tts.voice-name` | `x4_yezi` | 自动巡检语音播报音色（讯飞小露） |
 | `xfyun.tts.speed/volume/pitch` | `50/100/50` | 讯飞在线合成的语速、音量和音调；音量默认最大 |

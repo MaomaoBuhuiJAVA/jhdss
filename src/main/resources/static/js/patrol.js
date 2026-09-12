@@ -828,12 +828,32 @@ function closeAutomaticPatrolCompletion() {
     if (overlay) overlay.hidden = true;
 }
 
-function showAutomaticPatrolCompletion(data) {
+function showAutomaticPatrolCompletion(data, failed) {
     const overlay = document.getElementById('automaticPatrolCompletion');
     if (!overlay) return;
+    const modal = document.getElementById('patrol-completion-modal');
+    const icon = document.getElementById('patrol-completion-icon');
+    const kicker = document.getElementById('patrol-completion-kicker');
+    const title = document.getElementById('patrol-completion-title');
+    const description = document.getElementById('patrol-completion-description');
+    const confirm = document.getElementById('patrol-completion-confirm');
     const lines = document.getElementById('patrol-completion-lines');
     const captures = document.getElementById('patrol-completion-captures');
     const sprays = document.getElementById('patrol-completion-sprays');
+    if (modal) modal.classList.toggle('is-error', !!failed);
+    if (icon) icon.innerHTML = failed ? '<i class="ri-error-warning-line"></i>' : '<i class="ri-check-line"></i>';
+    if (kicker) kicker.textContent = failed ? 'AUTOMATIC PATROL INTERRUPTED' : 'AUTOMATIC PATROL COMPLETE';
+    if (title) title.textContent = failed ? '巡检异常停止' : '自动巡检已完成';
+    if (description) {
+        description.textContent = failed
+            ? ((data.lastError || '巡检任务未能继续执行') + '。系统已尝试发送紧急停止，请确认设备完全停止，并将摄像头回到最右下机械原点后再重新巡检。')
+            : '设备已自动回到最下最右初始位置，叶面肥水泵已关闭。';
+    }
+    if (confirm) {
+        confirm.innerHTML = failed
+            ? '<i class="ri-alert-line"></i><span>我已知晓</span>'
+            : '<i class="ri-checkbox-circle-line"></i><span>确认完成</span>';
+    }
     if (lines) lines.textContent = Number(data.totalRows || 0);
     if (captures) captures.textContent = Number(data.captureCount || 0);
     if (sprays) sprays.textContent = Number(data.sprayCount || 0);
@@ -889,8 +909,14 @@ async function loadAutomaticPatrolStatus() {
     if (automaticPatrolRunning) automaticPatrolCompletionPending = true;
     if (!automaticPatrolRunning && data.state === 'COMPLETED' && automaticPatrolCompletionPending) {
         automaticPatrolCompletionPending = false;
-        showAutomaticPatrolCompletion(data);
+        showAutomaticPatrolCompletion(data, false);
         speakPatrolInstruction('自动巡检已完成，设备已回到最下最右初始位置', true);
+    } else if (!automaticPatrolRunning && data.state === 'FAILED' && automaticPatrolCompletionPending) {
+        automaticPatrolCompletionPending = false;
+        showAutomaticPatrolCompletion(data, true);
+        automaticPatrolSpeechEnabled = false;
+        automaticPatrolSpeechQueue = [];
+        stopPatrolSpeechPlayback();
     } else if (!automaticPatrolRunning && (data.state === 'FAILED' || data.state === 'CANCELLED')) {
         automaticPatrolCompletionPending = false;
         automaticPatrolSpeechEnabled = false;
@@ -913,6 +939,31 @@ async function loadAutomaticPatrolStatus() {
     const message = document.getElementById('auto-patrol-message');
     const patrolQuality = document.getElementById('auto-patrol-quality');
     const progress = Math.max(0, Math.min(100, Number(data.progress || 0)));
+    const orbShell = document.getElementById('auto-patrol-orb-shell');
+    const orb = document.getElementById('auto-patrol-orb');
+    const orbProgress = document.getElementById('auto-patrol-orb-progress');
+    const orbActive = automaticPatrolRunning || automaticPatrolAnalysisRunning;
+    const orbCompleted = !orbActive && data.state === 'COMPLETED';
+    const orbFailed = !orbActive && (data.state === 'FAILED' || data.state === 'CANCELLED');
+    if (orbShell) {
+        orbShell.style.setProperty('--patrol-progress', String(progress));
+        orbShell.style.setProperty('--patrol-progress-angle', (progress * 3.6) + 'deg');
+        orbShell.dataset.progress = String(progress);
+        orbShell.classList.toggle('is-running', orbActive);
+        orbShell.classList.toggle('is-completed', orbCompleted);
+        orbShell.classList.toggle('is-error', orbFailed);
+    }
+    if (orbProgress) {
+        orbProgress.textContent = progress + '%';
+        orbProgress.hidden = !(orbActive || orbCompleted || orbFailed);
+    }
+    if (orb) {
+        const orbState = orbActive ? (data.phase || '巡检运行中')
+            : (orbCompleted ? '巡检已完成' : (orbFailed ? '巡检异常停止' : '开始自动巡检'));
+        const orbLabel = orbState + ((orbActive || orbCompleted || orbFailed) ? '，进度 ' + progress + '%' : '');
+        orb.title = orbLabel;
+        orb.setAttribute('aria-label', orbLabel);
+    }
     if (phase) phase.textContent = data.phase || '等待开始';
     if (progressText) progressText.textContent = progress + '%';
     if (progressBar) progressBar.style.width = progress + '%';

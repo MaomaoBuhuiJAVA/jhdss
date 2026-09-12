@@ -86,6 +86,53 @@ public class MqttModbusFallbackTest {
     }
 
     @Test
+    public void delayedStopAcknowledgementUsesTheDedicatedTimeoutWithoutModbusFallback() throws Exception {
+        MqttService mqtt = new MqttService();
+        MqttProperties properties = new MqttProperties();
+        RecordingTransport transport = new RecordingTransport();
+        MqttClient client = mock(MqttClient.class);
+        EquipmentMapper equipmentMapper = mock(EquipmentMapper.class);
+        ControlLogService controlLogService = mock(ControlLogService.class);
+        Equipment equipment = new Equipment();
+        String command = "03 05 00 01 00 00 9D E8";
+        equipment.setName("轨道电机状态");
+        equipment.setAlias("MOTOR_STATE");
+        equipment.setCloseCode(command);
+        when(client.isConnected()).thenReturn(true);
+        when(equipmentMapper.selectByAlias("MOTOR_STATE")).thenReturn(equipment);
+
+        ReflectionTestUtils.setField(mqtt, "mqttProperties", properties);
+        ReflectionTestUtils.setField(mqtt, "mqttClient", client);
+        ReflectionTestUtils.setField(mqtt, "modbusTcpTransport", transport);
+        ReflectionTestUtils.setField(mqtt, "equipmentMapper", equipmentMapper);
+        ReflectionTestUtils.setField(mqtt, "controlLogService", controlLogService);
+        ReflectionTestUtils.setField(mqtt, "deviceTwinState", new DeviceTwinState());
+        ReflectionTestUtils.setField(mqtt, "motorConfirmationTimeoutMs", 100L);
+        ReflectionTestUtils.setField(mqtt, "motorStopConfirmationTimeoutMs", 650L);
+        doAnswer(call -> {
+            Thread acknowledgement = new Thread(() -> {
+                try {
+                    Thread.sleep(275L);
+                    mqtt.handleResponse(properties.getTopic().getPrefix() + "/"
+                            + properties.getTopic().getResponseSuffix(), command);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, "delayed-motor-stop-ack");
+            acknowledgement.setDaemon(true);
+            acknowledgement.start();
+            return null;
+        }).when(client).publish(anyString(), any(MqttMessage.class));
+
+        String response = mqtt.sendCommand("MOTOR_STATE", "close", true);
+
+        assertEquals(command, response);
+        assertEquals(null, transport.command);
+        verify(client).publish(anyString(), any(MqttMessage.class));
+        verify(equipmentMapper).updateById(equipment);
+    }
+
+    @Test
     public void disconnectedMqttMapsMotorSignalsToDocumentedDirectCoils() {
         MqttService mqtt = new MqttService();
         MqttProperties properties = new MqttProperties();

@@ -12,11 +12,12 @@ def main():
     parser.add_argument('--input', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--conf', type=float, default=0.25)
+    parser.add_argument('--device', default='cpu')
     args = parser.parse_args()
 
     model = YOLO(args.model)
     results = model.predict(source=args.input, imgsz=1024, conf=args.conf,
-                            device=0, verbose=False, save=False)
+                            device=args.device, verbose=False, save=False)
     result = results[0]
     image = cv2.imread(args.input)
     if image is None:

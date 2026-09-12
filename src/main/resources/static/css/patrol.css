@@ -1712,3 +1712,131 @@
 .patrol-sidebar .twin-card .twin-viewport { height: 286px; }
 .patrol-sidebar .patrol-results-card { flex-basis: 160px !important; }
 }
+
+/* Draw patrol progress outside the existing button so status changes do not
+   resize the compact control card. */
+.patrol-autostart-card .patrol-start-orb-shell {
+    --patrol-progress-angle: 0deg;
+    position: relative;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: center;
+    width: 74px;
+    height: 74px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: conic-gradient(from -90deg, #36ead2 0deg var(--patrol-progress-angle), rgba(72, 132, 127, .25) var(--patrol-progress-angle) 360deg);
+    box-shadow: 0 0 10px rgba(54, 234, 210, .14), inset 0 0 6px rgba(255, 255, 255, .16);
+    transition: background .35s ease, box-shadow .35s ease, filter .35s ease;
+}
+
+.patrol-autostart-card .patrol-start-orb-shell::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(98, 220, 201, .22);
+    border-radius: inherit;
+    background: #05211f;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, .72);
+}
+
+.patrol-autostart-card .patrol-start-orb-shell .patrol-start-orb {
+    position: relative;
+    z-index: 1;
+    grid-column: auto;
+    grid-row: auto;
+    width: 64px;
+    height: 64px;
+}
+
+.patrol-start-orb-progress {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    bottom: 10px;
+    min-width: 32px;
+    transform: translateX(-50%);
+    color: #dffff8;
+    font: 700 10px/1 var(--font-mono);
+    text-align: center;
+    text-shadow: 0 0 7px rgba(82, 255, 224, .9);
+}
+
+.patrol-start-orb-progress[hidden] { display: none; }
+
+.patrol-start-orb-shell.is-running {
+    box-shadow: 0 0 8px rgba(54, 234, 210, .45), 0 0 20px rgba(54, 234, 210, .22), inset 0 0 7px rgba(255, 255, 255, .24);
+    animation: patrolProgressGlow 1.5s ease-in-out infinite;
+}
+
+.patrol-start-orb-shell.is-running .patrol-start-orb i,
+.patrol-start-orb-shell.is-completed .patrol-start-orb i,
+.patrol-start-orb-shell.is-error .patrol-start-orb i {
+    margin-left: 0;
+    font-size: 22px;
+    transform: translateY(-7px);
+}
+
+.patrol-start-orb-shell.is-completed {
+    background: conic-gradient(from -90deg, #53efaa 0deg 360deg);
+    box-shadow: 0 0 10px rgba(83, 239, 170, .5), 0 0 22px rgba(83, 239, 170, .24);
+}
+
+.patrol-start-orb-shell.is-completed .patrol-start-orb-progress { color: #caffdf; }
+
+.patrol-start-orb-shell.is-error {
+    background: conic-gradient(from -90deg, #ff5364 0deg var(--patrol-progress-angle), rgba(142, 53, 62, .28) var(--patrol-progress-angle) 360deg);
+    box-shadow: 0 0 10px rgba(255, 83, 100, .48), 0 0 22px rgba(255, 83, 100, .2);
+}
+
+.patrol-start-orb-shell.is-error .patrol-start-orb {
+    border-color: #ff6e7b;
+    color: #ffdbe0;
+    box-shadow: 0 0 18px rgba(255, 65, 86, .3), inset 0 0 16px rgba(255, 74, 92, .16);
+}
+
+.patrol-start-orb-shell.is-error .patrol-start-orb-progress {
+    color: #ffd9de;
+    text-shadow: 0 0 7px rgba(255, 83, 100, .86);
+}
+
+.patrol-completion-modal.is-error {
+    border-color: rgba(255, 92, 108, .72);
+    background: linear-gradient(160deg, rgba(57, 12, 20, .98), rgba(17, 5, 10, .98));
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .68), 0 0 34px rgba(255, 58, 82, .2), inset 0 1px rgba(255, 255, 255, .06);
+}
+
+.patrol-completion-modal.is-error::before {
+    background: linear-gradient(90deg, transparent, #ff6474, transparent);
+    box-shadow: 0 0 16px rgba(255, 79, 99, .8);
+}
+
+.patrol-completion-modal.is-error .patrol-completion-icon {
+    border-color: rgba(255, 102, 117, .76);
+    background: radial-gradient(circle, rgba(255, 62, 85, .3), rgba(255, 62, 85, .07) 64%, transparent 66%);
+    color: #ffc2ca;
+    box-shadow: 0 0 0 7px rgba(255, 62, 85, .05), 0 0 28px rgba(255, 62, 85, .3), inset 0 0 18px rgba(255, 62, 85, .16);
+}
+
+.patrol-completion-modal.is-error .patrol-completion-kicker { color: #ff8995; }
+.patrol-completion-modal.is-error > p { color: #e2b9bf; }
+.patrol-completion-modal.is-error .patrol-completion-stats { border-color: rgba(255, 101, 116, .25); }
+.patrol-completion-modal.is-error .patrol-completion-stats span + span { border-left-color: rgba(255, 101, 116, .18); }
+.patrol-completion-modal.is-error .patrol-completion-stats b { color: #ffe2e6; }
+.patrol-completion-modal.is-error > button {
+    border-color: #f05a69;
+    background: linear-gradient(135deg, #c72c42, #861a2c);
+    box-shadow: 0 7px 20px rgba(197, 38, 62, .28);
+}
+.patrol-completion-modal.is-error > button:hover { border-color: #ff9aa4; background: linear-gradient(135deg, #df3d52, #9b2033); }
+
+@keyframes patrolProgressGlow {
+    0%, 100% { filter: brightness(.92); }
+    50% { filter: brightness(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .patrol-start-orb-shell.is-running { animation: none; }
+}

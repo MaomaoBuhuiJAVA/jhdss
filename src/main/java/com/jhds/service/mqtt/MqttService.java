@@ -67,6 +67,8 @@ public class MqttService implements DisposableBean {
     private String motorStateClose;
     @Value("${device.commands.motor-confirmation-timeout-ms:1200}")
     private long motorConfirmationTimeoutMs;
+    @Value("${device.commands.motor-stop-confirmation-timeout-ms:3500}")
+    private long motorStopConfirmationTimeoutMs;
     @Value("${modbus.fallback.motor.relative-target:1000}")
     private int modbusFallbackMotorTarget;
     @Value("${modbus.fallback.motor.speed:60}")
@@ -357,8 +359,12 @@ public class MqttService implements DisposableBean {
             // serial frame cannot make a button appear hung for 30 seconds.
             boolean momentaryMotorCommand = "MOTOR_DIRECTION".equalsIgnoreCase(alias)
                     || "MOTOR_STATE".equalsIgnoreCase(alias);
+            boolean motorStopCommand = "MOTOR_STATE".equalsIgnoreCase(alias)
+                    && ("close".equalsIgnoreCase(value) || "stop".equalsIgnoreCase(value));
+            long motorTimeoutMs = motorStopCommand
+                    ? motorStopConfirmationTimeoutMs : motorConfirmationTimeoutMs;
             long timeoutMs = momentaryMotorCommand
-                    ? Math.max(250L, Math.min(5000L, motorConfirmationTimeoutMs))
+                    ? Math.max(250L, Math.min(5000L, motorTimeoutMs))
                     : isModbusWriteCommand(commandCode)
                     ? Math.min(Constants.COMMAND_TIMEOUT * 1000L, 5000L)
                     : Constants.COMMAND_TIMEOUT * 1000L;

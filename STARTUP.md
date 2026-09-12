@@ -2,6 +2,11 @@
 
 ## 快速启动
 
+`start-jhds.bat` 会先检查运行环境。缺少 Java、Maven、FFmpeg/FFprobe 或启用状态下的
+YOLO Python 依赖时，会下载到项目的 `.jhds-runtime` 目录；缺少 MySQL 或 Redis 时，
+会请求管理员权限并安装 MySQL 与 Memurai（Redis 兼容服务）。已有程序和已有数据库
+只会复用，不会重装或清空。首次联网安装可能需要数分钟。
+
 在项目根目录创建 `.env.local.bat`，填入真实凭据（不要提交到 Git）。启动脚本也兼容 `env.local.bat`，但建议统一改名为 `.env.local.bat`：
 
 ```bat
@@ -54,15 +59,16 @@ start-jhds.bat
 
 ## 启动前准备
 
-1. 安装并加入 PATH：JDK 8+、Maven 3.6+。
-2. 启动 MySQL，创建数据库并初始化表：
+1. 确保电脑可以访问互联网，以便首次启动自动下载缺失依赖。设置
+   `JHDS_AUTO_INSTALL=false` 可改为只检查、不自动下载。
+2. MySQL、Redis、JDK、Maven、FFmpeg 和 YOLO Python 可预先安装，也可交由启动脚本处理。
+3. 已有数据库会被保留。仅当本机 `jhds` 库没有任何表时才自动执行初始化脚本：
 
    ```bat
    mysql -uroot -p < src\main\resources\sql\init.sql
    ```
 
    默认连接为 `127.0.0.1:3306`、数据库 `jhds`、用户 `root`、密码 `a123456`。账号或密码不同可在 `.env.local.bat` 中设置 `SPRING_DATASOURCE_USERNAME` 和 `SPRING_DATASOURCE_PASSWORD`。
-3. 启动 Redis，默认监听 `127.0.0.1:6379`。
 4. 如果本地没有物联网 MQTT Broker，可在 `.env.local.bat` 中关闭 MQTT：
 
    ```bat

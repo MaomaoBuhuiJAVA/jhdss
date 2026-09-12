@@ -1,5 +1,6 @@
 # Build output and runtime data
 target/
+.jhds-runtime/
 logs/
 captures/
 uploads/
@@ -8,7 +9,8 @@ photo/
 .codex-runtime/
 artifacts/
 tmp/
-weights/
+weights/*
+!weights/black_longhorn_best.pt
 gin_http.log
 
 # Large local training assets and camera photo archive; copy separately per machine

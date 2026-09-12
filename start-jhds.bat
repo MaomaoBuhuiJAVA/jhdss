@@ -3,6 +3,13 @@ setlocal EnableExtensions EnableDelayedExpansion
 title JHDS Local Server
 
 cd /d "%~dp0"
+
+fltmc >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Requesting administrator privileges for dependency and service setup...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"
+    exit /b
+)
 echo ========================================
 echo   JHDS Smart Agriculture - Local Start
 echo ========================================
@@ -24,6 +31,15 @@ if exist ".env.local.bat" (
 ) else (
     echo [WARN] .env.local.bat or env.local.bat was not found. Required external-service variables may be missing.
 )
+
+echo [INFO] Checking and provisioning local dependencies...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\bootstrap-runtime.ps1" -ProjectRoot "%CD%"
+if errorlevel 1 goto :failed
+if not exist ".jhds-runtime\runtime-env.bat" (
+    echo [ERROR] Runtime environment file was not generated.
+    goto :failed
+)
+call ".jhds-runtime\runtime-env.bat"
 
 if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
     echo [WARN] JAVA_HOME does not contain bin\java.exe: %JAVA_HOME%
@@ -127,6 +143,10 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+echo [INFO] Checking the local jhds database...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\initialize-database.ps1" -ProjectRoot "%CD%"
+if errorlevel 1 goto :failed
 
 echo [INFO] Starting the bundled software control service...
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\start-modbus-gateway.ps1" -ProjectRoot "%CD%"

@@ -85,6 +85,8 @@ device:
     motor-state-close: ${MOTOR_STATE_CLOSE_HEX:}
     # 轨道电机使用短确认窗口，避免一次动作因串口回执缺失等待 5 秒。
     motor-confirmation-timeout-ms: ${MOTOR_CONFIRMATION_TIMEOUT_MS:1200}
+    # 停止回执在现场链路中可能延迟约 2 秒；单独放宽，避免误判后中断巡检。
+    motor-stop-confirmation-timeout-ms: ${MOTOR_STOP_CONFIRMATION_TIMEOUT_MS:3500}
 
 custom:
   redis:
@@ -126,6 +128,7 @@ camera:
     prefer-fallback: ${CAMERA_LOCAL_PREFER_FALLBACK:false}
     transport: ${CAMERA_LOCAL_TRANSPORT:tcp}
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${CAMERA_LOCAL_FFPROBE_PATH:ffprobe}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
     width: ${CAMERA_LOCAL_WIDTH:720}
     video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:2400k}

@@ -82,7 +82,12 @@
                                 <div class="auto-patrol-status" aria-live="polite"><div class="auto-patrol-phase"><span id="auto-patrol-phase">等待开始</span><strong id="auto-patrol-progress-text">0%</strong></div><div class="auto-patrol-progress"><span id="auto-patrol-progress-bar"></span></div><div class="auto-patrol-metrics"><span><i class="ri-layout-row-line"></i><b id="auto-patrol-row">0/0</b> 扫描线</span><span><i class="ri-camera-line"></i><b id="auto-patrol-captures">0</b> 张</span><span><i class="ri-4k-line"></i><b id="auto-patrol-quality">4K待验证</b> 抓拍</span></div><div class="auto-patrol-output" id="auto-patrol-output" title="">保存目录检查中</div><div class="auto-patrol-message" id="auto-patrol-message" hidden></div></div>
                                 <button type="button" class="btn-primary" id="auto-patrol-start" onclick="startAutomaticPatrol()" disabled hidden><i class="ri-play-fill"></i>开始巡检</button>
                             </div>
-                            <button type="button" class="patrol-start-orb" id="auto-patrol-orb" onclick="startAutomaticPatrol()" title="开始自动巡检"><i class="ri-play-fill"></i></button>
+                            <div class="patrol-start-orb-shell" id="auto-patrol-orb-shell" style="--patrol-progress:0" data-progress="0">
+                                <button type="button" class="patrol-start-orb" id="auto-patrol-orb" onclick="startAutomaticPatrol()" title="开始自动巡检" aria-label="开始自动巡检">
+                                    <i class="ri-play-fill"></i>
+                                    <span class="patrol-start-orb-progress" id="auto-patrol-orb-progress" hidden>0%</span>
+                                </button>
+                            </div>
                             <button type="button" class="auto-patrol-stop" id="auto-patrol-stop" onclick="stopAutomaticPatrol()" disabled><i class="ri-stop-fill"></i>紧急停止</button>
                         </section>
                         <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
@@ -151,17 +156,17 @@
     <span id="track-pos" hidden>1.0</span>
 
     <div class="patrol-completion-overlay" id="automaticPatrolCompletion" hidden>
-        <section class="patrol-completion-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-completion-title">
-            <div class="patrol-completion-icon" aria-hidden="true"><i class="ri-check-line"></i></div>
-            <span class="patrol-completion-kicker">AUTOMATIC PATROL COMPLETE</span>
+        <section class="patrol-completion-modal" id="patrol-completion-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-completion-title">
+            <div class="patrol-completion-icon" id="patrol-completion-icon" aria-hidden="true"><i class="ri-check-line"></i></div>
+            <span class="patrol-completion-kicker" id="patrol-completion-kicker">AUTOMATIC PATROL COMPLETE</span>
             <h2 id="patrol-completion-title">自动巡检已完成</h2>
-            <p>设备已自动回到最下最右初始位置，叶面肥水泵已关闭。</p>
+            <p id="patrol-completion-description">设备已自动回到最下最右初始位置，叶面肥水泵已关闭。</p>
             <div class="patrol-completion-stats">
                 <span><b id="patrol-completion-lines">0</b><small>扫描线</small></span>
                 <span><b id="patrol-completion-captures">0</b><small>巡检抓拍</small></span>
                 <span><b id="patrol-completion-sprays">0</b><small>中点喷淋</small></span>
             </div>
-            <button type="button" onclick="closeAutomaticPatrolCompletion()"><i class="ri-checkbox-circle-line"></i>确认完成</button>
+            <button type="button" id="patrol-completion-confirm" onclick="closeAutomaticPatrolCompletion()"><i class="ri-checkbox-circle-line"></i><span>确认完成</span></button>
         </section>
     </div>
 
@@ -226,7 +231,7 @@
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
     <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
-    <script th:src="@{/js/patrol.js(v='20260912-patrol-resilience-v1')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260912-patrol-progress-v2')}"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function(){
         var el=document.getElementById('patrol-twin');

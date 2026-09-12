@@ -45,6 +45,8 @@ public class YoloInferenceService {
     private double confidence;
     @Value("${ai.yolo.timeout-seconds:120}")
     private long timeoutSeconds;
+    @Value("${ai.yolo.device:0}")
+    private String device;
 
     @PostConstruct
     public void init() {
@@ -138,6 +140,7 @@ public class YoloInferenceService {
         command.add("--input"); command.add(input.toString());
         command.add("--output"); command.add(output.toString());
         command.add("--conf"); command.add(String.valueOf(threshold));
+        command.add("--device"); command.add(device);
         Path processLog = Files.createTempFile(Paths.get(uploadPath).toAbsolutePath().normalize(), ".yolo-", ".log");
         Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(processLog.toFile()).start();
         boolean finished;
