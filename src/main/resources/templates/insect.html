@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - 虫情灯</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
     <link rel="stylesheet" th:href="@{/css/insect.css}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
 </head>
 <body>
     <div th:replace="fragments/header::header('insect')"></div>
@@ -19,7 +20,7 @@
                         <div style="display:flex; align-items:center; gap:8px;"><i class="ri-bug-line"></i><span>虫情图像采集</span></div>
                         <span style="font-size:11px; color:var(--text-secondary);">今日已采集 <span style="color:var(--accent-primary); font-weight:600;" id="today-count">0</span> 条</span>
                     </div>
-                    <div class="date-selector" id="device-selector" style="border-bottom-color:rgba(30,60,100,0.15);">
+                    <div class="date-selector" id="device-selector" style="border-bottom-color:rgba(0,255,170,0.15);">
                         <i class="ri-hardware-line" style="color:var(--text-dim);font-size:14px;"></i>
                     </div>
                     <div class="tab-bar">
@@ -102,13 +103,9 @@
     </div>
 
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
 
-    <script th:src="@{/js/common.js}"></script>
+
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/insect.js}"></script>
 </body>
 </html>

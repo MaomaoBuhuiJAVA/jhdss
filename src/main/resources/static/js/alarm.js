@@ -1,4 +1,4 @@
-let alarmPieInstance = null;
+﻿let alarmPieInstance = null;
 
 const ALARM_PAGE_SIZE = 500;
 const alarmState = {
@@ -230,14 +230,14 @@ function renderPieChart() {
   const sourceStats = getSourceStats();
   const labels = sourceStats.map(function (item) { return sourceText[item.sourceModule] || item.sourceModule || '未分类'; });
   const data = sourceStats.map(function (item) { return Number(item.count || 0); });
-  const colors = ['#00c6f0', '#00e887', '#ff4d6a', '#f0a040', '#c084fc', '#f472b6'];
+  const colors = ['#00ffaa', '#1890ff', '#ff4d4f', '#faad14', '#c084fc', '#f472b6'];
   alarmPieInstance = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: labels, datasets: [{ data: data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { color: '#7b8fa8', font: { size: 11 }, padding: 15 } } },
+      plugins: { legend: { position: 'bottom', labels: { color: '#b3b3b3', font: { size: 11 }, padding: 15 } } },
       cutout: '60%'
     }
   });

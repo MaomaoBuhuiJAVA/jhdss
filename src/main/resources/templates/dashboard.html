@@ -5,42 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - 数据大屏</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
-    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v='20260912-ai-suggestion-size')}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
     <script th:src="@{/js/lib/hls.min.js}"></script>
+    <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='20260912-interactive')}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
+    <script th:src="@{/js/vendor/greenhouse-3d.js}"></script>
 </head>
 <body>
     <div th:replace="fragments/header::header('dashboard')"></div>
 
     <main class="main">
         <aside class="left-sidebar">
-            <div class="card">
-                <div class="card-header"><i class="ri-home-4-line"></i><span>大棚信息</span></div>
-                <div class="greenhouse-info">
-                    <div class="gh-title">
-                        <div class="gh-icon"><i class="ri-home-4-line"></i></div>
-                        <div><div class="gh-name" id="dashboard-greenhouse-name">--</div></div>
-                    </div>
-                    <div class="info-row"><span class="info-label">大棚类型</span><span class="info-value" id="dashboard-greenhouse-type">--</span></div>
-                    <div class="info-row"><span class="info-label">作物名称</span><span class="info-value" id="dashboard-greenhouse-crop">--</span></div>
-                    <div class="info-row"><span class="info-label">种植面积</span><span class="info-value" id="dashboard-greenhouse-area">--</span></div>
-                    <div class="info-row"><span class="info-label">定植株数</span><span class="info-value" id="dashboard-greenhouse-plant-count">--</span></div>
-                    <div class="info-row"><span class="info-label">定植日期</span><span class="info-value" id="dashboard-greenhouse-planting-date">--</span></div>
-                </div>
-            </div>
-            <div class="card" style="flex:1; display:flex; flex-direction:column;">
-                <div class="card-header"><i class="ri-tools-line"></i><span>农事操作</span></div>
-                <div style="flex:1; overflow-y:auto;">
-                    <div id="dashboard-operation-list"></div>
-                    <div style="border-top:1px solid rgba(30,60,100,0.3); margin:0 18px;"></div>
-                    <div style="padding:10px 18px 4px; font-size:12px; font-weight:600; color:var(--accent-primary); letter-spacing:0.04em;"><i class="ri-calendar-check-line" style="margin-right:6px;"></i>待办农事</div>
-                    <div class="todo-table" style="padding-bottom:4px;">
-                        <div class="todo-header"><div class="col-week">时间</div><div class="col-task">农事</div><div class="col-action">操作</div></div>
-                        <div id="dashboard-todo-list"></div>
-                    </div>
-                </div>
-            </div>
+            <div class="card dashboard-weather-card"><div class="card-header"><i class="ri-cloud-windy-line"></i><span>实时气象</span><small>实时同步</small></div><div class="dashboard-weather-main"><div class="weather-art" aria-hidden="true"><span class="weather-sun"></span><span class="weather-sunshine"></span><span class="weather-cloud weather-cloud-back"></span><span class="weather-cloud weather-cloud-front"></span></div><strong id="wt-temp">24.1°C</strong><span id="wt-condition">多云</span></div><div class="dashboard-weather-details"><div>风速 <b id="wt-wind">2.4m/s</b></div><div>风向 <b id="wt-wind-dir">东南风</b></div><div>湿度 <b id="wt-humidity">61%</b></div><div>光照 <b id="wt-light">68900 lux</b></div></div></div>
+            <div class="card dashboard-soil-card"><div class="card-header"><i class="ri-seedling-line"></i><span>土壤温湿度</span></div><div class="soil-rings"><div class="soil-ring warm" style="--ring-progress:295deg"><i class="ri-temp-hot-line" aria-hidden="true"></i><strong>22.6°C</strong><span>土壤温度</span></div><div class="soil-ring blue" style="--ring-progress:209deg"><i class="ri-drop-line" aria-hidden="true"></i><strong>58%</strong><span>土壤湿度</span></div><div class="soil-ring green" style="--ring-progress:274deg"><i class="ri-pulse-line" aria-hidden="true"></i><strong>1.32<small>mS/cm</small></strong><span>EC值</span></div><div class="soil-ring purple" style="--ring-progress:245deg"><i class="ri-test-tube-line" aria-hidden="true"></i><strong>6.8</strong><span>pH值</span></div></div></div>
+            <div class="card dashboard-zone-card"><div class="card-header"><i class="ri-community-line"></i><span>种植区（1-4号大棚）</span></div><div class="dashboard-zone-grid"><div class="zone-item active"><img th:src="@{/images/ui/greenhouse-icon.png}" alt=""><strong>1号大棚</strong><b>正常</b><small><i class="ri-temp-hot-line"></i>温度　23.8°C<br><i class="ri-drop-line"></i>湿度　58%<br><i class="ri-sun-line"></i>光照　68200 lux</small></div><div class="zone-item"><img th:src="@{/images/ui/greenhouse-icon.png}" alt=""><strong>2号大棚</strong><b>正常</b><small><i class="ri-temp-hot-line"></i>温度　24.5°C<br><i class="ri-drop-line"></i>湿度　61%<br><i class="ri-sun-line"></i>光照　70500 lux</small></div><div class="zone-item"><img th:src="@{/images/ui/greenhouse-icon.png}" alt=""><strong>3号大棚</strong><b>正常</b><small><i class="ri-temp-hot-line"></i>温度　23.2°C<br><i class="ri-drop-line"></i>湿度　58%<br><i class="ri-sun-line"></i>光照　64800 lux</small></div><div class="zone-item"><img th:src="@{/images/ui/greenhouse-icon.png}" alt=""><strong>4号大棚</strong><b>正常</b><small><i class="ri-temp-hot-line"></i>温度　24.2°C<br><i class="ri-drop-line"></i>湿度　63%<br><i class="ri-sun-line"></i>光照　72100 lux</small></div></div></div>
+            <div class="dashboard-contract-cache" aria-hidden="true"><span id="dashboard-greenhouse-name"></span><span id="dashboard-greenhouse-type"></span><span id="dashboard-greenhouse-crop"></span><span id="dashboard-greenhouse-area"></span><span id="dashboard-greenhouse-plant-count"></span><span id="dashboard-greenhouse-planting-date"></span><div id="dashboard-operation-list"></div><div id="dashboard-todo-list"></div></div>
         </aside>
         <section class="center-area">
             <div class="tabs-bar">
@@ -55,11 +36,22 @@
                     <span class="video-time">CH-01 &nbsp; 16:9</span>
                 </div>
                 <div class="video-main">
-                    <video id="dashboard-video-player" class="dashboard-video-player" autoplay muted playsinline></video>
-                    <div class="video-placeholder" id="dashboard-video-placeholder" style="display:none;"><i class="ri-video-line"></i><p>暂无画面，等待信号接入</p></div>
-                    <div class="dashboard-video-controls" aria-label="网页画面缩放">
+                    <video id="dashboard-video-player" class="dashboard-video-player" autoplay muted playsinline draggable="false"></video>
+                    <div class="video-placeholder dashboard-video-fallback" id="dashboard-video-placeholder" style="display:none;"><img th:src="@{/images/greenhouse-device-reference.jpg}" alt="温室设备现场画面"><span><i class="ri-video-line"></i>暂无实时画面，正在等待信号接入</span></div>
+                    <div class="dashboard-ptz" aria-label="摄像头视角控制"><button title="上移"><i class="ri-arrow-up-s-fill"></i></button><button title="左移"><i class="ri-arrow-left-s-fill"></i></button><button title="右移"><i class="ri-arrow-right-s-fill"></i></button><button title="下移"><i class="ri-arrow-down-s-fill"></i></button></div>
+                    <div class="dashboard-video-controls" aria-label="视频清晰度与电子缩放">
+                        <label class="dashboard-quality-control" for="dashboard-camera-quality" title="切换视频清晰度">
+                            <i class="ri-hd-line" aria-hidden="true"></i>
+                            <select id="dashboard-camera-quality" aria-label="视频清晰度" onchange="changeDashboardQuality(this.value)">
+                                <option value="smooth">流畅 480p</option>
+                                <option value="hd" selected>高清 720p</option>
+                                <option value="4k">超清 4K</option>
+                            </select>
+                        </label>
+                        <span class="dashboard-control-separator" aria-hidden="true"></span>
                         <button type="button" onclick="adjustDashboardZoom(-0.1)" title="缩小画面" aria-label="缩小画面"><i class="ri-zoom-out-line"></i></button>
                         <span id="dashboard-zoom-label">100%</span>
+                        <input id="dashboard-zoom-slider" class="dashboard-zoom-slider" type="range" min="100" max="400" step="10" value="100" oninput="setDashboardZoom(this.value)" aria-label="电子缩放比例">
                         <button type="button" onclick="adjustDashboardZoom(0.1)" title="放大画面" aria-label="放大画面"><i class="ri-zoom-in-line"></i></button>
                         <button type="button" onclick="resetDashboardZoom()" title="恢复画面比例" aria-label="恢复画面比例"><i class="ri-refresh-line"></i></button>
                     </div>
@@ -68,26 +60,21 @@
             </div>
         </section>
         <aside class="right-sidebar">
-            <div class="card weather-thumb" onclick="location.href='/jhds/weather'" style="cursor:pointer;">
-                <div class="card-header"><i class="ri-cloud-windy-line"></i><span>气象站</span></div>
-                <div class="wt-grid" id="weather-thumb">
-                    <div class="wt-item"><div class="wt-icon"><i class="ri-temp-hot-line"></i></div><div class="wt-info"><div class="wt-label">温度</div><div class="wt-value" id="wt-temp">--°C</div></div></div>
-                    <div class="wt-item"><div class="wt-icon"><i class="ri-drop-line"></i></div><div class="wt-info"><div class="wt-label">湿度</div><div class="wt-value" id="wt-humidity">--%</div></div></div>
-                    <div class="wt-item"><div class="wt-icon"><i class="ri-wind-line"></i></div><div class="wt-info"><div class="wt-label">风速</div><div class="wt-value" id="wt-wind">--m/s</div></div></div>
-                    <div class="wt-item"><div class="wt-icon"><i class="ri-navigation-line"></i></div><div class="wt-info"><div class="wt-label">风向</div><div class="wt-value" id="wt-wind-dir">--</div></div></div>
+            <div class="card twin-card dashboard-twin-card">
+                <div class="card-header"><i class="ri-cube-line"></i><span>设备3D缩略图</span><span data-twin-connection>连接中</span><button type="button" class="dashboard-twin-reset" title="重置三维视角" aria-label="重置三维视角" onclick="if(window.dashboardTwin) window.dashboardTwin.resetView()"><i class="ri-refresh-line"></i></button></div>
+                <div class="twin-viewport" id="dashboard-twin" role="img" aria-label="温室设备三维缩略图，可拖动旋转并使用滚轮缩放">
+                    <img class="twin-fallback-source" th:src="@{/images/greenhouse-device-reference.jpg}" alt="温室轨道设备现场图" hidden>
                 </div>
             </div>
-            <div class="card card-alarm dashboard-reveal-card" id="dashboard-alert-card" hidden>
+            <div class="card card-alarm dashboard-reveal-card" id="dashboard-alert-card">
                 <div class="card-header" style="justify-content:space-between;">
-                    <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line" style="color:#ff4d6a;text-shadow:0 0 8px rgba(255,77,106,0.5);"></i><span>告警信息</span></div>
-                    <span style="font-size:11px; color:#7b8fa8; cursor:pointer; letter-spacing:0.04em; transition:color 0.3s;" onmouseover="this.style.color='#ff4d6a'" onmouseout="this.style.color='#7b8fa8'"><i class="ri-history-line"></i> 历史记录</span>
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="ri-alarm-warning-line" style="color:#ff4d4f;text-shadow:0 0 8px rgba(255,77,79,0.5);"></i><span>告警信息</span></div>
+                    <span style="font-size:11px; color:rgba(255,255,255,0.8); cursor:pointer; letter-spacing:0.04em; transition:color 0.3s;" onmouseover="this.style.color='#ff4d4f'" onmouseout="this.style.color='rgba(255,255,255,0.8)'"><i class="ri-history-line"></i> 历史记录</span>
                 </div>
                 <div id="dashboard-alarm-list"></div>
             </div>
-            <div class="card market-feedback-card" style="flex:1;">
-                <div class="card-header"><i class="ri-message-3-line"></i><span>市场反馈</span></div>
-                <div class="market-feedback-list" id="dashboard-market-feedback-list"></div>
-            </div>
+            <div class="card dashboard-ai-summary"><div class="card-header"><i class="ri-robot-2-line"></i><span>AI农业助手</span><small>智能建议</small></div><div class="dashboard-ai-summary-body"><img th:src="@{/images/ui/agri-robot.png}" alt="农业助手机器人"><div id="dashboard-ai-suggestion" aria-live="polite"><p>当前樱桃生长状况良好，建议：</p><ol><li>1号大棚增加营养液 EC 值至 1.5</li><li>3号大棚注意近期湿度偏低</li><li>预计未来3天有降雨，注意棚内通风</li></ol></div></div></div>
+            <div class="dashboard-contract-cache" aria-hidden="true"><div id="dashboard-market-feedback-list"></div></div>
         </aside>
     </main>
 
@@ -101,18 +88,25 @@
         </section>
     </div>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
 
-    <script th:src="@{/js/common.js(v='20260906-camera-watchdog2')}"></script>
-    <script th:src="@{/js/dashboard.js}"></script>
+
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
+    <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
+    <script th:src="@{/js/device-twin-viewer.js(v='20260912-interactive')}"></script>
+    <script th:src="@{/js/dashboard.js(v='20260912-suggestion-fx')}"></script>
     <script>
+        document.addEventListener('DOMContentLoaded', function(){ var el=document.getElementById('dashboard-twin'); if(window.createGreenhouseTwin && el) window.dashboardTwin=window.createGreenhouseTwin(el,{compact:true,interactive:true,autoRotate:true,autoRotateSpeed:.65}); });
         let dashboardFlvPlayer = null;
         let dashboardHlsPlayer = null;
         let dashboardZoom = 1;
+        let dashboardPanX = 0;
+        let dashboardPanY = 0;
+        let dashboardDragging = false;
+        let dashboardDragPointerId = null;
+        let dashboardDragStartX = 0;
+        let dashboardDragStartY = 0;
+        let dashboardDragOriginX = 0;
+        let dashboardDragOriginY = 0;
         let dashboardVideoReady = false;
         let dashboardLatencyTimer = null;
         let dashboardWatchdogTimer = null;
@@ -240,8 +234,11 @@
                                 fragLoadingMaxRetry: 3,
                                 fragLoadingRetryDelay: 300,
                                 manifestLoadingRetryDelay: 500,
-                                xhrSetup: function (xhr) {
-                                    xhr.setRequestHeader('Cache-Control', 'no-cache');
+                                xhrSetup: function (xhr, url) {
+                                    const streamOrigin = new URL(url, window.location.href).origin;
+                                    if (streamOrigin === window.location.origin) {
+                                        xhr.setRequestHeader('Cache-Control', 'no-cache');
+                                    }
                                 }
                             });
                             dashboardHlsPlayer.on(Hls.Events.ERROR, function (event, data) {
@@ -317,7 +314,10 @@
             });
         }
 
-        window.addEventListener('DOMContentLoaded', initDashboardVideo);
+        window.addEventListener('DOMContentLoaded', function () {
+            bindDashboardViewportControls();
+            loadDashboardQuality().finally(initDashboardVideo);
+        });
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) initDashboardVideo();
         });
@@ -327,19 +327,141 @@
         window.addEventListener('pagehide', destroyDashboardPlayer);
         window.addEventListener('beforeunload', destroyDashboardPlayer);
 
+        function clampDashboardPan() {
+            const viewport = document.querySelector('.video-main');
+            if (!viewport || dashboardZoom <= 1) {
+                dashboardPanX = 0;
+                dashboardPanY = 0;
+                return;
+            }
+            const maxX = viewport.clientWidth * (dashboardZoom - 1) / 2;
+            const maxY = viewport.clientHeight * (dashboardZoom - 1) / 2;
+            dashboardPanX = Math.max(-maxX, Math.min(maxX, dashboardPanX));
+            dashboardPanY = Math.max(-maxY, Math.min(maxY, dashboardPanY));
+        }
+
         function applyDashboardZoom() {
             const video = document.getElementById('dashboard-video-player');
             const label = document.getElementById('dashboard-zoom-label');
-            if (video) video.style.transform = 'scale(' + dashboardZoom.toFixed(2) + ')';
+            const slider = document.getElementById('dashboard-zoom-slider');
+            const viewport = document.querySelector('.video-main');
+            clampDashboardPan();
+            if (video) {
+                video.style.transform = 'translate3d(' + dashboardPanX.toFixed(1) + 'px,'
+                        + dashboardPanY.toFixed(1) + 'px,0) scale(' + dashboardZoom.toFixed(2) + ')';
+            }
             if (label) label.textContent = Math.round(dashboardZoom * 100) + '%';
+            if (slider) slider.value = Math.round(dashboardZoom * 100);
+            if (viewport) viewport.classList.toggle('dashboard-pan-enabled', dashboardZoom > 1);
         }
-        function adjustDashboardZoom(delta) {
-            dashboardZoom = Math.max(1, Math.min(2, dashboardZoom + delta));
+
+        function adjustDashboardZoom(delta, focusX, focusY) {
+            const previousZoom = dashboardZoom;
+            const nextZoom = Math.max(1, Math.min(4, dashboardZoom + delta));
+            if (nextZoom === previousZoom) return;
+            if (typeof focusX === 'number' && typeof focusY === 'number' && previousZoom > 0) {
+                const ratio = nextZoom / previousZoom;
+                dashboardPanX = focusX - (focusX - dashboardPanX) * ratio;
+                dashboardPanY = focusY - (focusY - dashboardPanY) * ratio;
+            }
+            dashboardZoom = nextZoom;
             applyDashboardZoom();
         }
+
+        function setDashboardZoom(percent) {
+            const nextZoom = Number(percent) / 100;
+            if (!Number.isFinite(nextZoom)) return;
+            dashboardZoom = Math.max(1, Math.min(4, nextZoom));
+            applyDashboardZoom();
+        }
+
         function resetDashboardZoom() {
             dashboardZoom = 1;
+            dashboardPanX = 0;
+            dashboardPanY = 0;
             applyDashboardZoom();
+        }
+
+        function bindDashboardViewportControls() {
+            const viewport = document.querySelector('.video-main');
+            const video = document.getElementById('dashboard-video-player');
+            if (!viewport || !video || viewport.dataset.zoomBound === 'true') return;
+            viewport.dataset.zoomBound = 'true';
+            video.addEventListener('wheel', function (event) {
+                event.preventDefault();
+                const rect = viewport.getBoundingClientRect();
+                adjustDashboardZoom(event.deltaY < 0 ? 0.1 : -0.1,
+                        event.clientX - rect.left - rect.width / 2,
+                        event.clientY - rect.top - rect.height / 2);
+            }, { passive: false });
+            video.addEventListener('pointerdown', function (event) {
+                if (event.button !== 0 || dashboardZoom <= 1) return;
+                event.preventDefault();
+                dashboardDragging = true;
+                dashboardDragPointerId = event.pointerId;
+                dashboardDragStartX = event.clientX;
+                dashboardDragStartY = event.clientY;
+                dashboardDragOriginX = dashboardPanX;
+                dashboardDragOriginY = dashboardPanY;
+                video.setPointerCapture(event.pointerId);
+                viewport.classList.add('dashboard-dragging');
+            });
+            video.addEventListener('pointermove', function (event) {
+                if (!dashboardDragging || event.pointerId !== dashboardDragPointerId) return;
+                dashboardPanX = dashboardDragOriginX + event.clientX - dashboardDragStartX;
+                dashboardPanY = dashboardDragOriginY + event.clientY - dashboardDragStartY;
+                applyDashboardZoom();
+            });
+            function stopDashboardDragging(event) {
+                if (!dashboardDragging || event.pointerId !== dashboardDragPointerId) return;
+                dashboardDragging = false;
+                if (video.hasPointerCapture(event.pointerId)) video.releasePointerCapture(event.pointerId);
+                dashboardDragPointerId = null;
+                viewport.classList.remove('dashboard-dragging');
+            }
+            video.addEventListener('pointerup', stopDashboardDragging);
+            video.addEventListener('pointercancel', stopDashboardDragging);
+            video.addEventListener('dragstart', function (event) { event.preventDefault(); });
+            video.addEventListener('dblclick', resetDashboardZoom);
+            window.addEventListener('resize', applyDashboardZoom);
+        }
+
+        function applyDashboardQualityStatus(data) {
+            if (!data) return;
+            const select = document.getElementById('dashboard-camera-quality');
+            const quality = String(data.quality || 'hd').toLowerCase();
+            if (select) {
+                select.value = quality;
+                select.dataset.current = quality;
+                const dimensions = data.actualWidth && data.actualHeight
+                        ? data.actualWidth + '×' + data.actualHeight : '';
+                select.title = dimensions || (quality === '4k' ? '超清 4K' : quality === 'smooth' ? '流畅 480p' : '高清 720p');
+            }
+        }
+
+        async function loadDashboardQuality() {
+            const response = await apiGet('/camera/local-status');
+            if (response && response.code === 200 && response.data) applyDashboardQualityStatus(response.data);
+        }
+
+        async function changeDashboardQuality(quality) {
+            const select = document.getElementById('dashboard-camera-quality');
+            const placeholder = document.getElementById('dashboard-video-placeholder');
+            if (!select || select.disabled) return;
+            const previous = select.dataset.current || 'hd';
+            select.disabled = true;
+            destroyDashboardPlayer();
+            if (placeholder) placeholder.style.display = 'flex';
+            const response = await apiPut('/camera/local-quality', { quality: quality });
+            if (!response || response.code !== 200) {
+                select.value = previous;
+                select.disabled = false;
+                scheduleDashboardRecovery(1200);
+                return;
+            }
+            applyDashboardQualityStatus(response.data);
+            select.disabled = false;
+            initDashboardVideo();
         }
     </script>
 </body>

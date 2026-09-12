@@ -1,4 +1,4 @@
-let currentInsectDate = '';
+﻿let currentInsectDate = '';
 let deviceList = [];
 let selectedDevice = '';
 let controlParamsMap = {};
@@ -535,7 +535,7 @@ async function loadDataHistory(did) {
         Object.keys(allParams).forEach(name => {
             const values = allParams[name];
             const section = document.createElement('div');
-            section.style.cssText = 'padding:12px 0;border-bottom:1px solid rgba(30,60,100,0.15);';
+            section.style.cssText = 'padding:12px 0;border-bottom:1px solid rgba(0,255,170,0.15);';
             section.innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">' + name + '</div>';
             values.slice(0, 20).forEach(v => {
                 section.innerHTML += '<div class="ctrl-info"><span class="ctrl-label">' + v.time + '</span><span class="ctrl-value">' + v.value + (v.unit || '') + '</span></div>';

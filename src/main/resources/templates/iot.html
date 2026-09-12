@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - 物联设备</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
     <link rel="stylesheet" th:href="@{/css/iot.css}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
 </head>
 <body>
     <div th:replace="fragments/header::header('iot')"></div>
@@ -17,24 +18,38 @@
                 <div class="card-header"><i class="ri-smartphone-line"></i><span>大棚控制面板</span><span class="update-time" id="iot-update-time"></span><span class="mqtt-status" id="mqtt-status" aria-live="polite">MQTT 检查中</span></div>
             </div>
             <div class="card control-panel-status-card">
-                <div class="card-header"><i class="ri-bluetooth-connect-line"></i><span>蓝牙局域网控制面板</span><span class="control-panel-status-value" id="control-panel-status-value" aria-live="polite">连接检查中</span></div>
+                <div class="card-header"><i class="ri-router-line"></i><span>本机 Modbus 控制服务</span><span class="control-panel-status-value" id="control-panel-status-value" aria-live="polite">连接检查中</span></div>
                 <div class="control-panel-status-body">
                     <span class="control-panel-status-dot" id="control-panel-status-dot"></span>
-                    <span id="control-panel-status-text">正在检查 169.254.240.33</span>
+                    <span id="control-panel-status-text">正在检查 127.0.0.1:8999</span>
                     <span class="control-panel-last-command" id="control-panel-last-command"></span>
                 </div>
+            </div>
+            <div class="card modbus-motor-card">
+                <div class="card-header"><i class="ri-settings-3-line"></i><span>Modbus 电机精准控制</span><span class="modbus-status" id="modbus-status">连接检查中</span></div>
+                <div class="modbus-endpoint" id="modbus-endpoint">控制器：192.168.1.12:502</div>
+                <div class="motor-tabs"><button class="motor-tab active" data-tab="relative">相对运动</button><button class="motor-tab" data-tab="absolute">绝对定位</button></div>
+                <div class="motor-form" id="motor-relative-form">
+                    <label>目标位置 <input id="motor-target" type="number" min="0" max="65535" value="1000"></label>
+                    <label>速度 <input id="motor-speed" type="number" min="0" max="65535" value="100"></label>
+                    <div class="motor-actions"><button class="motor-btn forward" data-action="forward"><i class="ri-arrow-up-line"></i>前进</button><button class="motor-btn backward" data-action="backward"><i class="ri-arrow-down-line"></i>后退</button></div>
+                </div>
+                <div class="motor-form hidden" id="motor-absolute-form">
+                    <label>定位位置 <input id="motor-position" type="number" min="0" max="65535" value="1000"></label>
+                    <label>速度 <input id="motor-absolute-speed" type="number" min="0" max="65535" value="100"></label>
+                    <label>位置通道 <select id="motor-channel"><option value="1">位置1（D200）</option><option value="2">位置2（D210）</option></select></label>
+                    <button class="motor-btn locate" id="motor-locate"><i class="ri-focus-3-line"></i>开始定位</button>
+                </div>
+                <div class="motor-footer"><button class="motor-btn stop" id="motor-stop"><i class="ri-stop-circle-line"></i>急停</button><button class="motor-btn pump" id="motor-pump"><i class="ri-water-percent-line"></i>水泵</button><span id="motor-last-result"></span></div>
+                <div class="motor-hint">映射：D100 目标位置 · D20 速度 · M0 确认 · M10 前进 · M11 后退 · M12 运行 · M13 水泵 · D200/D210 绝对位置</div>
             </div>
             <div class="iot-grid" id="iot-grid"></div>
         </div>
     </main>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
 
-    <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/iot.js}"></script>
+
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
+    <script th:src="@{/js/iot.js(v='20260912-hardware-control')}"></script>
 </body>
 </html>

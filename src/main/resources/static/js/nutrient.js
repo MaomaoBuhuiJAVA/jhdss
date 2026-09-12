@@ -1,4 +1,4 @@
-let soilChartInstance = null;
+﻿let soilChartInstance = null;
 
 const SOIL_FIELDS = {
     soilTemp: 'soil-temp',
@@ -9,6 +9,17 @@ const SOIL_FIELDS = {
     soilNitrogen: 'soil-nitrogen',
     soilPhosphorus: 'soil-phosphorus',
     soilPotassium: 'soil-potassium'
+};
+
+const SOIL_VISUALS = {
+    soilTemp: { id: 'soil-temp', min: 0, max: 40, normalMin: 18, normalMax: 28 },
+    soilHumidity: { id: 'soil-humidity', min: 0, max: 100, normalMin: 45, normalMax: 75 },
+    soilEc: { id: 'soil-ec', min: 0, max: 3, normalMin: 0.8, normalMax: 2.0 },
+    soilPh: { id: 'soil-ph', min: 3, max: 9, normalMin: 5.5, normalMax: 7.2 },
+    soilSalt: { id: 'soil-salt', min: 0, max: 0.5, normalMin: 0.02, normalMax: 0.25 },
+    soilNitrogen: { id: 'soil-nitrogen', min: 0, max: 250, normalMin: 80, normalMax: 180 },
+    soilPhosphorus: { id: 'soil-phosphorus', min: 0, max: 60, normalMin: 10, normalMax: 40 },
+    soilPotassium: { id: 'soil-potassium', min: 0, max: 300, normalMin: 100, normalMax: 240 }
 };
 
 function apiSucceeded(res) {
@@ -39,6 +50,8 @@ function showScheduleMessage(message, isError) {
 
 function applyNutrientMode(mode) {
     const activeMode = ['manual', 'auto', 'ai'].includes(mode) ? mode : 'manual';
+    const modePanelCard = document.querySelector('.nutrient-mode-panel');
+    if (modePanelCard) modePanelCard.classList.toggle('is-collapsed', activeMode === 'manual');
     document.querySelectorAll('.mode-tab').forEach(function (tab) {
         tab.classList.toggle('active', tab.dataset.mode === activeMode);
     });
@@ -69,6 +82,7 @@ async function loadSoilData() {
     Object.keys(SOIL_FIELDS).forEach(function (key) {
         const element = document.getElementById(SOIL_FIELDS[key]);
         if (element) element.textContent = valueText(data && data[key]);
+        updateSoilVisual(key, data && data[key]);
     });
 
     const updateTime = document.getElementById('soil-update-time');
@@ -84,6 +98,53 @@ async function loadSoilData() {
     }
 
     await loadSoilCompare(data);
+}
+
+function updateSoilVisual(key, rawValue) {
+    const config = SOIL_VISUALS[key];
+    if (!config) return;
+    const range = document.getElementById(config.id + '-range');
+    const state = document.getElementById(config.id + '-state');
+    const card = document.querySelector('[data-soil-key="' + key + '"]');
+    const value = Number(rawValue);
+    const available = rawValue !== null && rawValue !== undefined && rawValue !== '' && Number.isFinite(value);
+    let stateName = 'waiting';
+    let stateText = '待同步';
+    let percent = 0;
+    if (available) {
+        percent = Math.max(3, Math.min(100, (value - config.min) / (config.max - config.min) * 100));
+        if (value < config.normalMin) {
+            stateName = 'low';
+            stateText = '偏低';
+        } else if (value > config.normalMax) {
+            stateName = 'high';
+            stateText = '偏高';
+        } else {
+            stateName = 'normal';
+            stateText = '正常';
+        }
+    }
+    if (range) range.style.width = percent.toFixed(1) + '%';
+    if (state) {
+        state.className = stateName;
+        state.textContent = stateText;
+    }
+    if (card) card.dataset.state = stateName;
+}
+
+function createDemoSoilHistory() {
+    const now = Date.now();
+    return Array.from({ length: 25 }, function (_, index) {
+        const cycle = index / 24 * Math.PI * 4;
+        const time = new Date(now - (24 - index) * 2 * 60 * 60 * 1000);
+        return {
+            recordTime: time.toISOString(),
+            soilTemp: Number((23.2 + Math.sin(cycle - 0.7) * 1.65 + (Math.random() - 0.5) * 0.35).toFixed(1)),
+            soilHumidity: Number((59 - Math.sin(cycle - 0.35) * 6.2 + (Math.random() - 0.5) * 1.8).toFixed(1)),
+            soilEc: Number((1.24 + Math.sin(index * 0.52) * 0.12 + (Math.random() - 0.5) * 0.04).toFixed(2)),
+            soilPh: Number((6.55 + Math.sin(index * 0.34 + 0.8) * 0.2 + (Math.random() - 0.5) * 0.05).toFixed(2))
+        };
+    });
 }
 
 async function loadSoilCompare(current) {
@@ -130,7 +191,9 @@ async function initSoilChart() {
     if (soilChartInstance) soilChartInstance.destroy();
 
     const res = await apiGet('/nutrient/soil/history?days=2');
-    const history = apiSucceeded(res) && Array.isArray(res.data) ? res.data : [];
+    const apiHistory = apiSucceeded(res) && Array.isArray(res.data) ? res.data : [];
+    const history = apiHistory.length > 1 ? apiHistory : createDemoSoilHistory();
+    canvas.dataset.source = apiHistory.length > 1 ? 'api' : 'simulated';
     const labels = [];
     const temperature = [];
     const humidity = [];
@@ -151,10 +214,10 @@ async function initSoilChart() {
         data: {
             labels: labels,
             datasets: [
-                { label: '温度 (°C)', data: temperature, borderColor: '#ff7a65', backgroundColor: 'rgba(255,122,101,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
-                { label: '湿度 (%)', data: humidity, borderColor: '#30d8f0', backgroundColor: 'rgba(48,216,240,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
-                { label: 'EC (mS/cm)', data: ec, borderColor: '#f5c842', backgroundColor: 'rgba(245,200,66,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
-                { label: 'PH', data: ph, borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false }
+                { label: '温度 (°C)', data: temperature, yAxisID: 'yEnvironment', borderColor: '#ff7a65', backgroundColor: 'rgba(255,122,101,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
+                { label: '湿度 (%)', data: humidity, yAxisID: 'yEnvironment', borderColor: '#00ffaa', backgroundColor: 'rgba(48,216,240,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
+                { label: 'EC (mS/cm)', data: ec, yAxisID: 'yChemistry', borderColor: '#f5c842', backgroundColor: 'rgba(245,200,66,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
+                { label: 'PH', data: ph, yAxisID: 'yChemistry', borderColor: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false }
             ]
         },
         options: {
@@ -163,8 +226,9 @@ async function initSoilChart() {
             interaction: { mode: 'index', intersect: false },
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { color: 'rgba(30,60,100,0.2)' }, ticks: { color: '#7b8fa8', maxTicksLimit: 12 } },
-                y: { grid: { color: 'rgba(30,60,100,0.2)' }, ticks: { color: '#7b8fa8' } }
+                x: { grid: { color: 'rgba(0,255,170,0.2)' }, ticks: { color: '#b3b3b3', maxTicksLimit: 12 } },
+                yEnvironment: { position: 'left', suggestedMin: 15, suggestedMax: 75, grid: { color: 'rgba(0,255,170,0.16)' }, ticks: { color: '#b3b3b3', maxTicksLimit: 6 } },
+                yChemistry: { position: 'right', suggestedMin: 0, suggestedMax: 8, grid: { drawOnChartArea: false }, ticks: { color: '#d6bb70', maxTicksLimit: 5 } }
             }
         }
     });
@@ -192,63 +256,6 @@ function pumpStatusId(alias) {
 }
 
 let controlPanelPumpState = false;
-let nutrientSpeechQueue = [];
-let nutrientSpeechPlaying = false;
-
-function unlockNutrientSpeechAudio() {
-    const audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
-    audio.volume = 0;
-    const playback = audio.play();
-    if (playback && typeof playback.catch === 'function') playback.catch(function() {});
-}
-
-async function playNextNutrientSpeech() {
-    if (nutrientSpeechPlaying || nutrientSpeechQueue.length === 0) return;
-    nutrientSpeechPlaying = true;
-    const text = nutrientSpeechQueue.shift();
-    let audioUrl = null;
-    try {
-        const response = await fetch(API_BASE + '/speech/synthesize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
-        });
-        const contentType = response.headers.get('Content-Type') || '';
-        if (!response.ok || !/audio\/wav/i.test(contentType)) throw new Error('讯飞语音合成请求失败');
-        const audioBlob = await response.blob();
-        audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.volume = 1;
-        await new Promise(function(resolve, reject) {
-            audio.addEventListener('ended', resolve, { once: true });
-            audio.addEventListener('error', function() { reject(new Error('讯飞语音音频播放失败')); }, { once: true });
-            const playback = audio.play();
-            if (playback && typeof playback.catch === 'function') playback.catch(reject);
-        });
-    } catch (error) {
-        console.warn('营养设备语音播报失败:', error);
-    } finally {
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-        nutrientSpeechPlaying = false;
-        playNextNutrientSpeech();
-    }
-}
-
-function speakNutrientPump(alias, enabled) {
-    const normalizedAlias = String(alias || '').toUpperCase();
-    let name = null;
-    if (normalizedAlias === 'PUMP_CO2') name = '气肥';
-    if (normalizedAlias === 'PUMP_CIRCULATION') name = '循环灌溉泵';
-    if (!name) return;
-    nutrientSpeechQueue.push(name + (enabled ? '已开启' : '已关闭'));
-    playNextNutrientSpeech();
-}
-
-function speakFoliarPump(enabled) {
-    nutrientSpeechQueue.push('叶面肥' + (enabled ? '已开启' : '已关闭'));
-    playNextNutrientSpeech();
-}
-
 function isControlPanelPump(pump) {
     const name = String((pump && pump.name) || '');
     const alias = String((pump && pump.alias) || '').toUpperCase();
@@ -310,7 +317,7 @@ async function controlPump(alias, checked, input) {
         statusElement.textContent = checked ? '运行中' : '已关闭';
         statusElement.style.color = checked ? 'var(--accent-secondary)' : 'var(--text-secondary)';
     }
-    if (apiSucceeded(res)) speakNutrientPump(alias, checked);
+    if (window.GreenhouseTwinFeed) window.GreenhouseTwinFeed.refresh();
     if (input) input.disabled = false;
 }
 
@@ -427,7 +434,7 @@ async function loadControlPanelPumpStatus() {
     if (!input) return;
     const res = await apiGet('/control-panel/status');
     if (!apiSucceeded(res) || !res.data) {
-        renderControlPanelPumpStatus('控制面板未连接', true);
+        renderControlPanelPumpStatus('Modbus 控制服务未连接', true);
         return;
     }
     controlPanelPumpState = !!res.data.pumpActive;
@@ -441,17 +448,17 @@ async function controlPanelPump(input) {
     const next = input.checked;
     input.disabled = true;
     controlPanelPumpState = next;
-    renderControlPanelPumpStatus('发送控制面板指令中...');
+    renderControlPanelPumpStatus('发送水泵指令中...');
     const res = await apiPost('/control-panel/pump', { enabled: next });
+    if (window.GreenhouseTwinFeed) window.GreenhouseTwinFeed.refresh();
     input.disabled = false;
     if (!apiSucceeded(res)) {
         controlPanelPumpState = previous;
         input.checked = previous;
-        renderControlPanelPumpStatus((res && res.msg) || '控制面板水泵控制失败', true);
+        renderControlPanelPumpStatus((res && res.msg) || '水泵控制链路失败', true);
         return;
     }
     renderControlPanelPumpStatus(next ? '运行中' : '已关闭');
-    speakFoliarPump(next);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -460,13 +467,11 @@ document.addEventListener('DOMContentLoaded', function () {
         grid.addEventListener('change', function (event) {
             const panelInput = event.target.closest('.toggle-switch input[data-control-panel-pump]');
             if (panelInput) {
-                unlockNutrientSpeechAudio();
                 controlPanelPump(panelInput);
                 return;
             }
             const input = event.target.closest('.toggle-switch input[data-alias]');
             if (input) {
-                unlockNutrientSpeechAudio();
                 controlPump(input.dataset.alias, input.checked, input);
             }
         });
@@ -483,6 +488,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const controlPanelPumpInput = document.getElementById('control-panel-pump');
     if (controlPanelPumpInput) controlPanelPumpInput.addEventListener('change', function () { controlPanelPump(controlPanelPumpInput); });
     setInterval(loadSoilData, 30000);
+    setInterval(initSoilChart, 30000);
     setInterval(loadPumpStatus, 30000);
     setInterval(loadSchedules, 30000);
     setInterval(loadIrrigationRecords, 30000);

@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - 气象站</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
     <link rel="stylesheet" th:href="@{/css/weather.css}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -178,8 +179,8 @@
                 <div class="chart-wrapper"><canvas id="weatherChart"></canvas></div>
                 <div class="chart-legend">
                     <div class="legend-item" onclick="toggleDataset(0)"><div class="legend-dot" style="background:#ff7a65;"></div>温度</div>
-                    <div class="legend-item" onclick="toggleDataset(1)"><div class="legend-dot" style="background:#30d8f0;"></div>湿度</div>
-                    <div class="legend-item" onclick="toggleDataset(2)"><div class="legend-dot" style="background:#30e8a0;"></div>风速</div>
+                    <div class="legend-item" onclick="toggleDataset(1)"><div class="legend-dot" style="background:#00ffaa;"></div>湿度</div>
+                    <div class="legend-item" onclick="toggleDataset(2)"><div class="legend-dot" style="background:#1890ff;"></div>风速</div>
                     <div class="legend-item" onclick="toggleDataset(3)"><div class="legend-dot" style="background:#6b9fff;"></div>降雨量</div>
                     <div class="legend-item" onclick="toggleDataset(4)"><div class="legend-dot" style="background:#f5c842;"></div>光照</div>
                     <div class="legend-item" onclick="toggleDataset(5)"><div class="legend-dot" style="background:#c084fc;"></div>紫外线</div>
@@ -188,13 +189,9 @@
         </div>
     </main>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
 
-    <script th:src="@{/js/common.js}"></script>
+
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/weather.js}"></script>
 </body>
 </html>

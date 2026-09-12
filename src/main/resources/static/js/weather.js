@@ -1,4 +1,4 @@
-const DIRS_16 = ["北","北北东","东北","东北东","东","东南东","东南","南南东","南","南南西","西南","西南西","西","西北西","西北","北北西"];
+﻿const DIRS_16 = ["北","北北东","东北","东北东","东","东南东","东南","南南东","南","南南西","西南","西南西","西","西北西","西北","北北西"];
 
 function displayValue(value) {
     return value === null || value === undefined || value === '' ? '--' : value;
@@ -44,7 +44,7 @@ async function initWeatherChart() {
             labels: labels,
             datasets: [
                 { label: '温度 (°C)', data: tempData, borderColor: '#ff7a65', backgroundColor: 'rgba(255,122,101,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
-                { label: '湿度 (%)', data: humData, borderColor: '#30d8f0', backgroundColor: 'rgba(48,216,240,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
+                { label: '湿度 (%)', data: humData, borderColor: '#00ffaa', backgroundColor: 'rgba(48,216,240,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
                 { label: '风速 (m/s)', data: windData, borderColor: '#30e8a0', backgroundColor: 'rgba(48,232,160,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
                 { label: '降雨量 (mm)', data: rainData, borderColor: '#6b9fff', backgroundColor: 'rgba(107,159,255,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: false },
                 { label: '光照 (Lux)', data: lightData, borderColor: '#f5c842', backgroundColor: 'rgba(245,200,66,0.1)', tension: 0.4, pointRadius: 0, borderWidth: 2, hidden: true },
@@ -56,8 +56,8 @@ async function initWeatherChart() {
             interaction: { mode: 'index', intersect: false },
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { color: 'rgba(30,60,100,0.2)' }, ticks: { color: '#7b8fa8', maxTicksLimit: 12 } },
-                y: { grid: { color: 'rgba(30,60,100,0.2)' }, ticks: { color: '#7b8fa8' } }
+                x: { grid: { color: 'rgba(0,255,170,0.2)' }, ticks: { color: '#b3b3b3', maxTicksLimit: 12 } },
+                y: { grid: { color: 'rgba(0,255,170,0.2)' }, ticks: { color: '#b3b3b3' } }
             }
         }
     });
@@ -164,7 +164,7 @@ async function loadHeartbeat() {
             cardEl.style.borderColor = 'rgba(52, 211, 153, 0.4)';
         } else {
             statusEl.textContent = '离线';
-            statusEl.style.color = '#ff4d6a';
+            statusEl.style.color = '#ff4d4f';
             timeEl.textContent = d.lastHeartbeat ? '最后心跳: ' + d.relativeTime : '无心跳数据';
             timeEl.style.color = 'rgba(255, 77, 106, 0.7)';
             cardEl.style.borderColor = 'rgba(255, 77, 106, 0.4)';
@@ -230,7 +230,7 @@ async function saveThreshold() {
         thresholdData = body;
     } else {
         msgEl.textContent = '✗ 保存失败';
-        msgEl.style.color = '#ff4d6a';
+        msgEl.style.color = '#ff4d4f';
     }
     setTimeout(function() { msgEl.textContent = ''; }, 3000);
     btn.disabled = false;
@@ -262,7 +262,7 @@ function applyThresholdWarnings(d) {
                 const badge = document.createElement('span');
                 badge.className = 'warn-badge';
                 badge.textContent = '⚠';
-                badge.style.cssText = 'position:absolute; top:8px; right:10px; font-size:16px; color:#ff4d6a; animation:warn-blink 1.2s infinite;';
+                badge.style.cssText = 'position:absolute; top:8px; right:10px; font-size:16px; color:#ff4d4f; animation:warn-blink 1.2s infinite;';
                 card.appendChild(badge);
             }
         } else {

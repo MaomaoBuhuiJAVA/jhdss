@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * safe span that would drive the carriage into the left hard limit.
  *
  * The rightmost end stays reachable, while leftward travel is capped at
- * {@code patrol.automatic.horizontal-coverage-ratio} (default 80%) of the calibrated
+ * {@code patrol.automatic.horizontal-coverage-ratio} (default 60%) of the calibrated
  * right-to-left travel for automatic patrols and manual control alike.
  */
 @Slf4j
@@ -43,7 +43,7 @@ public class RailPositionService {
     private long horizontalTravelMs;
 
     /** Share of the right-to-left travel the rail may ever use. */
-    @Value("${patrol.automatic.horizontal-coverage-ratio:0.80}")
+    @Value("${patrol.automatic.horizontal-coverage-ratio:0.60}")
     private double horizontalCoverageRatio;
 
     @Value("${patrol.rail.position-file:./work/patrol/rail-position.txt}")
@@ -73,7 +73,7 @@ public class RailPositionService {
     }
 
     public double safeRatio() {
-        if (Double.isNaN(horizontalCoverageRatio)) return 0.80;
+        if (Double.isNaN(horizontalCoverageRatio)) return 0.60;
         return Math.max(0.10, Math.min(0.97, horizontalCoverageRatio));
     }
 
@@ -105,6 +105,12 @@ public class RailPositionService {
 
     public boolean atLeftLimit() {
         return remainingLeftMs() <= 0L;
+    }
+
+    public boolean isMoving() {
+        synchronized (lock) {
+            return activeDirection != null;
+        }
     }
 
     /**
@@ -191,6 +197,27 @@ public class RailPositionService {
         }
         result.put("positionFile", positionPath().toString());
         return result;
+    }
+
+    /** Atomic live estimate, without banking travel or changing the soft limit. */
+    public Map<String, Object> twinPosition() {
+        synchronized (lock) {
+            long now = System.currentTimeMillis();
+            long elapsed = moveStartedAt == 0L ? 0L : Math.max(0L, now - moveStartedAt);
+            long estimated = positionMs;
+            if ("left".equals(activeDirection)) estimated += elapsed;
+            if ("right".equals(activeDirection)) estimated -= elapsed;
+            estimated = Math.max(0L, Math.min(leftLimitMs(), estimated));
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("x", 1.0 - (double) estimated / fullTravelMs());
+            result.put("velocityX", "left".equals(activeDirection) ? -1000.0 / fullTravelMs()
+                    : "right".equals(activeDirection) ? 1000.0 / fullTravelMs() : 0.0);
+            result.put("minX", 1.0 - (double) leftLimitMs() / fullTravelMs());
+            result.put("source", "motor-time-estimate");
+            result.put("timestampMs", now);
+            result.put("movingDirection", activeDirection);
+            return result;
+        }
     }
 
     private long remainingLeftMsLocked() {

@@ -5,6 +5,11 @@ captures/
 uploads/
 work/
 photo/
+.codex-runtime/
+artifacts/
+tmp/
+weights/
+gin_http.log
 
 # Large local training assets and camera photo archive; copy separately per machine
 LabelImg资料图片/
@@ -15,6 +20,13 @@ LabelImg资料图片/
 .env.*
 !.env.local.bat.example
 env.local.for-other-pc.bat
+env.local2.bat
+
+# Bundled field controller required by start-jhds.bat; other vendor and tool
+# payloads under software/ are machine-local and are not part of deployment.
+software/*
+!software/server.exe
+!software/说明.txt
 
 # IDE and operating-system files
 .idea/
@@ -28,3 +40,8 @@ _docx_review/
 preview/
 __pycache__/
 *.pyc
+pelican-*.png
+pelican-*.svg
+/=
+LabelImg/*.zip
+/LabelImg资料图片.zip

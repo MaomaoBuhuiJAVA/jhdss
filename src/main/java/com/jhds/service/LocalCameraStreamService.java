@@ -16,6 +16,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.file.StandardOpenOption;
+import java.util.UUID;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +48,43 @@ public class LocalCameraStreamService {
     private volatile long nextRetryAt;
     private volatile long playlistBaselineModifiedAt;
     private volatile StreamQuality streamQuality = StreamQuality.HD;
+    private FileChannel ownershipChannel;
+    private FileLock ownershipLock;
+    private volatile String segmentPrefix = "segment-unstarted-";
+    private volatile boolean nativeVideo;
+
+    private void acquireOwnership(Path output) throws IOException {
+        if (ownershipLock != null && ownershipLock.isValid()) return;
+        FileChannel channel = FileChannel.open(output.resolve("bridge.lock"),
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        try {
+            FileLock lock = channel.tryLock();
+            if (lock == null) throw new IOException("视频目录已被另一个服务占用");
+            ownershipChannel = channel;
+            ownershipLock = lock;
+        } catch (Exception e) {
+            channel.close();
+            throw new IOException("无法取得视频目录独占锁", e);
+        }
+    }
+
+    private boolean isNativeH264(String inputPath) {
+        Process probe = null;
+        try {
+            probe = new ProcessBuilder(properties.getFfprobePath(), "-v", "quiet",
+                    "-rtsp_transport", "tcp", "-timeout", "8000000", "-select_streams", "v:0",
+                    "-show_entries", "stream=codec_name", "-of", "default=nw=1:nk=1",
+                    buildRtspUrl(inputPath)).redirectError(ProcessBuilder.Redirect.INHERIT).start();
+            if (!probe.waitFor(12, TimeUnit.SECONDS)) return false;
+            return probe.exitValue() == 0
+                    && "h264".equals(new String(readAll(probe), StandardCharsets.UTF_8).trim());
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            if (probe != null && probe.isAlive()) probe.destroyForcibly();
+        }
+    }
 
     private enum StreamQuality {
         SMOOTH("smooth", 480, "1200k", "1800k"),
@@ -86,6 +127,10 @@ public class LocalCameraStreamService {
 
     private String targetBufferSize() {
         return streamQuality == StreamQuality.HD ? properties.getVideoBufferSize() : streamQuality.bufferSize;
+    }
+
+    private int targetFps() {
+        return Math.max(1, Math.min(60, properties.getFps()));
     }
 
     public boolean isEnabled() {
@@ -140,6 +185,7 @@ public class LocalCameraStreamService {
             try {
                 Path output = outputDirectory();
                 Files.createDirectories(output);
+                acquireOwnership(output);
                 stopStaleProcesses(output);
                 cleanOutput(output);
                 Path playlist = output.resolve("index.m3u8");
@@ -147,6 +193,8 @@ public class LocalCameraStreamService {
                         ? Files.getLastModifiedTime(playlist).toMillis() : 0L;
 
                 String inputPath = selectInitialPath();
+                segmentPrefix = "segment-" + UUID.randomUUID().toString() + "-";
+                nativeVideo = streamQuality == StreamQuality.UHD_4K && isNativeH264(inputPath);
                 List<String> command = buildCommand(output, inputPath);
                 ProcessBuilder builder = new ProcessBuilder(command);
                 builder.directory(new File("."));
@@ -208,8 +256,7 @@ public class LocalCameraStreamService {
         command.add("1000000");
         command.add("-probesize");
         command.add("1000000");
-        // Some cameras expose an RTP clock that jumps backwards after a
-        // reconnect. Wall-clock timestamps keep the HLS muxer monotonic.
+        // This camera's RTP clock jumps backwards; use arrival timestamps.
         command.add("-use_wallclock_as_timestamps");
         command.add("1");
         command.add("-i");
@@ -219,11 +266,15 @@ public class LocalCameraStreamService {
         command.add("-map");
         command.add("0:a:0?");
         if (streamQuality != StreamQuality.UHD_4K) {
-        command.add("-vf");
-            command.add("fps=15,scale=-2:" + targetHeight() + ",format=yuv420p");
+            command.add("-vf");
+            command.add("fps=" + targetFps() + ",scale=-2:" + targetHeight() + ",format=yuv420p");
         }
+        if (nativeVideo) {
+            command.add("-c:v");
+            command.add("copy");
+        } else {
         command.add("-r");
-        command.add("15");
+        command.add(String.valueOf(targetFps()));
         command.add("-fps_mode");
         command.add("cfr");
         command.add("-c:v");
@@ -237,7 +288,8 @@ public class LocalCameraStreamService {
         command.add("-x264-params");
         // Repeat SPS/PPS on every IDR frame so recovered clients do not
         // display a partial H.264 frame after a transient packet loss.
-        command.add("keyint=15:min-keyint=15:scenecut=0:repeat-headers=1");
+        command.add("keyint=" + targetFps() + ":min-keyint=" + targetFps()
+                + ":scenecut=0:repeat-headers=1");
         command.add("-pix_fmt");
         command.add("yuv420p");
         command.add("-b:v");
@@ -246,13 +298,14 @@ public class LocalCameraStreamService {
         command.add(targetBitrate());
         command.add("-bufsize");
         command.add(targetBufferSize());
-        // The camera publishes 15 fps. A one-second GOP keeps HLS latency low.
+        // A one-second GOP keeps segment timing stable at the configured source rate.
         command.add("-g");
-        command.add("15");
+        command.add(String.valueOf(targetFps()));
         command.add("-keyint_min");
-        command.add("15");
+        command.add(String.valueOf(targetFps()));
         command.add("-sc_threshold");
         command.add("0");
+        }
         command.add("-c:a");
         command.add("aac");
         command.add("-b:a");
@@ -284,7 +337,7 @@ public class LocalCameraStreamService {
         // segment during a reconnect. omit_endlist keeps the playlist live.
         command.add("delete_segments+independent_segments+program_date_time+temp_file+discont_start");
         command.add("-hls_segment_filename");
-        command.add(output.resolve("segment-%010d.ts").toString());
+        command.add(output.resolve(segmentPrefix + "%010d.ts").toString());
         command.add(output.resolve("index.m3u8").toString());
         return command;
     }
@@ -366,6 +419,7 @@ public class LocalCameraStreamService {
     private boolean isCurrentPlaylistReady(Path playlist) {
         try {
             return isPlaylistReady(playlist)
+                    && new String(Files.readAllBytes(playlist), StandardCharsets.UTF_8).contains(segmentPrefix)
                     && Files.getLastModifiedTime(playlist).toMillis() > playlistBaselineModifiedAt;
         } catch (IOException ignored) {
             return false;
@@ -428,7 +482,7 @@ public class LocalCameraStreamService {
         if (Files.exists(pid)) {
             try {
                 String value = new String(Files.readAllBytes(pid), StandardCharsets.US_ASCII).trim();
-                if (value.matches("\\d+")) stopPid(Long.parseLong(value));
+                // PID reuse can target unrelated processes; validate output ownership below instead.
             } catch (Exception e) {
                 log.debug("Unable to inspect stale FFmpeg pid file", e);
             }
@@ -444,15 +498,20 @@ public class LocalCameraStreamService {
                 + "| Where-Object { $_.CommandLine -and $_.CommandLine -match $re } "
                 + "| ForEach-Object { $_.ProcessId }";
         try {
-            Process scan = new ProcessBuilder("powershell", "-NoProfile", "-Command", script)
+            String encoded = java.util.Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
+            Process scan = new ProcessBuilder("powershell", "-NoProfile", "-EncodedCommand", encoded)
                     .redirectErrorStream(true).start();
+            if (!scan.waitFor(10, TimeUnit.SECONDS)) {
+                scan.destroyForcibly();
+                throw new IllegalStateException("旧视频进程检查超时，暂不启动新进程");
+            }
+            if (scan.exitValue() != 0) throw new IllegalStateException("旧视频进程检查失败");
             String text = new String(readAll(scan), StandardCharsets.UTF_8);
-            scan.waitFor(3, TimeUnit.SECONDS);
             for (String line : text.split("\\r?\\n")) {
                 if (line.trim().matches("\\d+")) stopPid(Long.parseLong(line.trim()));
             }
         } catch (Exception e) {
-            log.debug("Unable to scan stale FFmpeg processes", e);
+            throw new IllegalStateException("无法安全清理旧视频进程", e);
         }
     }
 
@@ -478,7 +537,7 @@ public class LocalCameraStreamService {
 
     private long processId(Process process) {
         try {
-            java.lang.reflect.Method method = process.getClass().getMethod("pid");
+            java.lang.reflect.Method method = Process.class.getMethod("pid");
             Object value = method.invoke(process);
             return value instanceof Number ? ((Number) value).longValue() : -1;
         } catch (Exception ignored) {
@@ -499,6 +558,8 @@ public class LocalCameraStreamService {
         status.put("actualHeight", actualHeight == 0 ? null : actualHeight);
         status.put("qualityVerified", qualityVerified);
         status.put("videoBitrate", targetBitrate());
+        status.put("targetFps", targetFps());
+        status.put("videoMode", nativeVideo ? "native-h264" : "transcode");
         boolean running = ffmpegProcess != null && ffmpegProcess.isAlive();
         status.put("running", running);
         Path playlist = outputDirectory().resolve("index.m3u8");
@@ -533,6 +594,15 @@ public class LocalCameraStreamService {
      * an automatic patrol is already streaming at 4K.
      */
     public Path captureLatestFrame(Path destination) {
+        return captureLatestFrameAfter(destination, startedAt);
+    }
+
+    /**
+     * Captures from a completed segment published after the requested time.
+     * Automatic patrol uses this after its focus delay so motion-blurred frames
+     * still buffered in HLS cannot be selected for the next photo.
+     */
+    public Path captureLatestFrameAfter(Path destination, long notBeforeEpochMs) {
         if (destination == null) {
             throw new IllegalArgumentException("截图保存路径不能为空");
         }
@@ -540,9 +610,9 @@ public class LocalCameraStreamService {
         // segment. The watchdog can otherwise restart FFmpeg between those
         // two operations after a transient RTSP disconnect.
         synchronized (processLock) {
-            Path segment = awaitStableSegment();
+            Path segment = awaitStableSegment(Math.max(startedAt, notBeforeEpochMs));
             if (segment == null) {
-                throw new IllegalStateException("没有可用于截图的完整视频分片");
+                throw new IllegalStateException("等待对焦后的清晰视频分片超时");
             }
 
             Path target = destination.toAbsolutePath().normalize();
@@ -610,12 +680,12 @@ public class LocalCameraStreamService {
      * RTSP reconnects can leave the playlist alive while the first new segment
      * is still being decoded, so a single directory scan is too eager here.
      */
-    private Path awaitStableSegment() {
+    private Path awaitStableSegment(long notBeforeEpochMs) {
         long timeout = Math.max(3000L, properties.getCaptureSegmentTimeoutMs());
         long deadline = System.currentTimeMillis() + timeout;
         while (System.currentTimeMillis() <= deadline) {
             ensureRunning();
-            Path segment = newestStableSegment(startedAt);
+            Path segment = newestStableSegment(notBeforeEpochMs);
             if (segment != null) return segment;
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0L) break;
@@ -669,7 +739,7 @@ public class LocalCameraStreamService {
         Path newest = null;
         long newestModifiedAt = Long.MIN_VALUE;
         long stableBefore = System.currentTimeMillis() - 1200L;
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(outputDirectory(), "segment-*.ts")) {
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(outputDirectory(), segmentPrefix + "*.ts")) {
             for (Path file : files) {
                 if (!Files.isRegularFile(file) || Files.size(file) <= 1024L) continue;
                 long modifiedAt = Files.getLastModifiedTime(file).toMillis();
@@ -716,6 +786,14 @@ public class LocalCameraStreamService {
 
     @PreDestroy
     public void destroy() {
-        stop();
+        synchronized (processLock) {
+            stopProcessLocked();
+            try {
+                if (ownershipLock != null) ownershipLock.release();
+                if (ownershipChannel != null) ownershipChannel.close();
+            } catch (IOException e) {
+                log.warn("Unable to release camera directory lock", e);
+            }
+        }
     }
 }

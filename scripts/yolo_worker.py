@@ -29,8 +29,15 @@ def main():
     for raw in sys.stdin:
         try:
             request = json.loads(raw)
-            encoded = request.get('image', '')
-            image = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
+            encoded_path = request.get('image_path_b64')
+            image_path = (base64.b64decode(encoded_path).decode('utf-8')
+                          if encoded_path else request.get('image_path'))
+            if image_path:
+                # np.fromfile keeps Windows paths containing Chinese characters usable.
+                image = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+            else:
+                encoded = request.get('image', '')
+                image = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
             if image is None:
                 raise ValueError('无法解析视频帧')
             confidence = max(0.05, min(0.95, float(request.get('confidence', 0.25))))

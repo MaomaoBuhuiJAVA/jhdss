@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - 营养液配液</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
-    <link rel="stylesheet" th:href="@{/css/nutrient.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
+    <link rel="stylesheet" th:href="@{/css/nutrient.css(v='20260912-card-hover')}">
+    <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='1')}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
+    <script th:src="@{/js/vendor/greenhouse-3d.js}"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -18,45 +21,53 @@
                 <div class="card">
                     <div class="card-header"><i class="ri-sensor-line"></i><span>土壤传感器</span><span class="update-time" id="soil-update-time"></span></div>
                     <div class="sensor-grid">
-                            <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤温度</div>
+                            <div class="soil-sensor" data-soil-key="soilTemp">
+                            <div class="soil-sensor-title"><span><i class="ri-temp-hot-line"></i></span><div class="soil-sensor-name">土壤温度</div><b id="soil-temp-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-temp">--</span><span class="soil-sensor-unit">°C</span></div>
                             <div class="soil-sensor-trend" id="soil-temp-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-temp-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤湿度</div>
+                        <div class="soil-sensor" data-soil-key="soilHumidity">
+                            <div class="soil-sensor-title"><span><i class="ri-drop-line"></i></span><div class="soil-sensor-name">土壤湿度</div><b id="soil-humidity-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-humidity">--</span><span class="soil-sensor-unit">%</span></div>
                             <div class="soil-sensor-trend" id="soil-humidity-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-humidity-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤EC</div>
+                        <div class="soil-sensor" data-soil-key="soilEc">
+                            <div class="soil-sensor-title"><span><i class="ri-pulse-line"></i></span><div class="soil-sensor-name">土壤EC</div><b id="soil-ec-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-ec">--</span><span class="soil-sensor-unit">mS/cm</span></div>
                             <div class="soil-sensor-trend" id="soil-ec-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-ec-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤PH</div>
+                        <div class="soil-sensor" data-soil-key="soilPh">
+                            <div class="soil-sensor-title"><span><i class="ri-test-tube-line"></i></span><div class="soil-sensor-name">土壤PH</div><b id="soil-ph-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-ph">--</span><span class="soil-sensor-unit">pH</span></div>
                             <div class="soil-sensor-trend" id="soil-ph-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-ph-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤盐分</div>
+                        <div class="soil-sensor" data-soil-key="soilSalt">
+                            <div class="soil-sensor-title"><span><i class="ri-bubble-chart-line"></i></span><div class="soil-sensor-name">土壤盐分</div><b id="soil-salt-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-salt">--</span><span class="soil-sensor-unit">%</span></div>
                             <div class="soil-sensor-trend" id="soil-salt-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-salt-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤氮</div>
+                        <div class="soil-sensor" data-soil-key="soilNitrogen">
+                            <div class="soil-sensor-title"><span><i class="ri-contrast-drop-2-line"></i></span><div class="soil-sensor-name">土壤氮</div><b id="soil-nitrogen-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-nitrogen">--</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-nitrogen-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-nitrogen-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤速效磷</div>
+                        <div class="soil-sensor" data-soil-key="soilPhosphorus">
+                            <div class="soil-sensor-title"><span><i class="ri-leaf-line"></i></span><div class="soil-sensor-name">土壤速效磷</div><b id="soil-phosphorus-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-phosphorus">--</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-phosphorus-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-phosphorus-range"></i></div>
                         </div>
-                        <div class="soil-sensor">
-                            <div class="soil-sensor-name">土壤钾</div>
+                        <div class="soil-sensor" data-soil-key="soilPotassium">
+                            <div class="soil-sensor-title"><span><i class="ri-seedling-line"></i></span><div class="soil-sensor-name">土壤钾</div><b id="soil-potassium-state">实时</b></div>
                             <div><span class="soil-sensor-value" id="soil-potassium">--</span><span class="soil-sensor-unit">mg/kg</span></div>
                             <div class="soil-sensor-trend" id="soil-potassium-trend"></div>
+                            <div class="soil-sensor-range"><i id="soil-potassium-range"></i></div>
                         </div>
                     </div>
                 </div>
@@ -65,7 +76,7 @@
                     <div class="chart-wrapper"><canvas id="soilChart"></canvas></div>
                     <div class="chart-legend">
                         <div class="legend-item" onclick="toggleSoilDataset(0)"><div class="legend-dot" style="background:#ff7a65;"></div>温度</div>
-                        <div class="legend-item" onclick="toggleSoilDataset(1)"><div class="legend-dot" style="background:#30d8f0;"></div>湿度</div>
+                        <div class="legend-item" onclick="toggleSoilDataset(1)"><div class="legend-dot" style="background:#00ffaa;"></div>湿度</div>
                         <div class="legend-item" onclick="toggleSoilDataset(2)"><div class="legend-dot" style="background:#f5c842;"></div>EC</div>
                         <div class="legend-item" onclick="toggleSoilDataset(3)"><div class="legend-dot" style="background:#c084fc;"></div>PH</div>
                     </div>
@@ -79,7 +90,7 @@
                         <div class="info-row"><span class="info-label">营养液B</span><span class="info-value" data-stat="pump-b">--</span></div>
                         <div class="info-row"><span class="info-label">酸液</span><span class="info-value" data-stat="pump-acid">--</span></div>
                         <div class="info-row"><span class="info-label">碱液</span><span class="info-value" data-stat="pump-base">--</span></div>
-                        <div style="margin-top:12px; padding:12px; background:rgba(0,200,160,0.08); border-radius:8px; border:1px solid rgba(0,200,160,0.2);">
+                        <div style="margin-top:12px; padding:12px; background:rgba(0,255,170,0.08); border-radius:8px; border:1px solid rgba(0,255,170,0.2);">
                             <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">下次预计灌溉</div>
                             <div id="next-irrigation-time" style="font-size:18px; font-weight:700; color:var(--accent-secondary); font-family:var(--font-mono);">--:--</div>
                         </div>
@@ -87,6 +98,14 @@
                 </div>
             </div>
             <div class="nutrient-main">
+                <section class="nutrient-equipment" id="nutrient-model-screen" aria-label="营养液配液设备">
+                    <div class="device-twin-heading"><i class="ri-cube-line"></i><span>巡检与施肥设备</span><span data-twin-connection>连接中</span></div>
+                    <div id="nutrient-twin" aria-label="巡检与施肥设备三维视图"></div>
+                    <div class="device-twin-tools">
+                        <button type="button" id="nutrient-twin-reset" title="重置视角" aria-label="重置视角"><i class="ri-refresh-line"></i></button>
+                        <button type="button" id="nutrient-twin-fullscreen" title="全屏" aria-label="全屏"><i class="ri-fullscreen-line"></i></button>
+                    </div>
+                </section>
                 <div class="card">
                     <div class="mode-tabs">
                         <button type="button" class="mode-tab active" data-mode="manual" onclick="switchNutrientMode('manual')">手动模式</button>
@@ -94,13 +113,9 @@
                         <button type="button" class="mode-tab" data-mode="ai" onclick="switchNutrientMode('ai')">AI 模式</button>
                     </div>
                 </div>
-                <div class="card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-                    <div class="mode-panel active" id="panel-manual">
-                        <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">配液泵控制</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">手动控制各泵开关</span></div>
-                        <div class="pump-grid" id="pump-grid"></div>
-                    </div>
+                <div class="card nutrient-mode-panel is-collapsed">
                     <div class="mode-panel" id="panel-auto">
-                        <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">自动灌溉计划</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">设定定时任务</span></div>
+                        <div style="margin-bottom:16px;"><span style="font-size:14px; font-weight:600; color:#ffffff;">自动灌溉计划</span><span style="font-size:11px; color:var(--text-dim); margin-left:8px;">设定定时任务</span></div>
                         <div class="schedule-form">
                             <div class="time-row">
                                 <div class="form-group"><label class="form-label">灌溉时间 1</label><input type="time" class="form-input"></div>
@@ -137,21 +152,37 @@
                                 <div class="ai-status-sub">根据土壤传感器数据自动判断是否执行灌溉</div>
                             </div>
                         </div>
-                        <div style="margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#e0ecf8;">AI 决策日志</span></div>
+                        <div style="margin-bottom:12px;"><span style="font-size:14px; font-weight:600; color:#ffffff;">AI 决策日志</span></div>
                         <div class="ai-decision-log" id="ai-log"><div class="log-empty">暂无AI决策记录</div></div>
                     </div>
                 </div>
             </div>
+            <aside class="nutrient-controls">
+                <section class="card nutrient-air-card">
+                    <div class="card-header"><i class="ri-plant-line"></i><span>空气与气环境情况</span></div>
+                    <div class="air-meters">
+                        <div class="air-meter temperature" style="--meter-progress:280deg"><i class="ri-temp-hot-line"></i><strong>24.8°C</strong><span>空气温度</span></div>
+                        <div class="air-meter humidity" style="--meter-progress:209deg"><i class="ri-drop-line"></i><strong>58%</strong><span>相对湿度</span></div>
+                        <div class="air-meter co2" style="--meter-progress:248deg"><i class="ri-cloud-line"></i><strong>689</strong><small>ppm</small><span>CO2浓度</span></div>
+                        <div class="air-meter light" style="--meter-progress:286deg"><i class="ri-sun-line"></i><strong>1012</strong><small>lux</small><span>光照强度</span></div>
+                        <div class="air-meter pressure" style="--meter-progress:266deg"><i class="ri-speed-up-line"></i><strong>689</strong><small>hPa</small><span>气压</span></div>
+                    </div>
+                </section>
+                <section class="card nutrient-pump-card">
+                    <div class="card-header"><i class="ri-settings-3-line"></i><span>配液泵组控制</span></div>
+                    <p class="pump-card-note">手动控制各泵开关</p>
+                    <div class="pump-grid" id="pump-grid"></div>
+                </section>
+            </aside>
         </div>
     </main>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
 
-    <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/nutrient.js(v='20260910-browser-speech')}"></script>
+
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
+    <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
+    <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
+    <script th:src="@{/js/nutrient-twin.js(v='1')}"></script>
+    <script th:src="@{/js/nutrient.js(v='20260912-speech-muted-v1')}"></script>
 </body>
 </html>

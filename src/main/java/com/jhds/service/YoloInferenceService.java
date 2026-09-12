@@ -31,7 +31,7 @@ public class YoloInferenceService {
 
     @Value("${ai.yolo.python-path:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}")
     private String pythonPath;
-    @Value("${ai.yolo.model-path:./LabelImg资料图片/yolo_runs/black_longhorn_yolo11s/weights/best.pt}")
+    @Value("${ai.yolo.model-path:./weights/black_longhorn_best.pt}")
     private String modelPath;
     @Value("${ai.yolo.script-path:./scripts/yolo_infer.py}")
     private String scriptPath;

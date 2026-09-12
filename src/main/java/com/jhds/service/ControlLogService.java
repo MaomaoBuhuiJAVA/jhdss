@@ -10,6 +10,8 @@ import java.util.Date;
 @Service
 public class ControlLogService {
 
+    private static final int COMMAND_COLUMN_LENGTH = 200;
+
     @Autowired
     private ControlLogMapper controlLogMapper;
 
@@ -20,10 +22,15 @@ public class ControlLogService {
         log.setDeviceName(name);
         log.setValue(value);
         log.setAutomatic(automatic);
-        log.setSendCommand(sendCommand);
-        log.setReturnCommand(returnCommand);
+        log.setSendCommand(limitCommand(sendCommand));
+        log.setReturnCommand(limitCommand(returnCommand));
         log.setSuccess(success);
         log.setCreatedAt(new Date());
         controlLogMapper.insert(log);
+    }
+
+    private String limitCommand(String value) {
+        return value == null || value.length() <= COMMAND_COLUMN_LENGTH
+                ? value : value.substring(0, COMMAND_COLUMN_LENGTH);
     }
 }

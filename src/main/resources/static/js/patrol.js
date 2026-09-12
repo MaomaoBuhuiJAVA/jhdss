@@ -1,4 +1,4 @@
-let currentDir = 'stop';
+﻿let currentDir = 'stop';
 let isAiCapturing = false;
 let patrolPageAlert = null;
 let activePtzDirection = null;
@@ -13,7 +13,7 @@ let voiceRecordChunks = [];
 let voiceRecordStartedAt = 0;
 let voiceRecordTimer = null;
 let cameraRecoveryTimer = null;
-let cameraPreferredProtocol = 4;
+let cameraPreferredProtocol = 2;
 let cameraLatencyTimer = null;
 let cameraWatchdogTimer = null;
 let cameraLastProgressAt = 0;
@@ -30,21 +30,17 @@ let cameraDragOriginX = 0;
 let cameraDragOriginY = 0;
 let ptzStopTimer = null;
 let motorRequestId = 0;
-let motorStopTimer = null;
 let motorCommandChain = Promise.resolve();
-let motorMotionGeneration = 0;
-let motorMotionActive = false;
+const manualHoldReleases = new Set();
+let railResetPending = false;
 let panelMotionDir = null;
 let panelMotionRequestId = 0;
-let panelMotionActive = false;
-let panelMotionTimer = null;
 let panelMotionChain = Promise.resolve();
-let panelMotionGeneration = 0;
 let selectedAutomaticPatrolPlan = 'standard';
 let automaticPatrolRunning = false;
+let automaticPatrolAnalysisRunning = false;
 let automaticPatrolSpeechEnabled = false;
-let automaticPatrolLastSpokenPhase = '';
-let automaticPatrolLastSpokenState = '';
+let automaticPatrolCompletionPending = false;
 let automaticPatrolSpeechQueue = [];
 let automaticPatrolSpeechPlaying = false;
 let automaticPatrolSpeechAudio = null;
@@ -52,6 +48,9 @@ let automaticPatrolSpeechRequest = null;
 let automaticPatrolSpeechFinish = null;
 let automaticPatrolSpeechGeneration = 0;
 let realtimeDetectionEnabled = false;
+let realtimeDetectionAvailable = false;
+let realtimeDetectionStreamId = 'patrol-' + Date.now().toString(36) + '-'
+        + Math.random().toString(36).slice(2, 10);
 let realtimeDetectionTimer = null;
 let realtimeDetectionInFlight = false;
 let realtimeDetectionErrors = 0;
@@ -61,9 +60,24 @@ let realtimeLastSoundAt = 0;
 let realtimeAudioContext = null;
 let realtimeLastDetectionAt = 0;
 let realtimeDetectionInterval = 1000;
+let realtimeDetectionSnapshot = '';
+let patrolTaskResults = [];
+let patrolResultSignature = '';
+
+function setTwinAxisMotion(axis, direction) {
+    if (window.greenhouseTwin && typeof window.greenhouseTwin.setAxisMotion === 'function') {
+        window.greenhouseTwin.setAxisMotion(axis, direction);
+    }
+}
+
+function refreshTwinState() {
+    if (window.GreenhouseTwinFeed && typeof window.GreenhouseTwinFeed.refresh === 'function') {
+        window.GreenhouseTwinFeed.refresh();
+    }
+}
 
 function clampCameraPan() {
-    var viewport = document.querySelector('.patrol-video-main');
+    var viewport = document.querySelector('.patrol-video-stage');
     if (!viewport || cameraZoom <= 1) {
         cameraPanX = 0;
         cameraPanY = 0;
@@ -78,7 +92,7 @@ function clampCameraPan() {
 function applyCameraZoom() {
     var video = document.getElementById('video-player');
     var label = document.getElementById('camera-zoom-label');
-    var viewport = document.querySelector('.patrol-video-main');
+    var viewport = document.querySelector('.patrol-video-stage');
     clampCameraPan();
     if (video) {
         video.style.transform = 'translate3d(' + cameraPanX.toFixed(1) + 'px,'
@@ -114,7 +128,7 @@ function resetCameraZoom() {
 }
 
 function bindCameraViewportControls() {
-    var viewport = document.querySelector('.patrol-video-main');
+    var viewport = document.querySelector('.patrol-video-stage');
     var video = document.getElementById('video-player');
     if (!viewport || !video || viewport.dataset.viewportControlsBound === 'true') return;
     viewport.dataset.viewportControlsBound = 'true';
@@ -243,11 +257,17 @@ function patrolKeyTargetIsEditable(target) {
 // The rail has no position sensor, so the backend dead-reckons travel from the
 // confirmed rightmost origin and caps leftward motion. Mirror that soft limit
 // here so "left" visibly disables instead of failing silently on click.
-let railLeftLimitPercent = 80;
+let railLeftLimitPercent = 60;
 let railAtLeftLimit = false;
 
 function applyRailLimitStatus(data) {
     if (!data) return;
+    if (data.rail && Number(data.rail.fullTravelMs) > 0) {
+        const railPosition = Math.max(0, Math.min(1, Number(data.rail.positionMs || 0) / Number(data.rail.fullTravelMs)));
+        const modelPosition = 1 - railPosition;
+        const trackPosition = document.getElementById('track-pos');
+        if (trackPosition) trackPosition.textContent = modelPosition.toFixed(3);
+    }
     if (data.railLeftLimitPercent !== undefined && data.railLeftLimitPercent !== null) {
         railLeftLimitPercent = Number(data.railLeftLimitPercent) || railLeftLimitPercent;
     }
@@ -262,7 +282,7 @@ function applyRailLimitStatus(data) {
         leftButton.classList.toggle('soft-limited', railAtLeftLimit);
         leftButton.title = railAtLeftLimit
             ? '已到达左侧 ' + railLeftLimitPercent + '% 软限位，只能向右移动'
-            : '向左移动';
+            : '按住向左移动，松开停止';
     }
     const status = document.getElementById('motor-control-status');
     if (status && railAtLeftLimit && !status.classList.contains('pending')) {
@@ -278,49 +298,94 @@ function updateMotorButtonState(dir, pending) {
         btn.classList.toggle('pending', active && pending);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    updateRailResetButtonState();
 }
 
-function togglePatrolDir(dir) {
-    // Fallback for programmatic/click callers. Direction buttons are bound
-    // as long-press controls in bindMotorHoldControls below.
-    setPatrolDir(currentDir === dir ? 'stop' : dir);
+function updateRailResetButtonState() {
+    const button = document.getElementById('rail-limit-reset');
+    if (!button) return;
+    button.disabled = railResetPending || automaticPatrolRunning || currentDir !== 'stop';
+}
+
+async function resetRailSoftLimit() {
+    if (automaticPatrolRunning || currentDir !== 'stop' || railResetPending) return;
+    const confirmed = window.confirm('请确认轨道摄像头已经回到最右端机械原点。\n\n当前位置不在最右端时重置会导致软限位失效，是否继续？');
+    if (!confirmed) return;
+
+    const button = document.getElementById('rail-limit-reset');
+    const status = document.getElementById('motor-control-status');
+    railResetPending = true;
+    if (button) button.classList.add('pending');
+    updateRailResetButtonState();
+    if (status) {
+        status.className = 'motor-control-status pending';
+        status.textContent = '正在重置软限位...';
+    }
+
+    const res = await apiPost('/patrol/rail-origin', { originConfirmed: true });
+    railResetPending = false;
+    if (button) button.classList.remove('pending');
+    if (res && res.code === 200 && res.data) {
+        railAtLeftLimit = false;
+        applyRailLimitStatus({
+            rail: res.data,
+            railLeftLimitPercent: res.data.safeRatioPercent,
+            railAtLeftLimit: res.data.atLeftLimit
+        });
+        if (status) {
+            status.className = 'motor-control-status success';
+            status.textContent = '软限位已重置 · 最右端 0%';
+        }
+    } else if (status) {
+        status.className = 'motor-control-status error';
+        status.textContent = (res && res.msg) || '软限位重置失败';
+    }
+    updateRailResetButtonState();
+}
+
+function queuePatrolDir(dir) {
+    motorCommandChain = motorCommandChain.catch(function() {}).then(function() {
+        return setPatrolDir(dir);
+    });
+    return motorCommandChain;
 }
 
 async function setPatrolDir(dir) {
     const requestId = ++motorRequestId;
-    if (motorStopTimer) {
-        clearTimeout(motorStopTimer);
-        motorStopTimer = null;
-    }
     const status = document.getElementById('motor-control-status');
     currentDir = dir;
+    if (dir === 'stop') setTwinAxisMotion('x', 'stop');
     updateMotorButtonState(dir, true);
     if (status) {
         status.className = 'motor-control-status pending';
-        status.textContent = dir === 'stop' ? '正在发送停止指令...' : '正在发送 MQTT 电机指令...';
+        status.textContent = dir === 'stop' ? '正在发送停止指令...' : '正在发送轨道电机指令...';
     }
-    const res = await apiPost('/patrol/control', {
+    const payload = {
         dir: dir,
         // This value is created only by the user's current button/key action.
         // The backend rejects movement requests that do not include it.
         motionConfirmed: dir !== 'stop'
-    });
+    };
+    const res = await apiPost('/patrol/control', payload);
     // A newer click owns the visible state. Do not let an older response
     // overwrite the direction selected by the user.
     if (requestId !== motorRequestId) return res;
     if (!res || res.code !== 200) {
         currentDir = 'stop';
+        setTwinAxisMotion('x', 'stop');
         updateMotorButtonState('stop', false);
         if (status) {
             status.className = 'motor-control-status error';
-            status.textContent = (res && res.msg) || 'MQTT 电机指令失败';
+            status.textContent = (res && res.msg) || '轨道电机控制链路失败';
         }
         window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
     } else {
+        setTwinAxisMotion('x', dir);
+        refreshTwinState();
         updateMotorButtonState(dir, false);
         if (status) {
             status.className = 'motor-control-status success';
-            status.textContent = dir === 'stop' ? '电机已停止' : (dir === 'left' ? 'MQTT 左移中' : 'MQTT 右移中');
+            status.textContent = dir === 'stop' ? '电机已停止' : (dir === 'left' ? '左移中' : '右移中');
         }
         if (dir === 'stop') {
             const stopButton = document.getElementById('btn-stop');
@@ -331,38 +396,6 @@ async function setPatrolDir(dir) {
             }
         }
     }
-}
-
-function startPatrolHold(dir) {
-    if (automaticPatrolRunning) return;
-    if (motorStopTimer) {
-        clearTimeout(motorStopTimer);
-        motorStopTimer = null;
-    }
-    const generation = ++motorMotionGeneration;
-    motorMotionActive = true;
-    // Queue the start behind any in-flight command so a release cannot send
-    // stop before the start request reaches the controller.
-    motorCommandChain = motorCommandChain.then(function() {
-        if (generation !== motorMotionGeneration) return;
-        return setPatrolDir(dir);
-    });
-}
-
-function stopPatrolHold() {
-    if (!motorMotionActive) return;
-    motorMotionActive = false;
-    if (motorStopTimer) clearTimeout(motorStopTimer);
-    // Delay the stop long enough for very short taps to be collapsed into a
-    // single no-op by the generation guard instead of a start/stop pair.
-    motorStopTimer = window.setTimeout(function() {
-        motorStopTimer = null;
-        const generation = ++motorMotionGeneration;
-        motorCommandChain = motorCommandChain.then(function() {
-            if (generation !== motorMotionGeneration) return;
-            return setPatrolDir('stop');
-        });
-    }, 120);
 }
 
 function updatePanelMotionButtons(dir, pending) {
@@ -381,104 +414,135 @@ function setPanelMotionStatus(message, error) {
     status.className = 'panel-motion-status' + (error ? ' error' : '');
 }
 
-async function togglePanelMotion(direction) {
-    return setPanelMotion(direction, panelMotionDir !== direction);
-}
-
-function setPanelMotion(direction, enabled) {
-    if (panelMotionTimer) {
-        clearTimeout(panelMotionTimer);
-        panelMotionTimer = null;
-    }
-    const generation = ++panelMotionGeneration;
-    panelMotionChain = panelMotionChain.then(function() {
-        if (generation !== panelMotionGeneration) return;
-        const requestId = ++panelMotionRequestId;
-        updatePanelMotionButtons(enabled ? direction : null, true);
-        setPanelMotionStatus(enabled ? '正在发送控制面板指令...' : '正在发送停止指令...');
-        return apiPost('/control-panel/move', { direction: direction, enabled: enabled }).then(function(res) {
-            if (requestId !== panelMotionRequestId) return res;
-            if (!res || res.code !== 200) {
-                updatePanelMotionButtons(panelMotionDir, false);
-                setPanelMotionStatus((res && res.msg) || '控制面板指令失败', true);
-                panelMotionActive = false;
-                return res;
-            }
-            panelMotionDir = enabled ? direction : null;
-            panelMotionActive = enabled;
-            updatePanelMotionButtons(panelMotionDir, false);
-            setPanelMotionStatus(enabled ? (direction === 'forward' ? '控制面板上移中' : '控制面板下移中') : '控制面板已停止');
-            return res;
-        });
+function queuePanelMotion(direction, enabled) {
+    panelMotionChain = panelMotionChain.catch(function() {}).then(function() {
+        return setPanelMotion(direction, enabled);
     });
+    return panelMotionChain;
 }
 
-function startPanelMotionHold(direction) {
-    if (automaticPatrolRunning) return;
-    if (panelMotionTimer) {
-        clearTimeout(panelMotionTimer);
-        panelMotionTimer = null;
+async function setPanelMotion(direction, enabled) {
+    const requestId = ++panelMotionRequestId;
+    const previousDirection = panelMotionDir;
+    if (!enabled) setTwinAxisMotion('y', 'stop');
+    updatePanelMotionButtons(enabled ? direction : null, true);
+    setPanelMotionStatus(enabled ? '正在发送控制面板指令...' : '正在发送停止指令...');
+    const res = await apiPost('/control-panel/move', { direction: direction, enabled: enabled });
+    if (requestId !== panelMotionRequestId) return res;
+    if (!res || res.code !== 200) {
+        panelMotionDir = previousDirection;
+        setTwinAxisMotion('y', panelMotionDir || 'stop');
+        updatePanelMotionButtons(panelMotionDir, false);
+        setPanelMotionStatus((res && res.msg) || '控制面板指令失败', true);
+        return res;
     }
-    panelMotionActive = true;
-    setPanelMotion(direction, true);
+    panelMotionDir = enabled ? direction : null;
+    setTwinAxisMotion('y', panelMotionDir || 'stop');
+    refreshTwinState();
+    updatePanelMotionButtons(panelMotionDir, false);
+    setPanelMotionStatus(enabled ? (direction === 'forward' ? '控制面板上移中' : '控制面板下移中') : '控制面板已停止');
+    return res;
 }
 
-function stopPanelMotionHold(direction) {
-    if (!panelMotionActive) return;
-    panelMotionActive = false;
-    if (panelMotionTimer) clearTimeout(panelMotionTimer);
-    panelMotionTimer = window.setTimeout(function() {
-        panelMotionTimer = null;
-        setPanelMotion(direction || panelMotionDir || 'forward', false);
-    }, 120);
+function bindHoldControl(button, start, stop) {
+    let activeToken = null;
+
+    function begin(token) {
+        if (activeToken !== null || button.disabled || automaticPatrolRunning) return;
+        activeToken = token;
+        button.classList.add('held');
+        start();
+    }
+
+    function end(token) {
+        if (activeToken === null || (token !== undefined && token !== activeToken)) return;
+        activeToken = null;
+        button.classList.remove('held');
+        stop();
+    }
+
+    manualHoldReleases.add(function() { end(); });
+
+    button.addEventListener('pointerdown', function(event) {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        const token = 'pointer-' + event.pointerId;
+        begin(token);
+        try {
+            if (activeToken === token && button.setPointerCapture) button.setPointerCapture(event.pointerId);
+        } catch (ignored) {}
+    });
+    button.addEventListener('pointerup', function(event) {
+        event.preventDefault();
+        end('pointer-' + event.pointerId);
+    });
+    button.addEventListener('pointercancel', function(event) {
+        event.preventDefault();
+        end('pointer-' + event.pointerId);
+    });
+    button.addEventListener('lostpointercapture', function(event) {
+        end('pointer-' + event.pointerId);
+    });
+    button.addEventListener('keydown', function(event) {
+        if ((event.key !== ' ' && event.key !== 'Enter') || event.repeat) return;
+        event.preventDefault();
+        begin('key-' + event.key);
+    });
+    button.addEventListener('keyup', function(event) {
+        if (event.key !== ' ' && event.key !== 'Enter') return;
+        event.preventDefault();
+        end('key-' + event.key);
+    });
+    button.addEventListener('blur', function() { end(); });
+    button.addEventListener('click', function(event) { event.preventDefault(); });
+    button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
 }
 
-function bindMotorHoldControls() {
+function releaseAllManualHolds() {
+    manualHoldReleases.forEach(function(release) { release(); });
+}
+
+function bindMotorControls() {
     document.querySelectorAll('[data-motor-direction]').forEach(function(button) {
         const direction = button.dataset.motorDirection;
-        button.addEventListener('pointerdown', function(event) {
-            if (event.button !== undefined && event.button !== 0) return;
-            event.preventDefault();
-            if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
-            startPatrolHold(direction);
-        });
-        button.addEventListener('pointerup', function(event) {
-            event.preventDefault();
-            stopPatrolHold();
-        });
-        button.addEventListener('pointercancel', function(event) {
-            event.preventDefault();
-            stopPatrolHold();
-        });
-        button.addEventListener('lostpointercapture', function(event) {
-            event.preventDefault();
-            stopPatrolHold();
-        });
-        button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+        button.title = '按住' + (direction === 'left' ? '向左移动' : '向右移动') + '，松开停止';
+        bindHoldControl(button,
+            function() { queuePatrolDir(direction); },
+            function() { queuePatrolDir('stop'); });
     });
 
     document.querySelectorAll('[data-panel-direction]').forEach(function(button) {
         const direction = button.dataset.panelDirection;
-        button.addEventListener('pointerdown', function(event) {
-            if (event.button !== undefined && event.button !== 0) return;
-            event.preventDefault();
-            if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
-            startPanelMotionHold(direction);
-        });
-        button.addEventListener('pointerup', function(event) {
-            event.preventDefault();
-            stopPanelMotionHold(direction);
-        });
-        button.addEventListener('pointercancel', function(event) {
-            event.preventDefault();
-            stopPanelMotionHold(direction);
-        });
-        button.addEventListener('lostpointercapture', function(event) {
-            event.preventDefault();
-            stopPanelMotionHold(direction);
-        });
-        button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
+        button.title = '按住' + (direction === 'forward' ? '向上移动' : '向下移动') + '，松开停止';
+        bindHoldControl(button,
+            function() { queuePanelMotion(direction, true); },
+            function() { queuePanelMotion(direction, false); });
     });
+}
+
+async function stopAllManualMotion() {
+    const stopButton = document.getElementById('btn-stop');
+    if (stopButton) stopButton.disabled = true;
+    const railStop = motorCommandChain.catch(function() {}).then(function() {
+        return setPatrolDir('stop');
+    });
+    const panelStop = panelMotionChain.catch(function() {}).then(async function() {
+        const res = await apiPost('/control-panel/stop', {});
+        if (res && res.code === 200) {
+            panelMotionDir = null;
+            setTwinAxisMotion('y', 'stop');
+            updatePanelMotionButtons(null, false);
+            setPanelMotionStatus('控制面板已停止');
+            refreshTwinState();
+        } else {
+            setPanelMotionStatus((res && res.msg) || '控制面板停止失败', true);
+        }
+        return res;
+    });
+    motorCommandChain = railStop;
+    panelMotionChain = panelStop;
+    await Promise.all([railStop, panelStop]);
+    if (stopButton) stopButton.disabled = false;
 }
 
 async function loadControlPanelStatus() {
@@ -589,8 +653,33 @@ function bindPtzControls() {
         });
         button.addEventListener('contextmenu', function(event) { event.preventDefault(); });
     });
-    const stop = document.querySelector('[data-ptz-stop]');
-    if (stop) stop.addEventListener('click', function() { stopPtz(activePtzDirection, stop, false); });
+}
+
+function bindDeviceStatusToggle() {
+    const toggle = document.getElementById('device-status-toggle');
+    const panel = document.getElementById('patrol-device-status');
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function() {
+        const shouldOpen = panel.hidden;
+        panel.hidden = !shouldOpen;
+        toggle.classList.toggle('active', shouldOpen);
+        toggle.setAttribute('aria-expanded', String(shouldOpen));
+        toggle.setAttribute('aria-label', shouldOpen ? '隐藏设备状态' : '显示设备状态');
+        toggle.title = shouldOpen ? '隐藏设备状态' : '显示设备状态';
+    });
+}
+
+function togglePatrolResultsView(forceOpen) {
+    const sidebar = document.getElementById('patrol-sidebar');
+    const button = document.getElementById('patrol-results-toggle');
+    if (!sidebar || !button) return;
+    const open = typeof forceOpen === 'boolean' ? forceOpen
+        : !sidebar.classList.contains('results-expanded');
+    sidebar.classList.toggle('results-expanded', open);
+    button.setAttribute('aria-expanded', String(open));
+    button.querySelector('span').textContent = open ? '收起' : '查看';
+    button.querySelector('i').className = open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line';
+    if (open) sidebar.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 async function loadAutomaticPatrolPlans() {
@@ -625,26 +714,30 @@ async function loadAutomaticPatrolPlans() {
 }
 
 function updateAutomaticPatrolActions() {
-    const origin = document.getElementById('auto-patrol-origin-confirmed');
     const start = document.getElementById('auto-patrol-start');
+    const startOrb = document.getElementById('auto-patrol-orb');
     const stop = document.getElementById('auto-patrol-stop');
-    if (origin) origin.disabled = automaticPatrolRunning;
-    if (start) start.disabled = automaticPatrolRunning || !origin || !origin.checked;
+    const patrolBusy = automaticPatrolRunning || automaticPatrolAnalysisRunning;
+    if (start) start.disabled = patrolBusy;
+    if (startOrb) startOrb.disabled = patrolBusy;
     if (stop) stop.disabled = !automaticPatrolRunning;
     document.querySelectorAll('[data-motor-direction], [data-panel-direction], [data-ptz-direction], [data-ptz-stop]').forEach(function(button) {
-        button.disabled = automaticPatrolRunning;
+        const atRailLimit = button.dataset.motorDirection === 'left' && railAtLeftLimit;
+        button.disabled = automaticPatrolRunning || atRailLimit;
     });
     document.querySelectorAll('input[name="auto-patrol-plan"]').forEach(function(input) {
-        input.disabled = automaticPatrolRunning;
+        input.disabled = patrolBusy;
     });
     const quality = document.getElementById('camera-quality');
     const encode = document.getElementById('btn-encode');
     if (quality) quality.disabled = automaticPatrolRunning;
     if (encode) encode.disabled = automaticPatrolRunning;
+    updateRailResetButtonState();
 }
 
 function stopPatrolSpeechPlayback() {
     automaticPatrolSpeechGeneration++;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     if (automaticPatrolSpeechRequest) automaticPatrolSpeechRequest.abort();
     automaticPatrolSpeechRequest = null;
     if (automaticPatrolSpeechAudio) {
@@ -694,7 +787,19 @@ async function playNextPatrolSpeech() {
             if (playback && typeof playback.catch === 'function') playback.catch(reject);
         });
     } catch (error) {
-        if (!error || error.name !== 'AbortError') console.warn('巡检语音播报失败:', error);
+        if (!error || error.name !== 'AbortError') {
+            console.warn('讯飞巡检语音播报失败，改用浏览器语音:', error);
+            if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+                await new Promise(function(resolve) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN';
+                    utterance.rate = 0.95;
+                    utterance.onend = resolve;
+                    utterance.onerror = resolve;
+                    window.speechSynthesis.speak(utterance);
+                });
+            }
+        }
     } finally {
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         if (generation !== automaticPatrolSpeechGeneration) return;
@@ -718,71 +823,43 @@ function speakPatrolInstruction(text, interrupt) {
     playNextPatrolSpeech();
 }
 
-function patrolSpeechForStatus(data) {
-    const state = String(data.state || '');
-    const phase = String(data.phase || '');
-    if (state === 'FAILED') return '巡检发生异常，已执行紧急停止，请检查设备连接';
-    if (state === 'CANCELLED') return '自动巡检已停止，请重新确认设备位置后再启动';
-    if (state === 'STOPPING') return '收到急停指令，正在停止全部设备';
-    if (state === 'COMPLETED') return '自动巡检完成，设备已停止，当前位置已回到底部安全高度';
-    if (state === 'QUEUED') return '巡检任务已提交，正在准备设备';
-    if (/检查视频、MQTT和控制面板/.test(phase)) return '正在检查摄像头、轨道电机和升降控制面板，请稍候';
-    if (/控制设备已就绪/.test(phase)) return '设备检查完成，自动巡检准备就绪';
-
-    if (/巡检结束，下移返回底部安全高度/.test(phase)) return '蛇形扫描结束，升降电机启动，正在下移返回底部安全高度';
-    let match = phase.match(/向左步进到第(\d+)条扫描线/);
-    if (match) return '轨道电机启动，正在向左移动至第' + match[1] + '条扫描线';
-    match = phase.match(/第(\d+)条扫描线(底部|中点|顶部)抓拍/);
-    if (match) return '到达第' + match[1] + '条扫描线' + match[2] + '，正在抓拍巡检图像';
-    match = phase.match(/第(\d+)条扫描线上移至(中点|顶部)/);
-    if (match) return '升降电机启动，正在沿第' + match[1] + '条扫描线上移至' + match[2];
-    match = phase.match(/第(\d+)条扫描线下移至(中点|底部)/);
-    if (match) return '升降电机反向启动，正在沿第' + match[1] + '条扫描线下移至' + match[2];
-    match = phase.match(/第(\d+)条扫描线返回底部/);
-    if (match) return '升降电机反向启动，第' + match[1] + '条扫描线正在返回底部';
-    return phase;
+function closeAutomaticPatrolCompletion() {
+    const overlay = document.getElementById('automaticPatrolCompletion');
+    if (overlay) overlay.hidden = true;
 }
 
-function announceAutomaticPatrolStatus(data) {
-    if (!automaticPatrolSpeechEnabled || !data) return;
-    const phase = String(data.phase || '');
-    const state = String(data.state || '');
-    if (phase && phase !== automaticPatrolLastSpokenPhase) {
-        automaticPatrolLastSpokenPhase = phase;
-        speakPatrolInstruction(patrolSpeechForStatus(data), state === 'FAILED' || state === 'CANCELLED' || state === 'STOPPING');
-    }
-    if (state === automaticPatrolLastSpokenState) return;
-    automaticPatrolLastSpokenState = state;
-    if (!phase && state !== 'IDLE') {
-        speakPatrolInstruction(patrolSpeechForStatus(data), state === 'FAILED' || state === 'CANCELLED' || state === 'STOPPING');
-    }
+function showAutomaticPatrolCompletion(data) {
+    const overlay = document.getElementById('automaticPatrolCompletion');
+    if (!overlay) return;
+    const lines = document.getElementById('patrol-completion-lines');
+    const captures = document.getElementById('patrol-completion-captures');
+    const sprays = document.getElementById('patrol-completion-sprays');
+    if (lines) lines.textContent = Number(data.totalRows || 0);
+    if (captures) captures.textContent = Number(data.captureCount || 0);
+    if (sprays) sprays.textContent = Number(data.sprayCount || 0);
+    overlay.hidden = false;
+    const button = overlay.querySelector('button');
+    if (button) button.focus();
 }
 
 async function startAutomaticPatrol() {
-    const origin = document.getElementById('auto-patrol-origin-confirmed');
-    if (!origin || !origin.checked) {
-        window.alert('请先确认轨道位于右下安全起点');
-        return;
-    }
+    const originConfirmed = window.confirm('自动巡检必须从最右下机械原点开始。\n\n请确认摄像头轨道已经回到最右端、升降机构已经回到底部。');
+    if (!originConfirmed) return;
     unlockPatrolSpeechAudio();
+    stopPatrolSpeechPlayback();
     automaticPatrolSpeechEnabled = true;
-    automaticPatrolLastSpokenPhase = '';
-    automaticPatrolLastSpokenState = '';
-    const selectedPlan = document.querySelector('input[name="auto-patrol-plan"]:checked');
-    const selectedPlanName = selectedPlan && selectedPlan.closest('.auto-patrol-plan')
-        ? selectedPlan.closest('.auto-patrol-plan').querySelector('strong') : null;
-    speakPatrolInstruction('开始执行' + (selectedPlanName ? selectedPlanName.textContent : '自动巡检')
-        + '方案，请确保轨道和种植架周围无人', true);
+    automaticPatrolCompletionPending = false;
+    closeAutomaticPatrolCompletion();
     const res = await apiPost('/patrol/auto/start', {
         planId: selectedAutomaticPatrolPlan,
-        originConfirmed: true
+        originConfirmed: originConfirmed
     });
     if (!res || res.code !== 200) {
-        speakPatrolInstruction('自动巡检启动失败，请检查设备连接', true);
         automaticPatrolSpeechEnabled = false;
         window.alert((res && res.msg) || '自动巡检启动失败');
         return;
     }
+    automaticPatrolCompletionPending = true;
     automaticPatrolRunning = true;
     updateAutomaticPatrolActions();
     loadAutomaticPatrolStatus();
@@ -791,13 +868,14 @@ async function startAutomaticPatrol() {
 async function stopAutomaticPatrol() {
     const stop = document.getElementById('auto-patrol-stop');
     if (stop) stop.disabled = true;
-    speakPatrolInstruction('收到停止指令，正在停止轨道电机、升降电机和摄像云台', true);
+    automaticPatrolCompletionPending = false;
+    automaticPatrolSpeechEnabled = false;
+    automaticPatrolSpeechQueue = [];
+    stopPatrolSpeechPlayback();
     const res = await apiPost('/patrol/auto/stop', {});
     if (!res || res.code !== 200) {
         window.alert((res && res.msg) || '停止指令发送失败');
     }
-    const origin = document.getElementById('auto-patrol-origin-confirmed');
-    if (origin) origin.checked = false;
     loadAutomaticPatrolStatus();
 }
 
@@ -805,13 +883,25 @@ async function loadAutomaticPatrolStatus() {
     const res = await apiGet('/patrol/auto/status');
     if (!res || res.code !== 200 || !res.data) return;
     const data = res.data;
+    renderAutomaticPatrolResults(data);
     automaticPatrolRunning = !!data.running;
-    announceAutomaticPatrolStatus(data);
-    const stateClass = automaticPatrolRunning ? 'running'
+    automaticPatrolAnalysisRunning = data.analysisState === 'ANALYZING';
+    if (automaticPatrolRunning) automaticPatrolCompletionPending = true;
+    if (!automaticPatrolRunning && data.state === 'COMPLETED' && automaticPatrolCompletionPending) {
+        automaticPatrolCompletionPending = false;
+        showAutomaticPatrolCompletion(data);
+        speakPatrolInstruction('自动巡检已完成，设备已回到最下最右初始位置', true);
+    } else if (!automaticPatrolRunning && (data.state === 'FAILED' || data.state === 'CANCELLED')) {
+        automaticPatrolCompletionPending = false;
+        automaticPatrolSpeechEnabled = false;
+        automaticPatrolSpeechQueue = [];
+        stopPatrolSpeechPlayback();
+    }
+    const stateClass = (automaticPatrolRunning || automaticPatrolAnalysisRunning) ? 'running'
         : (data.state === 'COMPLETED' ? 'completed' : ((data.state === 'FAILED' || data.state === 'CANCELLED') ? 'error' : ''));
     const live = document.getElementById('auto-patrol-live');
     if (live) {
-        live.textContent = automaticPatrolRunning ? '运行中' : (data.state === 'COMPLETED' ? '已完成' : (data.state === 'FAILED' ? '异常' : (data.state === 'CANCELLED' ? '已停止' : '待命')));
+        live.textContent = automaticPatrolRunning ? '运行中' : (automaticPatrolAnalysisRunning ? '复核中' : (data.state === 'COMPLETED' ? '已完成' : (data.state === 'FAILED' ? '异常' : (data.state === 'CANCELLED' ? '已停止' : '待命'))));
         live.className = 'auto-patrol-live ' + stateClass;
     }
     const phase = document.getElementById('auto-patrol-phase');
@@ -845,12 +935,9 @@ async function loadAutomaticPatrolStatus() {
     if (patrolQuality && data.quality) {
         const width = Number(data.actualWidth || 0);
         const height = Number(data.actualHeight || 0);
-        patrolQuality.textContent = data.quality === '4k' && data.qualityVerified === true
-            && width === 3840 && height === 2160 ? '真实4K' : '4K待验证';
-    }
-    if (!automaticPatrolRunning && data.state === 'CANCELLED') {
-        const origin = document.getElementById('auto-patrol-origin-confirmed');
-        if (origin) origin.checked = false;
+        patrolQuality.textContent = width > 0 && height > 0
+            ? (width === 3840 && height === 2160 ? '真实4K' : width + '×' + height)
+            : (data.quality === '4k' ? '4K检测中' : '高清检测中');
     }
     applyRailLimitStatus(data);
     updateAutomaticPatrolActions();
@@ -864,7 +951,7 @@ async function loadPatrolRecords() {
     container.innerHTML = '';
     res.data.forEach(function(record) {
         const div = document.createElement('div');
-        div.style.cssText = 'min-width:140px;height:90px;border-radius:8px;overflow:hidden;position:relative;border:1px solid rgba(30,60,100,0.3);cursor:pointer;flex-shrink:0;';
+        div.style.cssText = 'min-width:140px;height:90px;border-radius:8px;overflow:hidden;position:relative;border:1px solid rgba(0,255,170,0.3);cursor:pointer;flex-shrink:0;';
         if (record.imageUrl) {
             div.innerHTML = '<img src="' + record.imageUrl + '" style="width:100%;height:100%;object-fit:cover;">'
                 + '<div style="position:absolute;bottom:0;left:0;right:0;padding:3px 6px;background:rgba(0,0,0,0.7);font-size:10px;color:#aab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
@@ -874,7 +961,7 @@ async function loadPatrolRecords() {
             }
             div.onclick = function() { viewPatrolRecord(record); };
         } else {
-            div.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a1f2e,#0d2a3a);"><i class="ri-image-line" style="font-size:28px;color:#1e3550;"></i></div>';
+            div.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#001428,#001a2e);"><i class="ri-image-line" style="font-size:28px;color:#003060;"></i></div>';
         }
         container.appendChild(div);
     });
@@ -882,8 +969,8 @@ async function loadPatrolRecords() {
         for (var i = 0; i < 3; i++) {
             var ph = document.createElement('div');
             ph.className = 'record-placeholder';
-            ph.style.cssText = 'min-width:140px;height:90px;background:linear-gradient(135deg,#0a1f2e,#0d2a3a);border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(30,60,100,0.3);';
-            ph.innerHTML = '<i class="ri-image-line" style="font-size:28px;color:#1e3550;"></i>';
+            ph.style.cssText = 'min-width:140px;height:90px;background:linear-gradient(135deg,#001428,#001a2e);border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,255,170,0.3);';
+            ph.innerHTML = '<i class="ri-image-line" style="font-size:28px;color:#003060;"></i>';
             container.appendChild(ph);
         }
     }
@@ -1105,6 +1192,7 @@ function destroyCameraPlayer() {
     var video = document.getElementById('video-player');
     if (video) {
         video.onplaying = null;
+        video.onended = null;
         video.onerror = null;
         video.onstalled = null;
         video.onwaiting = null;
@@ -1188,7 +1276,7 @@ function drawRealtimeDetections(data) {
     }
     var scaleX = displayWidth / Number(data.width);
     var scaleY = displayHeight / Number(data.height);
-    (data.detections || []).forEach(function(detection) {
+    (data.candidates || data.detections || []).forEach(function(detection) {
         var box = detection.box || [];
         if (box.length !== 4) return;
         var x = offsetX + Number(box[0]) * scaleX;
@@ -1196,10 +1284,14 @@ function drawRealtimeDetections(data) {
         var width = (Number(box[2]) - Number(box[0])) * scaleX;
         var height = (Number(box[3]) - Number(box[1])) * scaleY;
         var score = (Number(detection.confidence || 0) * 100).toFixed(1) + '%';
-        var label = '黑天牛 ' + score;
+        var confirmed = detection.confirmed === true;
+        var hits = Number(detection.hits || 0);
+        var requiredHits = Number(detection.requiredHits || 0);
+        var label = confirmed ? '已确认 黑天牛 ' + score
+                : '待复核 ' + hits + '/' + requiredHits + ' ' + score;
         context.lineWidth = Math.max(2, Math.min(4, cssWidth / 280));
-        context.strokeStyle = '#ff365c';
-        context.shadowColor = 'rgba(255,54,92,.85)';
+        context.strokeStyle = confirmed ? '#ff4d4f' : '#ffb020';
+        context.shadowColor = confirmed ? 'rgba(255,77,79,.85)' : 'rgba(255,176,32,.72)';
         context.shadowBlur = 8;
         context.strokeRect(x, y, width, height);
         context.shadowBlur = 0;
@@ -1207,26 +1299,233 @@ function drawRealtimeDetections(data) {
         var labelWidth = context.measureText(label).width + 14;
         var labelHeight = 25;
         var labelY = Math.max(0, y - labelHeight);
-        context.fillStyle = 'rgba(218,18,54,.94)';
+        context.fillStyle = confirmed ? 'rgba(218,18,54,.94)' : 'rgba(154,91,0,.94)';
         context.fillRect(x, labelY, labelWidth, labelHeight);
         context.fillStyle = '#fff';
         context.fillText(label, x + 7, labelY + 17);
     });
 }
 
-function showRealtimeAlert(data) {
+function showRealtimeAlert(data, frame) {
     var banner = document.getElementById('realtime-alert-banner');
     var detail = document.getElementById('realtime-alert-detail');
-    if (!banner || Date.now() - realtimeAlertDismissedAt < 10000) return;
     var detections = data.detections || [];
     var maxConfidence = detections.reduce(function(maximum, detection) {
         return Math.max(maximum, Number(detection.confidence || 0));
     }, 0);
-    if (detail) detail.textContent = '检测到 ' + detections.length + ' 个目标，最高置信度 '
-            + (maxConfidence * 100).toFixed(1) + '%';
+    var maximumAverageConfidence = detections.reduce(function(maximum, detection) {
+        return Math.max(maximum, Number(detection.averageConfidence || 0));
+    }, 0);
+    realtimeDetectionSnapshot = frame && frame.image ? 'data:image/jpeg;base64,' + frame.image : realtimeDetectionSnapshot;
+    if (!banner || Date.now() - realtimeAlertDismissedAt < 10000) return;
+    if (detail) detail.textContent = '多帧确认 ' + detections.length + ' 个目标，平均置信度最高 '
+            + (maximumAverageConfidence * 100).toFixed(1) + '%（当前帧 '
+            + (maxConfidence * 100).toFixed(1) + '%）';
     banner.hidden = false;
     realtimeLastDetectionAt = Date.now();
     if (!realtimeWasDetected || Date.now() - realtimeLastSoundAt > 15000) playRealtimeWarningSound();
+}
+
+function realtimeDetectionName(detections) {
+    var rawName = detections.length ? String(detections[0].class || '') : '';
+    var normalized = rawName.toLowerCase().replace(/[\s_-]+/g, '');
+    if (!rawName || normalized.indexOf('longhorn') >= 0 || normalized.indexOf('blackbeetle') >= 0) {
+        return '黑天牛';
+    }
+    return rawName;
+}
+
+function formatRealtimeResultTime(value) {
+    var date = new Date(Number(value) || Date.now());
+    var pad = function(number) { return String(number).padStart(2, '0'); };
+    return pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' '
+            + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+}
+
+function renderAutomaticPatrolResults(data) {
+    var container = document.getElementById('patrol-realtime-results');
+    if (!container) return;
+    var analysisState = String(data.analysisState || 'IDLE');
+    var results = Array.isArray(data.analysisResults) ? data.analysisResults : [];
+    var signature = JSON.stringify([data.state, analysisState, data.analysisProgress, results]);
+    if (signature === patrolResultSignature) return;
+    patrolResultSignature = signature;
+    patrolTaskResults = results;
+    container.replaceChildren();
+    container.classList.toggle('has-results', results.length > 0);
+    var badge = document.getElementById('patrol-results-state');
+    if (badge) {
+        badge.className = analysisState.toLowerCase();
+        badge.innerHTML = '<i></i>' + (analysisState === 'ANALYZING' ? '复核中'
+                : analysisState === 'COMPLETED' ? '已生成'
+                : analysisState === 'FAILED' ? '分析异常'
+                : data.running ? '巡检中' : '待巡检');
+    }
+    if (data.running) {
+        appendPatrolResultEmpty(container, 'ri-camera-lens-line', '巡检任务进行中',
+                '采集照片将在设备返回并停止后统一分析');
+        return;
+    }
+    if (analysisState === 'ANALYZING') {
+        appendPatrolResultEmpty(container, 'ri-loader-4-line patrol-result-spinner', '正在多帧复核',
+                '已完成 ' + Number(data.analysisProgress || 0) + '%，设备当前已安全停止');
+        return;
+    }
+    if (analysisState === 'FAILED') {
+        appendPatrolAnalysisFailure(container, data.warning);
+        return;
+    }
+    if (!results.length) {
+        var completed = analysisState === 'COMPLETED';
+        appendPatrolResultEmpty(container, completed ? 'ri-shield-check-line' : 'ri-image-search-line',
+                completed ? '未发现明确虫害' : '等待巡检任务',
+                completed ? '所有采集点均已通过多帧复核' : '任务结束后将对照片进行多帧复核');
+        return;
+    }
+    updateExpandedPatrolResult(results[0]);
+    results.forEach(function(result, index) {
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'patrol-result-item confirmed';
+        item.setAttribute('aria-label', '查看' + result.plant + result.name + '巡检结果');
+        item.addEventListener('click', function() { openPatrolTaskResult(index); });
+
+        var image = document.createElement('img');
+        image.src = result.focusImage || result.image;
+        image.alt = result.plant + result.name + '标注图片';
+
+        var copy = document.createElement('div');
+        var title = document.createElement('strong');
+        title.textContent = result.name + (Number(result.count || 0) > 1 ? ' ×' + result.count : '');
+        var plant = document.createElement('span');
+        plant.textContent = result.plant;
+        var evidence = document.createElement('span');
+        evidence.textContent = Number(result.hits || 0) + '/' + Number(result.frames || 0)
+                + '帧确认 · ' + (Number(result.confidence || 0) * 100).toFixed(1) + '%';
+        copy.append(title, plant, evidence);
+
+        var location = document.createElement('time');
+        location.textContent = result.location || result.capturedAt || '';
+        var level = document.createElement('b');
+        level.textContent = '已确认';
+        item.append(image, copy, location, level);
+        container.appendChild(item);
+    });
+}
+
+function updateExpandedPatrolResult(result) {
+    if (!result) return;
+    var name = String(result.name || '未知害虫');
+    var image = document.getElementById('patrol-expanded-image');
+    var source = result.focusImage || result.image;
+    if (image && source) {
+        image.src = source;
+        image.alt = '巡检识别到的' + name + '害虫截图';
+    }
+    var values = {
+        'patrol-expanded-name': name,
+        'patrol-expanded-count': String(Number(result.count || 1)),
+        'patrol-expanded-confidence': (Number(result.confidence || 0) * 100).toFixed(1) + '%',
+        'patrol-expanded-caption': String(result.plant || '巡检摄像头') + ' · ' + String(result.location || '识别截图'),
+        'patrol-expanded-time': String(result.capturedAt || '').split(' ').pop() || '刚刚',
+        'patrol-expanded-advice': '立即隔离受害枝条，安排人工捕捉，并对相邻植株进行重点复检',
+        'patrol-expanded-warning': '检测到' + name + '，建议立即处理并复核相邻植株'
+    };
+    Object.keys(values).forEach(function(id) {
+        var element = document.getElementById(id);
+        if (element) element.textContent = values[id];
+    });
+}
+
+function appendPatrolAnalysisFailure(container, warning) {
+    var empty = document.createElement('div');
+    empty.className = 'patrol-results-empty patrol-results-failed';
+    var detail = String(warning || '').replace(/^.*照片分析失败[：:]?/, '') || '检测服务暂时不可用';
+    var icon = document.createElement('i');
+    icon.className = 'ri-error-warning-line';
+    var title = document.createElement('strong');
+    title.textContent = '照片分析异常';
+    var message = document.createElement('span');
+    message.textContent = detail;
+    var retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'patrol-analysis-retry';
+    retry.innerHTML = '<i class="ri-refresh-line"></i><span>重新分析最近照片</span>';
+    retry.addEventListener('click', retryLatestPatrolAnalysis);
+    empty.append(icon, title, message, retry);
+    container.appendChild(empty);
+}
+
+async function retryLatestPatrolAnalysis(event) {
+    var button = event && event.currentTarget;
+    if (button) button.disabled = true;
+    var response = await apiPost('/patrol/auto/analyze/retry', {});
+    if (!response || response.code !== 200) {
+        if (button) button.disabled = false;
+        window.alert((response && response.msg) || '重新分析失败');
+        return;
+    }
+    patrolResultSignature = '';
+    loadAutomaticPatrolStatus();
+}
+
+function appendPatrolResultEmpty(container, icon, title, detail) {
+        var empty = document.createElement('div');
+        empty.className = 'patrol-results-empty';
+        empty.innerHTML = '<i class="' + icon + '"></i><strong>' + title + '</strong><span>' + detail + '</span>';
+        container.appendChild(empty);
+}
+
+function openPatrolTaskResult(index) {
+    var result = patrolTaskResults[index];
+    if (!result) return;
+    var title = document.getElementById('patrol-warning-modal-title');
+    var warningText = document.getElementById('patrol-warning-text');
+    var gallery = document.getElementById('patrol-warning-images');
+    if (title) title.textContent = result.name + ' · ' + result.plant + ' · ' + result.location;
+    if (warningText) warningText.textContent = '巡检任务多帧复核确认发现' + result.name;
+    if (gallery) {
+        gallery.replaceChildren();
+        var appendResultImage = function(src, alt, caption) {
+            if (!src) return;
+            var figure = document.createElement('figure');
+            var image = document.createElement('img');
+            image.src = src;
+            image.alt = alt;
+            figure.appendChild(image);
+            if (caption) {
+                var figcaption = document.createElement('figcaption');
+                figcaption.textContent = caption;
+                figure.appendChild(figcaption);
+            }
+            gallery.appendChild(figure);
+        };
+        appendResultImage(result.focusImage || result.image,
+                result.plant + result.name + '虫体聚焦标注图片', '虫体聚焦图');
+        if (result.image && result.image !== result.focusImage) {
+            appendResultImage(result.image, result.plant + result.name + '完整标注图片', '完整巡检画面');
+        }
+    }
+    openPatrolWarning();
+}
+
+function openRealtimeDetectionAlert(event) {
+    if (event && event.target && event.target.closest('button')) return;
+    var title = document.getElementById('patrol-warning-modal-title');
+    var warningText = document.getElementById('patrol-warning-text');
+    var gallery = document.getElementById('patrol-warning-images');
+    if (title) title.textContent = '实时虫害识别告警';
+    if (warningText) warningText.textContent = 'AI轨道巡检经多帧复核确认黑天牛';
+    if (gallery && realtimeDetectionSnapshot) {
+        gallery.innerHTML = '<img src="' + realtimeDetectionSnapshot + '" alt="AI轨道巡检自动截取的虫害画面">';
+    }
+    openPatrolWarning();
+}
+
+function handleRealtimeAlertKey(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openRealtimeDetectionAlert(event);
 }
 
 function playRealtimeWarningSound() {
@@ -1291,7 +1590,7 @@ async function runRealtimeDetection() {
     try {
         var response = await apiPost('/patrol/realtime-detect', {
             image: frame.image,
-            confidence: 0.25,
+            streamId: realtimeDetectionStreamId,
             location: getTrackPosition() || 'AI轨道巡检摄像头'
         });
         if (!response || response.code !== 200 || !response.data) {
@@ -1300,9 +1599,13 @@ async function runRealtimeDetection() {
         realtimeDetectionErrors = 0;
         drawRealtimeDetections(response.data);
         var detected = !!response.data.detected;
+        var verification = response.data.verification || {};
         if (detected) {
-            setRealtimeDetectionStatus('detected', '发现 ' + response.data.count + ' 个目标');
-            showRealtimeAlert(response.data);
+            setRealtimeDetectionStatus('detected', '多帧确认 ' + response.data.count + ' 个');
+            showRealtimeAlert(response.data, frame);
+        } else if (Number(response.data.candidateCount || 0) > 0) {
+            setRealtimeDetectionStatus('warming', '复核中 ' + Number(verification.maximumHits || 0)
+                    + '/' + Number(verification.requiredHits || 0));
         } else {
             setRealtimeDetectionStatus('running', '监测中 · 未发现');
             var banner = document.getElementById('realtime-alert-banner');
@@ -1322,8 +1625,8 @@ async function runRealtimeDetection() {
 }
 
 function toggleRealtimeDetection() {
-    if (!realtimeDetectionEnabled) {
-        setRealtimeDetectionStatus('', '监测已关闭');
+    if (!realtimeDetectionAvailable) {
+        setRealtimeDetectionStatus('error', '模型未启用');
         return;
     }
     realtimeDetectionEnabled = !realtimeDetectionEnabled;
@@ -1369,16 +1672,16 @@ function startCameraWatchdog(video) {
 
 function startLiveLatencyMonitor(video) {
     if (cameraLatencyTimer) clearInterval(cameraLatencyTimer);
-    // A live stream should not silently build a multi-second buffer after a
-    // brief network stall. Catch up only when the buffered tail is clearly
-    // stale, avoiding constant seeks during normal playback.
+    // Gently recover normal drift. Hard seeking every few seconds is visible
+    // as a freeze, so reserve it for genuinely stale playback.
     cameraLatencyTimer = window.setInterval(function() {
         if (!video || video.paused || video.seeking || video.readyState < 3 || !video.buffered.length) return;
         const end = video.buffered.end(video.buffered.length - 1);
         const lag = end - video.currentTime;
-        if (lag > 2.5) {
-            video.currentTime = Math.max(0, end - 0.35);
-        }
+        // hls.js owns live latency; a second seek loop drains its safety buffer.
+        if (__hlsPlayer) return;
+        if (lag > 12) video.currentTime = Math.max(0, end - 4);
+        video.playbackRate = lag > 6 ? 1.02 : 1;
     }, 1000);
 }
 
@@ -1711,17 +2014,20 @@ async function initCamera(protocolOverride) {
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 __hlsPlayer = new Hls({
                     enableWorker: true,
-                    lowLatencyMode: true,
-                    backBufferLength: 10,
-                    maxBufferLength: 4,
-                    maxMaxBufferLength: 6,
-                    liveSyncDurationCount: 1,
-                    liveMaxLatencyDurationCount: 3,
-                    maxLiveSyncPlaybackRate: 1.2,
+                    lowLatencyMode: false,
+                    backBufferLength: 12,
+                    maxBufferLength: 12,
+                    maxMaxBufferLength: 20,
+                    liveSyncDurationCount: 3,
+                    liveMaxLatencyDurationCount: 8,
+                    maxLiveSyncPlaybackRate: 1.02,
                     // Never let a cached playlist keep the player on a stale
                     // sequence after the bridge has restarted.
-                    xhrSetup: function(xhr) {
-                        xhr.setRequestHeader('Cache-Control', 'no-cache');
+                    xhrSetup: function(xhr, url) {
+                        var streamOrigin = new URL(url, window.location.href).origin;
+                        if (streamOrigin === window.location.origin) {
+                            xhr.setRequestHeader('Cache-Control', 'no-cache');
+                        }
                     },
                     manifestLoadingMaxRetry: 3,
                     fragLoadingMaxRetry: 3,
@@ -1795,6 +2101,12 @@ async function initCamera(protocolOverride) {
         video.onplaying = markCameraPlaying;
         video.onloadeddata = markCameraPlaying;
         video.oncanplay = markCameraPlaying;
+        video.onended = function() {
+            patrolVideoReady = false;
+            setCameraStatus('loading', '视频流已结束，正在重新连接');
+            showCameraPlaceholder('正在重新获取萤石实时画面');
+            scheduleCameraRecovery(2500, cameraPreferredProtocol);
+        };
         video.onerror = function() {
             patrolVideoReady = false;
             setCameraStatus('error', '视频流播放失败，请检查摄像头编码和网络');
@@ -1928,14 +2240,18 @@ window.addEventListener('DOMContentLoaded', function() {
     apiGet('/patrol/realtime-detect/status').then(function(response) {
         if (response && response.code === 200 && response.data) {
             realtimeDetectionInterval = Math.max(500, Math.min(5000, Number(response.data.intervalMs || 1000)));
-            realtimeDetectionEnabled = response.data.enabled === true;
+            realtimeDetectionAvailable = response.data.enabled === true;
+            realtimeDetectionEnabled = realtimeDetectionAvailable;
             var detectButton = document.getElementById('realtime-detect-toggle');
             if (detectButton) {
+                detectButton.disabled = !realtimeDetectionAvailable;
+                detectButton.onclick = toggleRealtimeDetection;
                 detectButton.classList.toggle('active', realtimeDetectionEnabled);
                 detectButton.setAttribute('aria-pressed', realtimeDetectionEnabled ? 'true' : 'false');
                 detectButton.innerHTML = '<i class="ri-radar-line"></i><span>虫害监测 ' + (realtimeDetectionEnabled ? '开' : '已关闭') + '</span>';
             }
-            setRealtimeDetectionStatus(realtimeDetectionEnabled ? 'warming' : '', realtimeDetectionEnabled ? '模型待加载' : '监测已关闭');
+            setRealtimeDetectionStatus(realtimeDetectionEnabled ? 'warming' : 'error',
+                    realtimeDetectionEnabled ? '多帧模型待加载' : '模型未启用');
         }
         if (realtimeDetectionEnabled) scheduleRealtimeDetection(500);
     });
@@ -1948,8 +2264,9 @@ window.addEventListener('DOMContentLoaded', function() {
     if (aiBtn) {
         aiBtn.addEventListener('click', triggerAiCapture);
     }
-    bindMotorHoldControls();
+    bindMotorControls();
     bindPtzControls();
+    bindDeviceStatusToggle();
     loadControlPanelStatus();
     window.setInterval(loadControlPanelStatus, 15000);
     var warningOverlay = document.getElementById('patrolWarningOverlay');
@@ -1982,7 +2299,9 @@ window.addEventListener('pageshow', function (event) {
     if (event.persisted) initCamera();
 });
 window.addEventListener('visibilitychange', function() {
-    if (!document.hidden && Date.now() - cameraLastProgressAt > 15000) initCamera(cameraPreferredProtocol);
+    if (document.hidden) releaseAllManualHolds();
+    else if (Date.now() - cameraLastProgressAt > 15000) initCamera(cameraPreferredProtocol);
 });
+window.addEventListener('blur', releaseAllManualHolds);
 window.addEventListener('pagehide', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); releaseVoiceMicrophone(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });
 window.addEventListener('beforeunload', function() { stopPtz(activePtzDirection); destroyCameraPlayer(); releaseVoiceMicrophone(); if (realtimeDetectionTimer) clearTimeout(realtimeDetectionTimer); });

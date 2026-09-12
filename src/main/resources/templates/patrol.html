@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jhds - AI轨道巡检</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/common.css}">
-    <link rel="stylesheet" th:href="@{/css/patrol.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
+    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260912-auto-spray-return-v1')}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
     <script th:src="@{/js/lib/hls.min.js}"></script>
+    <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='1')}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
+    <script th:src="@{/js/vendor/greenhouse-3d.js}"></script>
 </head>
 <body>
     <div th:replace="fragments/header::header('patrol')"></div>
@@ -28,15 +31,20 @@
 
                     </div>
                     <div class="patrol-video-main">
-                        <div class="patrol-scan-line"></div>
-                        <video id="video-player" class="patrol-video-player" autoplay playsinline crossorigin="anonymous" draggable="false"></video>
-                        <canvas id="realtime-detection-canvas" class="realtime-detection-canvas" aria-hidden="true"></canvas>
-                        <div class="realtime-alert-banner" id="realtime-alert-banner" role="alert" hidden>
-                            <i class="ri-alarm-warning-fill"></i>
-                            <div><strong>发现疑似黑天牛</strong><span id="realtime-alert-detail">请立即复核现场画面</span></div>
-                            <button type="button" onclick="dismissRealtimeAlert()" aria-label="关闭警告"><i class="ri-close-line"></i></button>
+                        <div class="patrol-video-stage">
+                            <div class="patrol-scan-line"></div>
+                            <video id="video-player" class="patrol-video-player" autoplay playsinline crossorigin="anonymous" draggable="false"></video>
+                            <canvas id="realtime-detection-canvas" class="realtime-detection-canvas" aria-hidden="true"></canvas>
+                            <div class="realtime-alert-banner" id="realtime-alert-banner" role="button" tabindex="0" onclick="openRealtimeDetectionAlert(event)" onkeydown="handleRealtimeAlertKey(event)" hidden>
+                                <i class="ri-alarm-warning-fill"></i>
+                                <div><strong>多帧确认发现黑天牛</strong><span id="realtime-alert-detail">请立即复核现场画面</span></div>
+                                <button type="button" onclick="event.stopPropagation();dismissRealtimeAlert()" aria-label="关闭警告"><i class="ri-close-line"></i></button>
+                            </div>
+                            <div class="video-placeholder patrol-video-fallback" id="video-placeholder">
+                                <img th:src="@{/images/greenhouse-device-reference.jpg}" alt="温室轨道设备现场画面">
+                                <div class="patrol-video-fallback-copy"><i class="ri-camera-lens-line"></i><strong>AI轨道巡检实时画面</strong><p id="video-placeholder-message">正在检查萤石摄像头连接</p></div>
+                            </div>
                         </div>
-                        <div class="video-placeholder" id="video-placeholder"><i class="ri-camera-lens-line" style="font-size:64px;"></i><p>AI轨道巡检实时画面</p><p id="video-placeholder-message" style="font-size:11px; margin-top:4px; color:var(--text-dim);">正在检查萤石摄像头连接</p></div>
                         <div class="camera-stream-tools">
                             <button class="ctrl-btn encode" id="btn-encode" onclick="changeEncodeType()"><i class="ri-settings-4-line"></i>H.264 默认</button>
                             <label class="camera-quality-control" for="camera-quality">
@@ -58,72 +66,104 @@
                             <button type="button" class="video-view-btn" onclick="adjustCameraZoom(0.1)" title="放大画面" aria-label="放大画面"><i class="ri-zoom-in-line"></i></button>
                             <button type="button" class="video-view-btn" onclick="resetCameraZoom()" title="恢复画面比例" aria-label="恢复画面比例"><i class="ri-refresh-line"></i></button>
                         </div>
-                    </div>
-                    <div class="patrol-control-cards">
-                        <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
-                            <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><span class="panel-motion-connection" id="panel-motion-connection">控制面板检查中</span></div>
-                            <div class="motor-direction-grid">
-                                <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false"><i class="ri-arrow-left-line"></i><span>左移</span></button>
-                                <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false"><i class="ri-arrow-right-line"></i><span>右移</span></button>
-                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-forward" data-panel-direction="forward" aria-pressed="false"><i class="ri-arrow-up-line"></i><span>上移</span></button>
-                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-backward" data-panel-direction="backward" aria-pressed="false"><i class="ri-arrow-down-line"></i><span>下移</span></button>
-                            </div>
-                            <div class="control-card-actions">
-                                <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="setPatrolDir('stop')"><i class="ri-pause-circle-line"></i><span>停止电机</span></button>
-                                <button type="button" class="ctrl-btn" id="btn-ai-capture"><i class="ri-camera-2-line"></i><span>AI拍照识别</span></button>
-                            </div>
-                            <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>
-                            <div class="panel-motion-status" id="panel-motion-status" aria-live="polite">控制面板待命</div>
-                        </section>
-                        <section class="patrol-control-card ptz-controls" aria-label="摄像头云台控制">
-                            <div class="control-card-heading"><i class="ri-focus-3-line"></i><span>摄像头云台</span><span class="ptz-status" id="ptz-status" aria-live="polite">云台待命</span></div>
-                            <label class="ptz-speed-label">速度<select id="ptz-speed" class="ptz-speed"><option value="0">慢</option><option value="1" selected>中</option><option value="2">快</option></select></label>
+                        <div class="patrol-video-ptz" aria-label="摄像头方向控制">
                             <div class="ptz-pad">
                                 <span></span><button type="button" class="ptz-btn" data-ptz-direction="0" aria-label="云台上移" title="上移"><i class="ri-arrow-up-line"></i></button><span></span>
-                                <button type="button" class="ptz-btn" data-ptz-direction="2" aria-label="云台左移" title="左移"><i class="ri-arrow-left-line"></i></button><button type="button" class="ptz-btn ptz-stop" data-ptz-stop aria-label="停止云台" title="停止"><i class="ri-stop-circle-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="3" aria-label="云台右移" title="右移"><i class="ri-arrow-right-line"></i></button>
+                                <button type="button" class="ptz-btn" data-ptz-direction="2" aria-label="云台左移" title="左移"><i class="ri-arrow-left-line"></i></button><span></span><button type="button" class="ptz-btn" data-ptz-direction="3" aria-label="云台右移" title="右移"><i class="ri-arrow-right-line"></i></button>
                                 <span></span><button type="button" class="ptz-btn" data-ptz-direction="1" aria-label="云台下移" title="下移"><i class="ri-arrow-down-line"></i></button><span></span>
                             </div>
-                            <div class="ptz-extra"><button type="button" class="ptz-btn" data-ptz-direction="8" aria-label="放大" title="放大"><i class="ri-zoom-in-line"></i></button><button type="button" class="ptz-btn" data-ptz-direction="9" aria-label="缩小" title="缩小"><i class="ri-zoom-out-line"></i></button></div>
+                        </div>
+                    </div>
+                    <div class="patrol-control-cards">
+                        <section class="patrol-autostart-card" aria-label="自动巡检启动">
+                            <div class="patrol-autostart-content">
+                                <span class="auto-patrol-live" id="auto-patrol-live" hidden>待命</span>
+                                <div class="auto-patrol-plans" id="auto-patrol-plans"><div class="auto-patrol-loading">正在读取巡检方案</div></div>
+                                <div class="auto-patrol-status" aria-live="polite"><div class="auto-patrol-phase"><span id="auto-patrol-phase">等待开始</span><strong id="auto-patrol-progress-text">0%</strong></div><div class="auto-patrol-progress"><span id="auto-patrol-progress-bar"></span></div><div class="auto-patrol-metrics"><span><i class="ri-layout-row-line"></i><b id="auto-patrol-row">0/0</b> 扫描线</span><span><i class="ri-camera-line"></i><b id="auto-patrol-captures">0</b> 张</span><span><i class="ri-4k-line"></i><b id="auto-patrol-quality">4K待验证</b> 抓拍</span></div><div class="auto-patrol-output" id="auto-patrol-output" title="">保存目录检查中</div><div class="auto-patrol-message" id="auto-patrol-message" hidden></div></div>
+                                <button type="button" class="btn-primary" id="auto-patrol-start" onclick="startAutomaticPatrol()" disabled hidden><i class="ri-play-fill"></i>开始巡检</button>
+                            </div>
+                            <button type="button" class="patrol-start-orb" id="auto-patrol-orb" onclick="startAutomaticPatrol()" title="开始自动巡检"><i class="ri-play-fill"></i></button>
+                            <button type="button" class="auto-patrol-stop" id="auto-patrol-stop" onclick="stopAutomaticPatrol()" disabled><i class="ri-stop-fill"></i>紧急停止</button>
+                        </section>
+                        <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
+                            <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><button type="button" class="rail-limit-reset" id="rail-limit-reset" onclick="resetRailSoftLimit()" title="在最右端原点重置软限位" aria-label="重置轨道软限位"><i class="ri-restart-line"></i></button><span class="panel-motion-connection" id="panel-motion-connection">设备链路检查中</span></div>
+                            <div class="motor-direction-grid">
+                                <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" aria-label="按住向左移动，松开停止"><i class="ri-arrow-left-line"></i><span>左移</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" aria-label="按住向右移动，松开停止"><i class="ri-arrow-right-line"></i><span>右移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-forward" data-panel-direction="forward" aria-pressed="false" aria-label="按住向上移动，松开停止"><i class="ri-arrow-up-line"></i><span>上移</span></button>
+                                <button type="button" class="ctrl-btn panel-motion-btn" id="btn-panel-backward" data-panel-direction="backward" aria-pressed="false" aria-label="按住向下移动，松开停止"><i class="ri-arrow-down-line"></i><span>下移</span></button>
+                            </div>
+                            <div class="control-card-actions">
+                                <button type="button" class="ctrl-btn stop" id="btn-stop" onclick="stopAllManualMotion()"><i class="ri-pause-circle-line"></i><span>停止电机</span></button>
+                                <button type="button" class="ctrl-btn" id="btn-ai-capture" hidden><i class="ri-camera-2-line"></i><span>AI拍照识别</span></button>
+                            </div>
+                            <div class="motor-status-row">
+                                <div class="motor-control-status" id="motor-control-status" aria-live="polite">轨道电机待命</div>
+                                <div class="panel-motion-status" id="panel-motion-status" aria-live="polite">纵向电机待命</div>
+                            </div>
                         </section>
                     </div>
                 </div>
             </div>
-            <div class="patrol-sidebar">
-                <div class="card auto-patrol-card">
-                    <div class="card-header"><i class="ri-route-line"></i><span>自动巡检方案</span><span class="auto-patrol-live" id="auto-patrol-live">待命</span></div>
-                    <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
-                        <i class="ri-alarm-warning-line"></i>
-                        <span id="patrol-warning-text">⚠️花朵数量严重超标！</span>
-                        <i class="ri-arrow-right-s-line"></i>
-                    </button>
-                    <div class="auto-patrol-body">
-                        <div class="auto-patrol-plans" id="auto-patrol-plans">
-                            <div class="auto-patrol-loading">正在读取巡检方案</div>
+            <div class="patrol-sidebar" id="patrol-sidebar">
+                <div class="card twin-card">
+                    <div class="card-header"><i class="ri-cube-line"></i><span>设备3D模型</span><span data-twin-connection>连接中</span></div>
+                    <div class="twin-viewport">
+                        <div class="twin-render-host" id="patrol-twin" role="img" aria-label="温室轨道设备三维模型">
+                            <img class="twin-fallback-source" th:src="@{/images/greenhouse-device-reference.jpg}" alt="温室轨道设备现场图" hidden>
                         </div>
-                        <div class="auto-patrol-status" aria-live="polite">
-                            <div class="auto-patrol-phase"><span id="auto-patrol-phase">等待开始</span><strong id="auto-patrol-progress-text">0%</strong></div>
-                            <div class="auto-patrol-progress"><span id="auto-patrol-progress-bar"></span></div>
-                            <div class="auto-patrol-metrics">
-                                <span><i class="ri-layout-row-line"></i><b id="auto-patrol-row">0/0</b> 扫描线</span>
-                                <span><i class="ri-camera-line"></i><b id="auto-patrol-captures">0</b> 张</span>
-                                <span><i class="ri-4k-line"></i><b id="auto-patrol-quality">4K待验证</b> 抓拍</span>
-                            </div>
-                            <div class="auto-patrol-output" id="auto-patrol-output" title="">保存目录检查中</div>
-                            <div class="auto-patrol-message" id="auto-patrol-message" hidden></div>
-                        </div>
-                        <label class="auto-patrol-origin">
-                            <input type="checkbox" id="auto-patrol-origin-confirmed" onchange="updateAutomaticPatrolActions()">
-                            <span>右下安全起点已确认</span>
-                        </label>
-                        <div class="auto-patrol-actions">
-                            <button type="button" class="btn-primary" id="auto-patrol-start" onclick="startAutomaticPatrol()" disabled><i class="ri-play-fill"></i>开始巡检</button>
-                            <button type="button" class="auto-patrol-stop" id="auto-patrol-stop" onclick="stopAutomaticPatrol()" disabled><i class="ri-stop-fill"></i>紧急停止</button>
+                        <button type="button" class="twin-reset" id="patrol-twin-reset" title="重置视角" aria-label="重置三维模型视角"><i class="ri-refresh-line"></i></button>
+                        <button type="button" class="device-status-toggle" id="device-status-toggle" aria-expanded="false" aria-controls="patrol-device-status" title="显示设备状态" aria-label="显示设备状态"><i class="ri-dashboard-3-line"></i></button>
+                        <div class="patrol-device-status" id="patrol-device-status" aria-label="设备状态" hidden>
+                            <strong class="device-status-title"><i class="ri-dashboard-3-line"></i>设备状态</strong>
+                            <span><i class="ri-battery-charge-line"></i><b>电量</b><em><i style="width:78%"></i></em>78%</span>
+                            <span><i class="ri-temp-hot-line"></i><b>温度</b><em><i style="width:64%"></i></em>42.6°C</span>
+                            <span><i class="ri-signal-tower-line"></i><b>信号</b><em><i style="width:88%"></i></em>强</span>
                         </div>
                     </div>
                 </div>
+                <section class="card patrol-task-card"><div class="card-header"><i class="ri-task-line"></i><span>巡检任务</span><small>今日计划</small><button type="button" class="patrol-results-toggle" id="patrol-results-toggle" aria-expanded="false" onclick="togglePatrolResultsView()"><span>查看</span><i class="ri-arrow-down-s-line"></i></button></div><div class="patrol-task-body"><div class="patrol-task-summary"><span>计划巡检<b>4个大棚</b></span><span>已完成<b>2个</b></span></div><strong class="patrol-task-progress">50%<small>完成度</small></strong><div class="patrol-task-list"><div><span>1号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div><span>2号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div class="working"><span>3号大棚</span><b><i class="ri-loader-4-line"></i>巡检中</b></div><div><span>4号大棚</span><em><i class="ri-add-circle-fill"></i>待巡检</em></div></div></div></section>
+                <section class="card patrol-results-card">
+                    <div class="card-header"><i class="ri-alarm-warning-line"></i><span>害虫警报</span><small id="patrol-results-state"><i></i>待巡检</small></div>
+                    <div class="patrol-realtime-results" id="patrol-realtime-results" aria-live="polite">
+                        <div class="patrol-results-empty">
+                            <i class="ri-image-search-line"></i>
+                            <strong>等待巡检任务</strong>
+                            <span>任务结束后将对照片进行多帧复核</span>
+                        </div>
+                    </div>
+                    <div class="patrol-results-detail" id="patrol-results-detail">
+                        <figure class="patrol-result-hero"><img id="patrol-expanded-image" th:src="@{/images/alerts/longhorn-beetle-detection.png}" alt="巡检摄像头识别到的黑天牛害虫截图"><figcaption><i class="ri-camera-lens-line"></i><span id="patrol-expanded-caption">CH-03 巡检识别截图</span><time id="patrol-expanded-time">17:03:58</time></figcaption></figure>
+                        <section class="patrol-detail-section"><h3><i class="ri-focus-3-line"></i>实时检测结果</h3><dl class="patrol-result-facts"><div><dt>目标类别</dt><dd id="patrol-expanded-name">黑天牛</dd></div><div><dt>检测数量</dt><dd><strong id="patrol-expanded-count">1</strong></dd></div><div class="wide"><dt>识别置信度</dt><dd><b id="patrol-expanded-confidence">92.3%</b><span>多帧复核确认</span></dd></div><div class="wide"><dt>推荐措施</dt><dd id="patrol-expanded-advice">立即隔离受害枝条，安排人工捕捉并进行重点复检</dd></div></dl></section>
+                        <section class="patrol-detail-section"><h3><i class="ri-cpu-line"></i>设备状态</h3><div class="patrol-device-facts"><span><i class="ri-robot-2-line"></i>巡检机器人<b>在线</b></span><span><i class="ri-camera-line"></i>摄像头 ID<b>CH-03</b></span><span><i class="ri-sun-line"></i>光照强度<b>6800 lux</b></span><span><i class="ri-water-percent-line"></i>土壤湿度<b>72%</b></span></div></section>
+                        <section class="patrol-detail-warning"><i class="ri-alarm-warning-fill"></i><div><span>预警信息</span><strong id="patrol-expanded-warning">检测到黑天牛，建议立即处理并复核相邻植株</strong></div></section>
+                    </div>
+                </section>
+                <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
+                    <i class="ri-alarm-warning-line"></i>
+                    <span id="patrol-warning-text">⚠️花朵数量严重超标！</span>
+                    <i class="ri-arrow-right-s-line"></i>
+                </button>
             </div>
         </div>
     </main>
+
+    <span id="track-pos" hidden>1.0</span>
+
+    <div class="patrol-completion-overlay" id="automaticPatrolCompletion" hidden>
+        <section class="patrol-completion-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-completion-title">
+            <div class="patrol-completion-icon" aria-hidden="true"><i class="ri-check-line"></i></div>
+            <span class="patrol-completion-kicker">AUTOMATIC PATROL COMPLETE</span>
+            <h2 id="patrol-completion-title">自动巡检已完成</h2>
+            <p>设备已自动回到最下最右初始位置，叶面肥水泵已关闭。</p>
+            <div class="patrol-completion-stats">
+                <span><b id="patrol-completion-lines">0</b><small>扫描线</small></span>
+                <span><b id="patrol-completion-captures">0</b><small>巡检抓拍</small></span>
+                <span><b id="patrol-completion-sprays">0</b><small>中点喷淋</small></span>
+            </div>
+            <button type="button" onclick="closeAutomaticPatrolCompletion()"><i class="ri-checkbox-circle-line"></i>确认完成</button>
+        </section>
+    </div>
 
     <div class="patrol-records-overlay" id="patrolRecordsOverlay" hidden>
         <section class="patrol-records-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-records-title">
@@ -180,14 +220,18 @@
         </section>
     </div>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
+
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script th:src="@{/js/common.js}"></script>
-    <script th:src="@{/js/patrol.js(v='20260910-rail-soft-limit')}"></script>
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
+    <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
+    <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260912-patrol-resilience-v1')}"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function(){
+        var el=document.getElementById('patrol-twin');
+        if(window.createGreenhouseTwin && el){ var twin=window.createGreenhouseTwin(el,{compact:true}); var reset=document.getElementById('patrol-twin-reset'); if(reset) reset.addEventListener('click',twin.resetView); window.greenhouseTwin=twin; }
+      });
+    </script>
 </body>
 </html>

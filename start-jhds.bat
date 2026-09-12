@@ -128,6 +128,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [INFO] Starting the bundled software control service...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\start-modbus-gateway.ps1" -ProjectRoot "%CD%"
+if errorlevel 1 goto :failed
+
 echo.
 echo [INFO] Starting Spring Boot. Keep this window open.
 echo [INFO] URL: http://localhost:9117/jhds/

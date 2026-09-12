@@ -16,6 +16,8 @@ if not exist "pom.xml" (
 )
 
 echo [INFO] Looking for this project's Spring Boot process...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\stop-modbus-gateway.ps1" -ProjectRoot "%CD%"
+
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$pidFile = Join-Path (Get-Location).Path 'work\camera\hls\ffmpeg.pid'; if (Test-Path -LiteralPath $pidFile) { $cameraPid = (Get-Content -LiteralPath $pidFile -Raw).Trim(); if ($cameraPid -match '^\d+$') { Write-Host ('[INFO] Stopping camera FFmpeg tree PID ' + $cameraPid); & taskkill.exe /PID $cameraPid /T /F 2>$null | Out-Null }; Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue }"
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI 学习页交互
  * 流程：idle → selected(file picked) → scanning(progress) → done(api fetch)
  * 仅有最后一步会真实请求 /api/ai-learn/analyze 接口，其它都是样式/前端抽帧。
@@ -356,7 +356,7 @@
                 card.className = 'ai-card';
                 card.innerHTML = `
                     <img class="ai-card-img" src="${resolveImg(it.image)}" alt="${escapeHtml(it.title)}"
-                         onerror="this.style.background='linear-gradient(135deg,#103040,#1a3850)'">
+                         onerror="this.style.background='linear-gradient(135deg,#001a30,#002245)'">
                     <div class="ai-card-body">
                         <div class="ai-card-title">${escapeHtml(it.title)}</div>
                         <div class="ai-card-desc">${nl2br(escapeHtml(it.desc))}</div>

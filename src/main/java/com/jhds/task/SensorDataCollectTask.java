@@ -18,8 +18,8 @@ public class SensorDataCollectTask {
 
     @Scheduled(cron = "0 */15 * * * ?")
     public void collectAllData() {
-        if (!mqttService.isConnected()) {
-            log.warn("MQTT not connected, skip sensor data collection");
+        if (!mqttService.hasAvailableTransport()) {
+            log.warn("MQTT and Modbus fallback are unavailable, skip sensor data collection");
             return;
         }
         log.debug("Collecting sensor data...");

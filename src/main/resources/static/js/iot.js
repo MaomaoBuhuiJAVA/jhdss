@@ -74,9 +74,13 @@ async function loadMqttStatus() {
         return;
     }
     const connected = res.data.connected === true;
-    status.textContent = connected ? 'MQTT 已连接' : (res.data.enabled ? 'MQTT 未连接' : 'MQTT 已禁用');
-    status.className = 'mqtt-status ' + (connected ? 'online' : 'offline');
-    status.title = res.data.brokerUrl + ' · ' + res.data.commandTopic;
+    const fallback = res.data.fallback || {};
+    const fallbackOnline = fallback.enabled === true && fallback.reachable === true;
+    status.textContent = connected ? 'MQTT 已连接' : (fallbackOnline ? 'Modbus 备用链路' : '控制链路离线');
+    status.className = 'mqtt-status ' + (connected || fallbackOnline ? 'online' : 'offline');
+    status.title = connected
+        ? res.data.brokerUrl + ' · ' + res.data.commandTopic
+        : (fallback.host ? fallback.host + ':' + fallback.port : (res.data.enabled ? 'MQTT 未连接' : 'MQTT 已禁用'));
 }
 
 async function loadControlPanelStatus() {
@@ -91,12 +95,63 @@ async function loadControlPanelStatus() {
     value.textContent = online ? '已连接' : '未连接';
     value.className = 'control-panel-status-value ' + (online ? 'online' : 'offline');
     dot.className = 'control-panel-status-dot ' + (online ? 'online' : 'offline');
-    text.textContent = online ? ('局域网地址：' + (data.baseUrl || '169.254.240.33')) : '无法访问局域网控制面板';
+    text.textContent = online ? ('控制服务：' + (data.baseUrl || '127.0.0.1:8999')) : '无法访问本机 Modbus 控制服务';
     if (command && data) {
         const motion = data.forwardActive ? '上移中' : (data.backwardActive ? '下移中' : '移动停止');
         command.textContent = '最近状态：' + motion + ' · 水泵' + (data.pumpActive ? '运行中' : '已关闭');
     }
     value.title = data && data.lastError ? data.lastError : '';
+}
+
+async function loadModbusStatus() {
+    const el = document.getElementById('modbus-status');
+    const endpoint = document.getElementById('modbus-endpoint');
+    if (!el) return;
+    const res = await apiGet('/modbus/motor/status');
+    const data = res && res.code === 200 ? res.data : null;
+    const online = !!(data && data.reachable);
+    el.textContent = online ? 'Modbus 已连接' : 'Modbus 未连接';
+    el.className = 'modbus-status ' + (online ? 'online' : 'offline');
+    if (endpoint && data) endpoint.textContent = '控制器：' + data.host + ':' + data.port + ' · 从站 ' + data.unitId;
+    el.title = data && data.lastError ? data.lastError : '';
+}
+
+function motorNumber(id) {
+    const value = Number(document.getElementById(id).value);
+    if (!Number.isInteger(value) || value < 0 || value > 65535) throw new Error('请输入 0-65535 的整数');
+    return value;
+}
+
+async function sendMotor(path, payload) {
+    const result = document.getElementById('motor-last-result');
+    try {
+        const res = await apiPost('/modbus/motor/' + path, payload || {});
+        if (!res || res.code !== 200) throw new Error((res && res.msg) || '指令发送失败');
+        if (result) result.textContent = '已发送 · ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
+        loadModbusStatus();
+    } catch (e) {
+        if (result) result.textContent = e.message;
+        window.alert(e.message);
+    }
+}
+
+function initMotorControls() {
+    document.querySelectorAll('.motor-tab').forEach(tab => tab.addEventListener('click', () => {
+        document.querySelectorAll('.motor-tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.getElementById('motor-relative-form').classList.toggle('hidden', tab.dataset.tab !== 'relative');
+        document.getElementById('motor-absolute-form').classList.toggle('hidden', tab.dataset.tab !== 'absolute');
+    }));
+    document.querySelectorAll('.motor-btn[data-action]').forEach(btn => btn.addEventListener('click', () => {
+        try { sendMotor('relative', {target:motorNumber('motor-target'), speed:motorNumber('motor-speed'), direction:btn.dataset.action}); } catch (e) { window.alert(e.message); }
+    }));
+    document.getElementById('motor-locate').addEventListener('click', () => {
+        try { sendMotor('absolute', {position:motorNumber('motor-position'), speed:motorNumber('motor-absolute-speed'), channel:Number(document.getElementById('motor-channel').value)}); } catch (e) { window.alert(e.message); }
+    });
+    document.getElementById('motor-stop').addEventListener('click', () => { if (window.confirm('确定向电机发送急停指令？')) sendMotor('stop'); });
+    document.getElementById('motor-pump').addEventListener('click', function() {
+        const enabled = this.dataset.enabled !== '1'; this.dataset.enabled = enabled ? '1' : '0';
+        sendMotor('pump', {enabled}); this.classList.toggle('active', enabled);
+    });
 }
 
 function renderDeviceStatus(alias, checked) {
@@ -133,8 +188,11 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDevices();
     loadMqttStatus();
     loadControlPanelStatus();
+    initMotorControls();
+    loadModbusStatus();
     setInterval(loadDevices, 30000);
     setInterval(loadMqttStatus, 10000);
     setInterval(loadControlPanelStatus, 15000);
+    setInterval(loadModbusStatus, 10000);
     document.getElementById('iot-update-time').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
 });

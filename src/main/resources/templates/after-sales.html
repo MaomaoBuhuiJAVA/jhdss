@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>jhds - 采后销售售后反馈平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
+    <link rel="stylesheet" th:href="@{/css/after-sales.css(v='20260912-v1')}">
+    <link rel="stylesheet" th:href="@{/css/logistics-map.css(v='20260912-v1')}">
+    <script th:src="@{/js/vendor/greenhouse-3d.js}"></script>
+</head>
+<body>
+<div th:replace="fragments/header::header('after-sales')"></div>
+<main class="main after-sales-page">
+    <header class="sales-page-head"><div><span>POST-HARVEST QUALITY LOOP</span><h1>采后销售售后反馈平台</h1><p>客户反馈、物流风险与田间生产批次联动追溯</p></div><div class="sales-actions"><button type="button" id="open-logistics"><i class="ri-truck-fill"></i>物流检测云</button><label><i class="ri-upload-cloud-2-line"></i>上传反馈 CSV<input id="feedback-upload" type="file" accept=".csv"></label><button type="button" id="export-feedback"><i class="ri-download-2-line"></i>导出报表</button></div></header>
+    <div id="logistics-main-dock"><section th:replace="fragments/logistics-map::workspace"></section></div>
+    <section class="sales-metrics" aria-label="售后核心指标">
+        <article><i class="ri-feedback-fill"></i><span>售后反馈总条数</span><strong>286</strong><small>较上期 +12.4%</small></article>
+        <article><i class="ri-error-warning-fill"></i><span>不良品反馈率</span><strong>3.8%</strong><small>问题订单 / 总发货</small></article>
+        <article class="danger"><i class="ri-alarm-warning-fill"></i><span>高严重度反馈</span><strong>17</strong><small>需要紧急处理</small></article>
+        <article><i class="ri-stack-fill"></i><span>覆盖采摘批次</span><strong>24</strong><small>关联 4 个大棚</small></article>
+        <article><i class="ri-pie-chart-2-fill"></i><span>渠道分布</span><strong>52%</strong><small>电商 52 · 商超 31 · 团购 17</small></article>
+    </section>
+    <div class="sales-workspace">
+        <section class="sales-panel problem-panel"><header><div><span>PROBLEM MAP</span><h2>售后问题地图</h2></div><small>区块越大，反馈数量越多</small></header><div class="problem-map">
+            <button class="problem-block quality" data-topic="果实品质"><b>果实品质类</b><strong>146</strong><span>P 9.2 · 最高优先</span><em>腐果 61 · 裂果 42 · 糖度 25 · 损伤 18</em></button>
+            <button class="problem-block logistics" data-topic="物流包装"><b>物流包装类</b><strong>67</strong><span>P 7.6 · 高优先</span><em>包装破损 · 冰袋失效 · 快递超时</em></button>
+            <button class="problem-block spec" data-topic="规格服务"><b>规格服务类</b><strong>38</strong><span>P 5.1</span><em>果径不符 · 重量短缺 · 错发漏发</em></button>
+            <button class="problem-block service" data-topic="客服售后"><b>客服售后类</b><strong>21</strong><span>P 3.8</span><em>理赔慢 · 咨询回复慢</em></button>
+            <button class="problem-block other" data-topic="其他"><b>其他反馈</b><strong>14</strong><span>P 1.4</span><em>好评建议 · 复购咨询</em></button>
+        </div></section>
+        <aside class="sales-panel priority-panel"><header><div><span>PRIORITY</span><h2>优先处理线索</h2></div><b>按风险排序</b></header><div class="priority-list">
+            <article><em>01</em><div><strong>腐果发霉集中反馈</strong><span>9 条 · 高严重度 78%</span><small>批次 CH-0908-03 · 电商</small></div><button data-trace="CH-0908-03">溯源</button><p>建议理赔召回，核查预冷与冷链温度</p></article>
+            <article><em>02</em><div><strong>3号棚裂果占比突增</strong><span>7 条 · 高严重度 43%</span><small>批次 CH-0909-03 · 商超</small></div><button data-trace="CH-0909-03">溯源</button><p>核查采摘期土壤湿度，下一批提前控水</p></article>
+            <article><em>03</em><div><strong>泡沫箱冰袋失效</strong><span>6 条 · 高严重度 33%</span><small>批次 CH-0910-02 · 团购</small></div><button data-trace="CH-0910-02">溯源</button><p>更换包装冷链，调整冰袋配置</p></article>
+        </div></aside>
+    </div>
+    <section class="sales-panel trace-alert"><i class="ri-radar-fill"></i><div><span>批次风险预警</span><strong>3号大棚 CH-0909-03 裂果售后占比突增</strong><p>成熟度 86% · 采摘期土壤湿度峰值 82% · AI 巡检未见虫害</p></div><button data-trace="CH-0909-03">查看田间记录<i class="ri-arrow-right-line"></i></button></section>
+    <section class="sales-panel feedback-panel"><header><div><span>RAW FEEDBACK</span><h2>原始反馈明细</h2></div><div class="feedback-filters"><label><i class="ri-search-line"></i><input id="feedback-search" placeholder="搜索反馈或批次"></label><select id="topic-filter"><option value="">全部主题</option><option>果实品质</option><option>物流包装</option><option>规格服务</option><option>客服售后</option></select><select id="severity-filter"><option value="">全部严重度</option><option>紧急</option><option>重要</option><option>一般</option></select><select id="channel-filter"><option value="">全部渠道</option><option>电商</option><option>商超</option><option>团购</option></select></div></header>
+        <div class="feedback-table-wrap"><table><thead><tr><th>反馈时间</th><th>渠道 / 批次</th><th>客户原始反馈</th><th>自动主题</th><th>严重度</th><th>情绪</th><th>处理状态</th><th>溯源</th></tr></thead><tbody id="feedback-body">
+            <tr data-topic="果实品质" data-severity="紧急" data-channel="电商"><td>09-12 15:42</td><td>电商<br><code>CH-0908-03</code></td><td>收到后底层樱桃已有霉点，附开箱照片</td><td>腐果发霉</td><td><b class="level urgent">紧急</b></td><td>负向</td><td><span class="state doing">处理中</span></td><td><button data-trace="CH-0908-03">查看</button></td></tr>
+            <tr data-topic="果实品质" data-severity="重要" data-channel="商超"><td>09-12 13:18</td><td>商超<br><code>CH-0909-03</code></td><td>本批次裂果明显多于上一批</td><td>裂果</td><td><b class="level high">重要</b></td><td>负向</td><td><span class="state wait">待处理</span></td><td><button data-trace="CH-0909-03">查看</button></td></tr>
+            <tr data-topic="物流包装" data-severity="重要" data-channel="团购"><td>09-12 10:06</td><td>团购<br><code>CH-0910-02</code></td><td>冰袋到货时已完全融化，箱内温度偏高</td><td>冰袋失效</td><td><b class="level high">重要</b></td><td>负向</td><td><span class="state done">已结案</span></td><td><button data-trace="CH-0910-02">查看</button></td></tr>
+            <tr data-topic="规格服务" data-severity="一般" data-channel="电商"><td>09-11 18:35</td><td>电商<br><code>CH-0910-01</code></td><td>部分果径小于商品页标注规格</td><td>果径不符</td><td><b class="level normal">一般</b></td><td>中性</td><td><span class="state wait">待处理</span></td><td><button data-trace="CH-0910-01">查看</button></td></tr>
+        </tbody></table></div>
+    </section>
+    <section class="sales-analysis"><div class="sales-panel trend-panel"><header><h2>售后问题趋势</h2><small>近 7 日</small></header><div class="trend-bars"><i style="--h:38%"><b>18</b><span>06</span></i><i style="--h:55%"><b>26</b><span>07</span></i><i style="--h:44%"><b>21</b><span>08</span></i><i style="--h:72%"><b>34</b><span>09</span></i><i style="--h:61%"><b>29</b><span>10</span></i><i style="--h:83%"><b>39</b><span>11</span></i><i style="--h:66%"><b>31</b><span>12</span></i></div></div><div class="sales-panel batch-panel"><header><h2>各大棚批次不良率</h2><small>本期</small></header><div><span>1号棚 <i><b style="width:31%"></b></i><em>2.1%</em></span><span>2号棚 <i><b style="width:44%"></b></i><em>3.0%</em></span><span class="warn">3号棚 <i><b style="width:82%"></b></i><em>5.6%</em></span><span>4号棚 <i><b style="width:25%"></b></i><em>1.7%</em></span></div></div></section>
+</main>
+<div class="trace-drawer" id="trace-drawer" hidden><button class="trace-close" aria-label="关闭溯源"><i class="ri-close-line"></i></button><span>BATCH TRACE</span><h2 id="trace-title">批次溯源</h2><div class="trace-timeline"><p><i class="ri-seedling-line"></i><b>田间环境</b><span>温度 24.6°C · 湿度 72% · 土壤 EC 1.32</span></p><p><i class="ri-robot-2-line"></i><b>AI 巡检</b><span>未发现虫害 · 成熟果占比 86%</span></p><p><i class="ri-scissors-cut-line"></i><b>采摘记录</b><span>09-09 06:40 · 3号大棚 · 312 kg</span></p><p><i class="ri-snowy-line"></i><b>预冷物流</b><span>预冷 3.2 小时 · 运输高温 18 分钟</span></p></div></div>
+<div class="logistics-overlay" id="logistics-overlay" hidden><section class="logistics-cloud" role="dialog" aria-modal="true" aria-labelledby="logistics-title"><header><div><span>SMART COLD-CHAIN NETWORK</span><h2 id="logistics-title">樱桃销售物流检测云平台</h2></div><button id="close-logistics" aria-label="关闭"><i class="ri-close-line"></i></button></header><div class="logistics-scroll">
+    <div class="logistics-metrics"><article><span>本期运单</span><b>1,248</b></article><article><span>在途运单</span><b>186</b></article><article><span>已完成</span><b>1,021</b></article><article class="danger"><span>异常运单</span><b>41</b></article><article><span>损耗预估率</span><b>3.29%</b></article><article><span>采摘批次</span><b>24</b></article></div>
+    <div class="logistics-grid"><section class="cloud-panel route-map"><h3><i class="ri-map-2-line"></i>在途物流实时监控 <small class="map-source-badge">GLB · 可交互数据层</small></h3><div class="logistics-map-viewport" id="logistics-map-3d"><div class="logistics-map-loading">加载中国物流地图…</div><div class="logistics-map-toolbar"><button type="button" id="logistics-map-reset" title="重置视角" aria-label="重置视角"><i class="ri-refresh-line"></i></button><button type="button" id="logistics-map-pause" title="暂停车辆动画" aria-label="暂停车辆动画"><i class="ri-pause-line"></i></button></div><div class="logistics-map-legend"><span><i class="live"></i>在途</span><span><i class="delivered"></i>已完成</span><span><i class="alert"></i>异常</span></div><div class="logistics-map-tooltip" hidden></div></div></section><section class="cloud-panel cold-status"><h3><i class="ri-snowy-line"></i>仓储与预冷</h3><p><b>PC-01</b><span>2.1°C · 预冷完成</span><em>8 批次</em></p><p><b>PC-02</b><span>3.4°C · 预冷中</span><em>5 批次</em></p><p class="warn"><b>PC-03</b><span>5.8°C · 温度偏高</span><em>2 批次</em></p><h3><i class="ri-cpu-line"></i>设备状态</h3><div class="device-cloud"><span>在线 36</span><span>低电量 2</span><span>离线 1</span></div></section><section class="cloud-panel logistics-alerts"><h3><i class="ri-alarm-warning-line"></i>实时风险预警</h3><article class="urgent"><b>冷链高温预警</b><span>WL-0912-067 · 7.2°C 持续 18 分钟</span><p>紧急联系司机调整制冷并优先派送</p></article><article><b>配送超时预警</b><span>WL-0911-204 · 超出计划 42 分钟</span><p>通知收货方并准备售后理赔预案</p></article><article><b>预冷不足预警</b><span>CH-0911-04 · 预冷仅 1.4 小时</span><p>暂缓出库并补足标准预冷时长</p></article></section></div>
+    <section class="cloud-panel shipment-table"><header><h3><i class="ri-route-line"></i>运单明细溯源</h3><button id="logistics-to-sales">查看关联售后</button></header><table><thead><tr><th>运单编号</th><th>采摘批次</th><th>渠道 / 目的地</th><th>预冷环境</th><th>运输环境</th><th>设备</th><th>当前状态</th><th>风险</th></tr></thead><tbody><tr><td>WL-0912-067</td><td>CH-0909-03</td><td>商超 · 上海</td><td>3.1°C / 3.2h</td><td>7.2°C / 78%</td><td>在线</td><td>在途</td><td><b>温度异常</b></td></tr><tr><td>WL-0912-031</td><td>CH-0910-01</td><td>电商 · 成都</td><td>2.4°C / 4.1h</td><td>2.8°C / 72%</td><td>在线</td><td>在途</td><td>无风险</td></tr><tr><td>WL-0911-204</td><td>CH-0910-02</td><td>团购 · 北京</td><td>2.7°C / 3.8h</td><td>3.5°C / 69%</td><td>低电量</td><td>在途</td><td><b>时效超时</b></td></tr></tbody></table></section>
+</div></section></div>
+<script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
+<script th:src="@{/js/logistics-data.js(v='2')}"></script>
+<script th:src="@{/js/logistics-map.js(v='2')}"></script>
+<script th:src="@{/js/logistics-workbench.js(v='2')}"></script>
+<script th:src="@{/js/after-sales.js(v='20260912-v2')}"></script>
+</body></html>

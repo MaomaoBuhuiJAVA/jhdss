@@ -25,7 +25,9 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -45,6 +47,8 @@ public class PatrolService {
 
     @Value("${patrol.capture-path:./captures}")
     private String capturePath;
+    @Value("${modbus.fallback.motor.speed:60}")
+    private volatile int currentMotorSpeed;
 
     private static final int MAX_CAPTURES = 10;
 
@@ -197,9 +201,30 @@ public class PatrolService {
         }
     }
 
+    public synchronized Map<String, Object> setMotorSpeed(int speed) {
+        if (speed < 1 || speed > 500) {
+            throw new IllegalArgumentException("电机速度范围为 1-500");
+        }
+        Map<String, Object> result = mqttService.setMotorSpeed(speed, false);
+        if (result != null) currentMotorSpeed = speed;
+        return result;
+    }
+
+    public Map<String, Object> motorSpeedStatus() {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("speed", currentMotorSpeed);
+        status.put("min", 1);
+        status.put("max", 500);
+        return status;
+    }
+
     /** Re-zeroes the soft-limit tracker once the operator confirms the rightmost origin. */
-    public void markRightOrigin() {
+    public Map<String, Object> markRightOrigin() {
+        if (railPositionService.isMoving()) {
+            throw new IllegalStateException("轨道电机正在移动，停止后才能重置软限位");
+        }
         railPositionService.markRightOrigin();
+        return railPositionService.status();
     }
 
     /**
@@ -210,21 +235,39 @@ public class PatrolService {
     private String startRailMove(String direction) {
         String alias = "MOTOR_DIRECTION";
         String value = "left".equals(direction) ? "open" : "close";
+        boolean trackingStarted = false;
+        if ("left".equals(direction)) {
+            long allowed = railPositionService.beginMove(direction, Long.MAX_VALUE);
+            if (allowed < 0L) {
+                stopForSoftLimit();
+                return null;
+            }
+            trackingStarted = true;
+        }
         String response = mqttService.sendCommand(alias, value, false);
         if (response == null) {
-            return response;
-        }
-        long allowed = railPositionService.beginMove(direction, Long.MAX_VALUE);
-        if (allowed < 0L) {
-            // The scheduler reached the limit in the gap between the guard and
-            // this start; de-energize the direction coil immediately.
-            stopForSoftLimit();
+            // The motor may have acted on the write even if its acknowledgement
+            // was lost. Stop first, then bank all potentially travelled time.
+            try {
+                mqttService.sendCommand("MOTOR_STATE", "close", false);
+            } finally {
+                if (trackingStarted) railPositionService.endMove();
+            }
             return null;
         }
-        // Only the leftward direction has a soft limit; rightward jogging stays
-        // fully permitted and continues until the operator releases the button.
-        String runResponse = mqttService.sendCommand("MOTOR_STATE", "open", false);
-        return runResponse == null ? response : runResponse;
+        if (!trackingStarted) {
+            // A failed right command must not reduce the stored leftward
+            // position and incorrectly grant more left-travel allowance.
+            long allowed = railPositionService.beginMove(direction, Long.MAX_VALUE);
+            if (allowed < 0L) {
+                stopForSoftLimit();
+                return null;
+            }
+        }
+        // The deployed rail starts from the direction frame itself. MOTOR_STATE
+        // only has a verified stop frame, so an unconfigured start signal must
+        // not delay or block otherwise valid left/right motion.
+        return response;
     }
 
     public RailPositionService railPositionService() {

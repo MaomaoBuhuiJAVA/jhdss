@@ -1,0 +1,130 @@
+/* Reference green palette for every screen except the AI assistant. */
+body {
+    --bg-deep: #00140b;
+    --bg-panel: #031a0e;
+    --bg-card: #052716;
+    --surface-card: #052716;
+    --surface-raised: #0a321d;
+    --surface-inset: #00180d;
+    --surface-chip: rgba(91, 190, 92, .14);
+    --accent-primary: #72cf72;
+    --accent-primary-strong: #9be093;
+    --accent-primary-deep: #2e913e;
+    --accent-primary-dim: rgba(53, 157, 65, .18);
+    --on-accent: #061008;
+    --text-primary: #edf7ea;
+    --text-secondary: #b4cbae;
+    --text-tertiary: #7f9d7c;
+    --text-dim: rgba(127, 157, 124, .72);
+    --border-subtle: rgba(48, 137, 65, .44);
+    --border-strong: rgba(100, 202, 105, .72);
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(139, 230, 139, .04);
+    --shadow-card-hover: 0 7px 22px rgba(0, 0, 0, .48), 0 0 18px rgba(69, 177, 76, .12);
+    --glow-primary: 0 0 12px rgba(91, 207, 95, .26);
+    --status-online: #72cf72;
+    background:
+        radial-gradient(circle at 50% -18%, rgba(35, 126, 57, .18), transparent 42%),
+        linear-gradient(180deg, #00170d 0%, #001109 100%) !important;
+}
+
+.topbar {
+    background: linear-gradient(180deg, #001109 0%, #031b0f 100%) !important;
+    border-bottom-color: rgba(42, 137, 58, .58) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .38), 0 0 18px rgba(43, 139, 59, .08) !important;
+}
+
+.top-nav-item {
+    border-color: rgba(52, 128, 63, .52) !important;
+    background: linear-gradient(145deg, rgba(5, 38, 19, .98), rgba(2, 23, 12, .98)) !important;
+    color: #d5e8cf !important;
+    box-shadow: 0 0 20px rgba(24, 93, 42, .3), inset 0 1px 0 rgba(183, 238, 176, .05) !important;
+}
+
+.top-nav-item i { color: #a2dca0 !important; }
+.top-nav-item[href$='/alarm'] i,
+.top-nav-item.danger i { color: #f3343f !important; }
+.top-nav-item:hover,
+.top-nav-item.active {
+    border-color: #68d56b !important;
+    background: linear-gradient(145deg, rgba(16, 83, 35, .98), rgba(4, 45, 22, .98)) !important;
+    color: #f1faed !important;
+    box-shadow: 0 0 24px rgba(83, 194, 88, .22), inset 0 1px 0 rgba(207, 255, 200, .1) !important;
+}
+.top-nav-item:hover i,
+.top-nav-item.active i { color: #b7e9ad !important; }
+.top-nav-item[href$='/alarm']:hover i,
+.top-nav-item[href$='/alarm'].active i,
+.top-nav-item.danger:hover i,
+.top-nav-item.danger.active i { color: #ff3c45 !important; }
+.top-nav-item[href$='/alarm'],
+.top-nav-item.danger {
+    border-color: rgba(195, 48, 57, .78) !important;
+    background: linear-gradient(145deg, rgba(78, 9, 17, .98), rgba(39, 3, 9, .98)) !important;
+    color: #ffd9dc !important;
+    box-shadow: 0 0 20px rgba(174, 29, 43, .24), inset 0 1px 0 rgba(255, 184, 190, .06) !important;
+}
+.top-nav-item[href$='/alarm']:hover,
+.top-nav-item[href$='/alarm'].active,
+.top-nav-item.danger:hover,
+.top-nav-item.danger.active {
+    border-color: #ff5059 !important;
+    background: linear-gradient(145deg, rgba(139, 20, 34, .98), rgba(73, 6, 16, .98)) !important;
+    color: #fff1f2 !important;
+    box-shadow: 0 0 25px rgba(239, 52, 68, .34), inset 0 1px 0 rgba(255, 213, 216, .1) !important;
+}
+
+.brand-mark {
+    color: #eff9eb !important;
+    text-shadow: 0 0 10px rgba(145, 222, 139, .28) !important;
+    filter: drop-shadow(0 0 8px rgba(71, 180, 79, .28)) drop-shadow(0 7px 12px rgba(0, 0, 0, .42)) !important;
+}
+.brand-mark::before {
+    background: linear-gradient(90deg, #155827 0%, #7ee27c 14%, #26763a 36%, #a0ed94 50%, #26763a 64%, #7ee27c 86%, #155827 100%) !important;
+}
+.brand-mark::after {
+    background:
+        linear-gradient(90deg, transparent 4%, rgba(126, 226, 124, .16) 4.3%, transparent 4.7%, transparent 95.3%, rgba(126, 226, 124, .16) 95.7%, transparent 96%),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(114, 207, 114, .045) 32px, transparent 33px),
+        linear-gradient(180deg, rgba(4, 29, 15, .99), rgba(5, 58, 26, .96)) !important;
+    box-shadow: inset 0 0 0 1px rgba(132, 224, 128, .2), inset 0 0 24px rgba(78, 190, 84, .12), inset 0 -14px 28px rgba(0, 17, 8, .62) !important;
+}
+.brand-title-shiny {
+    background-image: linear-gradient(120deg, #afcaaa 0%, #e4f2df 35%, #fff 50%, #d8edd2 65%, #9dbb98 100%) !important;
+}
+.header-live { color: #91d98d !important; }
+
+.card,
+.chart-container,
+.yolo-panel,
+.yolo-stats > div,
+[class$='-card'],
+[class*='-card '] {
+    background: linear-gradient(145deg, rgba(5, 43, 24, .98), rgba(1, 23, 13, .98)) !important;
+    border-style: solid !important;
+    border-width: var(--card-border-width) !important;
+    border-color: rgba(43, 133, 57, .66) !important;
+    box-shadow: var(--shadow-card) !important;
+}
+
+.card:hover,
+.chart-container:hover,
+.yolo-panel:hover,
+.yolo-stats > div:hover,
+[class$='-card']:hover,
+[class*='-card ']:hover {
+    border-color: rgba(103, 205, 106, .82) !important;
+}
+
+.card-header {
+    background: linear-gradient(90deg, rgba(13, 63, 32, .48), rgba(3, 34, 18, .14)) !important;
+    border-bottom-color: rgba(42, 128, 55, .48) !important;
+    color: #e4f3df !important;
+}
+.card-header i { color: #79d477 !important; }
+
+.modal,
+[class$='-modal'],
+[class*='-modal '] {
+    background-color: #072818 !important;
+    border-color: rgba(71, 157, 79, .68) !important;
+}

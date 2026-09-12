@@ -43,11 +43,12 @@ public class PatrolController {
         try {
             String image = body == null || body.get("image") == null ? null : String.valueOf(body.get("image"));
             String location = body == null || body.get("location") == null ? null : String.valueOf(body.get("location"));
+            String streamId = body == null || body.get("streamId") == null ? null : String.valueOf(body.get("streamId"));
             Double confidence = null;
             if (body != null && body.get("confidence") instanceof Number) {
                 confidence = ((Number) body.get("confidence")).doubleValue();
             }
-            return Result.ok(yoloRealtimeDetectionService.detect(image, confidence, location));
+            return Result.ok(yoloRealtimeDetectionService.detect(image, confidence, location, streamId));
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());
         } catch (IllegalStateException e) {
@@ -79,11 +80,61 @@ public class PatrolController {
                     && Boolean.parseBoolean(String.valueOf(body.get("motionConfirmed")));
             String result = patrolService.control(dir, motionConfirmed);
             if (result == null) {
-                return Result.error(503, "MQTT未连接，或电机尚未配置有效的十六进制串口指令");
+                return Result.error(503, "MQTT 与 Modbus 控制链路均不可用，或电机指令尚未配置");
             }
             return Result.ok(result);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
         } catch (IllegalStateException e) {
             return Result.error(409, e.getMessage());
+        }
+    }
+
+    @ApiOperation("获取轨道电机速度")
+    @GetMapping("/motor-speed")
+    public Result<Map<String, Object>> motorSpeed() {
+        return Result.ok(patrolService.motorSpeedStatus());
+    }
+
+    @ApiOperation("设置轨道电机速度")
+    @PostMapping("/motor-speed")
+    public Result<Map<String, Object>> motorSpeed(@RequestBody Map<String, Object> body) {
+        try {
+            Map<String, Object> result = patrolService.setMotorSpeed(requiredInteger(body, "speed"));
+            return result == null ? Result.error(503, "MQTT 与 Modbus 速度控制链路均不可用") : Result.ok(result);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        }
+    }
+
+    @ApiOperation("确认最右端原点并重置轨道软限位")
+    @PostMapping("/rail-origin")
+    public Result<Map<String, Object>> resetRailOrigin(@RequestBody Map<String, Object> body) {
+        boolean confirmed = body != null
+                && Boolean.parseBoolean(String.valueOf(body.get("originConfirmed")));
+        if (!confirmed) {
+            return Result.error(400, "请先确认轨道已位于最右端机械原点");
+        }
+        if (Boolean.TRUE.equals(automaticPatrolService.status().get("running"))) {
+            return Result.error(409, "自动巡检运行中，不能重置软限位");
+        }
+        try {
+            return Result.ok(patrolService.markRightOrigin());
+        } catch (IllegalStateException e) {
+            return Result.error(409, e.getMessage());
+        }
+    }
+
+    private int requiredInteger(Map<String, Object> body, String key) {
+        if (body == null || body.get(key) == null) throw new IllegalArgumentException(key + " 不能为空");
+        return parseInteger(body.get(key), key);
+    }
+
+    private int parseInteger(Object value, String key) {
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(key + " 必须是整数");
         }
     }
 
@@ -132,6 +183,16 @@ public class PatrolController {
     @PostMapping("/auto/stop")
     public Result<Map<String, Object>> stopAutomaticPatrol() {
         return Result.ok(automaticPatrolService.stop());
+    }
+
+    @ApiOperation("重新分析最近一次自动巡检照片")
+    @PostMapping("/auto/analyze/retry")
+    public Result<Map<String, Object>> retryAutomaticPatrolAnalysis() {
+        try {
+            return Result.ok(automaticPatrolService.retryLatestAnalysis());
+        } catch (IllegalStateException e) {
+            return Result.error(409, e.getMessage());
+        }
     }
 
     @ApiOperation("删除巡逻任务")

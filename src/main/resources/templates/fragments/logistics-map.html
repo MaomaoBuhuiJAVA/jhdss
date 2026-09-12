@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-CN"><body>
+<section th:fragment="workspace" id="logistics-workbench" class="logistics-workbench" aria-label="物流三维调度">
+    <header class="logistics-board-head">
+        <div><i class="ri-route-line"></i><h2>全国冷链物流</h2><span class="logistics-simulation">虚拟运单</span></div>
+        <div class="logistics-board-kpis"><span>运单 <b id="logistics-total">0</b></span><span>运输中 <b id="logistics-active">0</b></span><span>异常 <b id="logistics-risk">0</b></span></div>
+    </header>
+    <div class="logistics-board-tools">
+        <div class="logistics-layers" aria-label="地图图层">
+            <label><input type="checkbox" data-layer="routes" checked>轨迹</label>
+            <label><input type="checkbox" data-layer="vehicles" checked>车辆</label>
+            <label><input type="checkbox" data-layer="cities" checked>节点</label>
+            <label><input type="checkbox" data-layer="hotspots" checked>热点</label>
+            <label><input type="checkbox" data-layer="labels" checked>地名</label>
+        </div>
+        <div class="logistics-board-actions">
+            <button type="button" id="logistics-add"><i class="ri-add-line"></i>新建运单</button>
+            <button type="button" id="logistics-download" title="导出虚拟运单" aria-label="导出虚拟运单"><i class="ri-download-2-line"></i></button>
+            <button type="button" id="logistics-upload" title="导入虚拟运单" aria-label="导入虚拟运单"><i class="ri-upload-2-line"></i></button>
+            <input type="file" id="logistics-json-file" accept="application/json,.json" hidden>
+        </div>
+    </div>
+    <div class="logistics-board-body">
+        <div class="logistics-map-dock" id="logistics-map-dock"></div>
+        <aside class="logistics-dispatch">
+            <div class="logistics-query"><label><i class="ri-search-line"></i><input id="logistics-search" type="search" placeholder="运单 / 车辆 / 城市" aria-label="搜索运单"></label>
+                <select id="logistics-state-filter" aria-label="运输状态"><option value="">全部状态</option><option value="transit">运输中</option><option value="alert">温度异常</option><option value="delayed">延误</option><option value="delivered">已签收</option><option value="stopped">停靠</option></select></div>
+            <div class="logistics-order-list" id="logistics-order-list" aria-label="虚拟运单列表"></div>
+            <section class="logistics-selected" id="logistics-selected" aria-label="运单详情">
+                <header><strong id="logistics-selected-title">运单详情</strong><div>
+                    <button type="button" id="logistics-focus" title="跟踪车辆" aria-label="跟踪车辆"><i class="ri-focus-3-line"></i></button>
+                    <button type="button" id="logistics-edit" title="编辑运单" aria-label="编辑运单"><i class="ri-edit-line"></i></button>
+                </div></header>
+                <div id="logistics-detail"></div>
+            </section>
+        </aside>
+    </div>
+    <footer class="logistics-board-footer"><div class="logistics-playback">
+        <button type="button" id="logistics-toggle-play" title="暂停" aria-label="暂停动画"><i class="ri-pause-line"></i></button>
+        <button type="button" id="logistics-replay" title="重播" aria-label="重播"><i class="ri-restart-line"></i></button>
+        <label>推演倍速 <select id="logistics-rate"><option value="1">1x</option><option value="4">4x</option><option value="12">12x</option></select></label>
+        <span id="logistics-runtime">00:00</span></div>
+        <a class="logistics-credit" href="https://sketchfab.com/3d-models/3d-b43136c9fd294505b624d240180aedd6" target="_blank" rel="noopener">地图 1933617028 · CC BY 4.0</a>
+    </footer>
+    <p class="logistics-message" id="logistics-message" role="status" hidden></p>
+    <dialog id="logistics-order-editor" class="logistics-editor">
+        <form id="logistics-order-form">
+            <header><h3 id="logistics-editor-title">新建虚拟运单</h3><button type="button" id="logistics-editor-close" title="关闭" aria-label="关闭"><i class="ri-close-line"></i></button></header>
+            <div class="logistics-form-fields">
+                <label>运单编号<input name="id" required pattern="[A-Za-z0-9_-]{1,32}" maxlength="32"></label>
+                <label>车辆代号<input name="vehicle" required pattern="[A-Za-z0-9_-]{1,24}" maxlength="24"></label>
+                <label>始发节点<select name="from" required></select></label><label>到达节点<select name="to" required></select></label>
+                <label class="logistics-form-wide">途经节点<select name="via" multiple size="3" aria-label="途经节点"></select></label>
+                <label>状态<select name="status"><option value="transit">运输中</option><option value="alert">温度异常</option><option value="delayed">延误</option><option value="delivered">已签收</option><option value="stopped">停靠</option></select></label>
+                <label>模拟车速 · km/h<input name="speed" type="number" min="0" max="120" required></label>
+                <label>车厢温度 · °C<input name="temp" type="number" min="-30" max="50" step="0.1" required></label>
+                <label>货件数<input name="parcels" type="number" min="1" max="99999" step="1" required></label>
+                <label class="logistics-form-wide">起始进度 <output id="logistics-form-progress">0%</output><input name="progress" type="range" min="0" max="100" value="0"></label>
+            </div>
+            <p class="logistics-form-error" id="logistics-form-error" role="alert"></p>
+            <footer><button type="button" id="logistics-delete" title="删除运单"><i class="ri-delete-bin-line"></i>删除运单</button><button type="submit"><i class="ri-save-line"></i>保存运单</button></footer>
+        </form>
+    </dialog>
+</section>
+</body></html>

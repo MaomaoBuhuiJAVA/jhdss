@@ -1,5 +1,65 @@
 const API_BASE = window.location.origin + '/jhds/api';
 
+const PAGE_ENTER_SELECTOR = [
+    '.card',
+    '.sensor-card',
+    '.stat-card',
+    '.chart-container',
+    '.yolo-panel',
+    '.ai-learn-card',
+    '.ai-conversations',
+    '.ai-workspace',
+    '.nutrient-equipment',
+    '.patrol-video',
+    '.patrol-autostart-card',
+    '.patrol-control-card',
+    '.main > .center-area'
+].join(',');
+
+let pageEntranceCleanupTimer = null;
+
+function initPageEntrance() {
+    const main = document.querySelector('.main');
+    if (!main || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const candidates = Array.from(main.querySelectorAll(PAGE_ENTER_SELECTOR)).filter(function(element) {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden'
+            && rect.width > 2 && rect.height > 2;
+    });
+    const modules = candidates.filter(function(element) {
+        return !candidates.some(function(parent) {
+            return parent !== element && parent.contains(element);
+        });
+    }).sort(function(a, b) {
+        const ar = a.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        const rowDifference = ar.top - br.top;
+        return Math.abs(rowDifference) > 18 ? rowDifference : ar.left - br.left;
+    });
+    if (!modules.length) return;
+
+    clearTimeout(pageEntranceCleanupTimer);
+    modules.forEach(function(element, index) {
+        const rect = element.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        const horizontalOffset = center < window.innerWidth * .36 ? '-8px'
+            : center > window.innerWidth * .64 ? '8px' : '0px';
+        element.classList.add('page-enter-module');
+        element.style.setProperty('--page-enter-x', horizontalOffset);
+        element.style.setProperty('--page-enter-delay', Math.min(index * 45, 360) + 'ms');
+    });
+
+    pageEntranceCleanupTimer = window.setTimeout(function() {
+        modules.forEach(function(element) {
+            element.classList.remove('page-enter-module');
+            element.style.removeProperty('--page-enter-x');
+            element.style.removeProperty('--page-enter-delay');
+        });
+    }, 1050);
+}
+
 async function apiGet(url) {
     // Live camera requests must not hang indefinitely while the bridge is
     // restarting. Retry short network failures so the page recovers without a
@@ -65,7 +125,9 @@ function updateClock() {
     const now = new Date();
     const str = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate() + ' ' +
         String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-    document.getElementById('clock').querySelector('span').textContent = str;
+    var clockRoot = document.getElementById('clock');
+    var clockTarget = clockRoot && (clockRoot.querySelector('.header-clock-value') || clockRoot.querySelector('span'));
+    if (clockTarget) clockTarget.textContent = str;
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -190,7 +252,15 @@ function initDraggableAiFloat() {
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDraggableAiFloat);
+    document.addEventListener('DOMContentLoaded', function() {
+        initPageEntrance();
+        initDraggableAiFloat();
+    });
 } else {
+    initPageEntrance();
     initDraggableAiFloat();
 }
+
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) initPageEntrance();
+});

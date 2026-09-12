@@ -8,15 +8,127 @@ const DASHBOARD_ALERT_FALLBACK = {
   imagesJson: '["/jhds/images/alerts/graft-union-anomaly.png","/jhds/images/alerts/graft-cut-anomaly.png"]'
 };
 
+const DASHBOARD_SUGGESTIONS = [
+  {
+    title: '当前樱桃生长状况良好，建议：',
+    items: ['1号大棚增加营养液 EC 值至 1.5', '3号大棚注意近期湿度偏低', '预计未来3天有降雨，注意棚内通风']
+  },
+  {
+    title: '环境数据整体处于适宜区间，建议：',
+    items: ['2号大棚午后湿度升高，提前开启循环风机', '4号大棚光照较强，适当调整遮阳时段', '夜间温差增大，保持棚温不低于 18°C']
+  },
+  {
+    title: '土壤养分消耗出现轻微变化，建议：',
+    items: ['1号大棚下一轮灌溉补充钾肥 8%', '2号大棚维持当前 pH 配液参数', '3号大棚 EC 波动偏小，可延长监测周期']
+  },
+  {
+    title: '病虫害模型未发现高风险特征，建议：',
+    items: ['继续保持每日两次轨道巡检', '重点复查种植架 3 的叶片背面', '雨后及时排湿，降低白粉病发生概率']
+  }
+];
+
+const DASHBOARD_WIND_DIRECTIONS = ['北风', '东北风', '东风', '东南风', '南风', '西南风', '西风', '西北风'];
+const dashboardWeatherState = {
+  temperature: 24.1,
+  humidity: 61,
+  windSpeed: 2.4,
+  windDirection: '东南风',
+  lightIntensity: 68900,
+  condition: '多云'
+};
+let dashboardSuggestionIndex = 0;
+
+function dashboardNumber(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function dashboardClamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function dashboardWindDirection(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const degrees = Number(value);
+  if (!Number.isFinite(degrees)) return String(value);
+  const normalized = ((degrees % 360) + 360) % 360;
+  return DASHBOARD_WIND_DIRECTIONS[Math.round(normalized / 45) % DASHBOARD_WIND_DIRECTIONS.length];
+}
+
+function renderWeatherThumb() {
+  setDashboardText('wt-temp', dashboardWeatherState.temperature.toFixed(1) + '\u00B0C');
+  setDashboardText('wt-humidity', Math.round(dashboardWeatherState.humidity) + '%');
+  setDashboardText('wt-wind', dashboardWeatherState.windSpeed.toFixed(1) + 'm/s');
+  setDashboardText('wt-wind-dir', dashboardWeatherState.windDirection);
+  setDashboardText('wt-light', Math.round(dashboardWeatherState.lightIntensity / 100) * 100 + ' lux');
+  setDashboardText('wt-condition', dashboardWeatherState.condition);
+}
+
 async function loadWeatherThumb() {
   const res = await apiGet('/weather/current');
   if (res && res.data) {
     const d = res.data;
-    document.getElementById('wt-temp').textContent = (d.temperature ?? '--') + '\u00B0C';
-    document.getElementById('wt-humidity').textContent = (d.humidity ?? '--') + '%';
-    document.getElementById('wt-wind').textContent = (d.windSpeed ?? '--') + 'm/s';
-    document.getElementById('wt-wind-dir').textContent = d.windDirection ?? '--';
+    dashboardWeatherState.temperature = dashboardNumber(d.temperature, dashboardWeatherState.temperature);
+    dashboardWeatherState.humidity = dashboardNumber(d.humidity, dashboardWeatherState.humidity);
+    dashboardWeatherState.windSpeed = dashboardNumber(d.windSpeed, dashboardWeatherState.windSpeed);
+    dashboardWeatherState.windDirection = dashboardWindDirection(d.windDirection, dashboardWeatherState.windDirection);
+    dashboardWeatherState.lightIntensity = dashboardNumber(d.lightIntensity, dashboardWeatherState.lightIntensity);
+    dashboardWeatherState.condition = d.condition || d.weather || dashboardWeatherState.condition;
   }
+  renderWeatherThumb();
+}
+
+function fluctuateWeatherThumb() {
+  dashboardWeatherState.temperature = dashboardClamp(dashboardWeatherState.temperature + (Math.random() - 0.5) * 0.5, 18, 32);
+  dashboardWeatherState.humidity = dashboardClamp(dashboardWeatherState.humidity + Math.round((Math.random() - 0.5) * 4), 45, 78);
+  dashboardWeatherState.windSpeed = dashboardClamp(dashboardWeatherState.windSpeed + (Math.random() - 0.5) * 0.6, 0.6, 5.8);
+  dashboardWeatherState.lightIntensity = dashboardClamp(dashboardWeatherState.lightIntensity + (Math.random() - 0.5) * 2400, 52000, 79000);
+  if (Math.random() < 0.18) {
+    dashboardWeatherState.windDirection = DASHBOARD_WIND_DIRECTIONS[Math.floor(Math.random() * DASHBOARD_WIND_DIRECTIONS.length)];
+  }
+  dashboardWeatherState.condition = dashboardWeatherState.humidity > 70 ? '阴' : (dashboardWeatherState.lightIntensity > 73000 ? '晴间多云' : '多云');
+  renderWeatherThumb();
+}
+
+function renderDashboardSuggestion(index, animate) {
+  const container = document.getElementById('dashboard-ai-suggestion');
+  if (!container) return;
+  const suggestion = DASHBOARD_SUGGESTIONS[index % DASHBOARD_SUGGESTIONS.length];
+  const update = function () {
+    const title = container.querySelector('p');
+    const list = container.querySelector('ol');
+    if (title) title.textContent = suggestion.title;
+    if (list) {
+      list.replaceChildren(...suggestion.items.map(function (item) {
+        const row = document.createElement('li');
+        row.textContent = item;
+        return row;
+      }));
+    }
+    container.dataset.suggestionIndex = String(index % DASHBOARD_SUGGESTIONS.length);
+    container.classList.remove('is-changing');
+    container.classList.remove('is-entering');
+    void container.offsetWidth;
+    container.classList.add('is-entering');
+    window.setTimeout(function () {
+      container.classList.remove('is-entering');
+    }, 650);
+  };
+  if (!animate) {
+    container.classList.remove('is-changing', 'is-entering');
+    update();
+    container.classList.remove('is-entering');
+    return;
+  }
+  container.classList.add('is-changing');
+  window.setTimeout(update, 300);
+}
+
+function rotateDashboardSuggestion() {
+  if (document.hidden) return;
+  dashboardSuggestionIndex = (dashboardSuggestionIndex + 1) % DASHBOARD_SUGGESTIONS.length;
+  renderDashboardSuggestion(dashboardSuggestionIndex, true);
 }
 
 function setDashboardText(id, value) {
@@ -210,11 +322,15 @@ function isTypingTarget(target) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  renderWeatherThumb();
+  renderDashboardSuggestion(dashboardSuggestionIndex, false);
   loadWeatherThumb();
   loadDashboardOverview();
   loadDashboardPageAlert();
   window.setInterval(loadDashboardOverview, 30000);
   window.setInterval(loadWeatherThumb, 30000);
+  window.setInterval(fluctuateWeatherThumb, 5000);
+  window.setInterval(rotateDashboardSuggestion, 7000);
   window.setInterval(loadDashboardPageAlert, 60000);
 
   const overlay = document.getElementById('dashboard-modal');

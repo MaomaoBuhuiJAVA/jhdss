@@ -8,6 +8,10 @@ import com.jhds.config.MqttProperties;
 import com.jhds.entity.Equipment;
 import com.jhds.mapper.EquipmentMapper;
 import com.jhds.service.ControlLogService;
+import com.jhds.service.ControlPanelService;
+import com.jhds.service.DeviceTwinState;
+import com.jhds.service.ModbusTcpTransport;
+import com.jhds.service.ModbusMotorService;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -42,6 +46,14 @@ public class MqttService implements DisposableBean {
     private EquipmentMapper equipmentMapper;
     @Autowired
     private ControlLogService controlLogService;
+    @Autowired
+    private DeviceTwinState deviceTwinState;
+    @Autowired
+    private ModbusTcpTransport modbusTcpTransport;
+    @Autowired
+    private ModbusMotorService modbusMotorService;
+    @Autowired
+    private ControlPanelService controlPanelService;
 
     // Optional overrides are useful when the motor command table is managed by
     // deployment configuration instead of edited directly in MySQL.
@@ -55,6 +67,12 @@ public class MqttService implements DisposableBean {
     private String motorStateClose;
     @Value("${device.commands.motor-confirmation-timeout-ms:1200}")
     private long motorConfirmationTimeoutMs;
+    @Value("${modbus.fallback.motor.relative-target:1000}")
+    private int modbusFallbackMotorTarget;
+    @Value("${modbus.fallback.motor.speed:60}")
+    private int modbusFallbackMotorSpeed;
+    @Value("${modbus.motor.unit-id:1}")
+    private int modbusMotorUnitId;
 
     private volatile MqttClient mqttClient;
     private volatile String effectiveClientId;
@@ -256,10 +274,20 @@ public class MqttService implements DisposableBean {
     }
 
     public String sendCommand(String alias, String value, boolean automatic) {
+        deviceTwinState.invalidate(alias);
         Equipment equipment = equipmentMapper.selectByAlias(alias);
         if (equipment == null) {
             log.warn("Equipment not found: {}", alias);
             return null;
+        }
+        if (!isConnected()) {
+            if (isDirectMotorSignal(alias)) {
+                return sendDirectMotorFallback(alias, equipment, value, automatic);
+            }
+            if (isGatewayOutputSignal(alias)) {
+                String gatewayResponse = sendGatewayOutputFallback(alias, equipment, value, automatic);
+                if (gatewayResponse != null) return gatewayResponse;
+            }
         }
         String commandCode = equipment.getOpenCode();
         if ("close".equals(value) || "stop".equals(value)) {
@@ -306,6 +334,9 @@ public class MqttService implements DisposableBean {
             if (success) {
                 equipment.setStatus("close".equals(value) || "stop".equals(value) ? 0 : 1);
                 equipmentMapper.updateById(equipment);
+                observeTwinResponse(alias, value, response);
+            } else {
+                deviceTwinState.invalidate(alias);
             }
             return response;
         } catch (Exception e) {
@@ -313,6 +344,7 @@ public class MqttService implements DisposableBean {
             controlLogService.log(alias, equipment.getName(), value,
                     automatic ? 1 : 0, null, e.getMessage(), 0);
             pendingCommands.remove(requestId);
+            deviceTwinState.invalidate(alias);
             return null;
         }
     }
@@ -335,16 +367,23 @@ public class MqttService implements DisposableBean {
             // the device powers on, causing an unexpected limit hit. QoS 0
             // makes these commands valid only while the device is connected.
             String response = sendHexSync(commandCode, timeoutMs, momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()));
+            if (response == null && momentaryMotorCommand) {
+                response = retryMotorFrameThroughModbus(alias, commandCode);
+            }
             boolean success = response != null;
             controlLogService.log(alias, equipment.getName(), value,
                     automatic ? 1 : 0, commandCode, response, success ? 1 : 0);
             if (success) {
                 equipment.setStatus("close".equals(value) || "stop".equals(value) ? 0 : 1);
                 equipmentMapper.updateById(equipment);
+                observeTwinResponse(alias, value, response);
+            } else {
+                deviceTwinState.invalidate(alias);
             }
             return response;
         } catch (Exception e) {
             log.error("Hex command failed: alias={}, value={}, code={}", alias, value, commandCode, e);
+            deviceTwinState.invalidate(alias);
             controlLogService.log(alias, equipment.getName(), value,
                     automatic ? 1 : 0, commandCode, null, 0);
             return null;
@@ -398,11 +437,251 @@ public class MqttService implements DisposableBean {
         status.put("lastConnectedAt", lastConnectedAt == 0 ? null : new Date(lastConnectedAt));
         status.put("lastDisconnectedAt", lastDisconnectedAt == 0 ? null : new Date(lastDisconnectedAt));
         status.put("lastConnectionAttemptAt", lastConnectionAttemptAt == 0 ? null : new Date(lastConnectionAttemptAt));
+        boolean mqttConnected = isConnected();
+        Map<String, Object> gateway = controlPanelService == null ? null : controlPanelService.connectionStatus();
+        boolean gatewayReachable = gateway != null && Boolean.TRUE.equals(gateway.get("reachable"));
+        Map<String, Object> fallback = modbusTcpTransport == null ? new LinkedHashMap<>()
+                : modbusTcpTransport.status(!mqttConnected && !gatewayReachable);
+        boolean directReachable = Boolean.TRUE.equals(fallback.get("reachable"));
+        fallback.put("directReachable", directReachable);
+        fallback.put("gateway", gateway);
+        fallback.put("reachable", directReachable || gatewayReachable);
+        fallback.put("mode", gatewayReachable ? "software-modbus"
+                : directReachable ? "direct-modbus" : "offline");
+        status.put("fallback", fallback);
+        status.put("transportMode", mqttConnected ? "mqtt"
+                : fallback != null && Boolean.TRUE.equals(fallback.get("enabled"))
+                && Boolean.TRUE.equals(fallback.get("reachable")) ? "modbus" : "offline");
         return status;
+    }
+
+    private boolean isDirectMotorSignal(String alias) {
+        return "MOTOR_DIRECTION".equalsIgnoreCase(alias) || "MOTOR_STATE".equalsIgnoreCase(alias);
+    }
+
+    private boolean isGatewayOutputSignal(String alias) {
+        return "PUMP_CO2".equalsIgnoreCase(alias) || "PUMP_CIRCULATION".equalsIgnoreCase(alias);
+    }
+
+    private String sendGatewayOutputFallback(String alias, Equipment equipment, String value, boolean automatic) {
+        if (controlPanelService == null || modbusTcpTransport == null
+                || !modbusTcpTransport.isFallbackEnabled()) return null;
+        boolean enabled = !"close".equalsIgnoreCase(value) && !"stop".equalsIgnoreCase(value);
+        try {
+            Map<String, Object> result = controlPanelService.deviceOutput(alias, enabled);
+            result.put("transport", "modbus");
+            result.put("fallbackPath", "software-http-modbus");
+            result.put("alias", alias);
+            result.put("success", true);
+            String response = JSON.toJSONString(result);
+            controlLogService.log(alias, equipment.getName(), value, automatic ? 1 : 0,
+                    "MODBUS_GATEWAY " + alias + " " + value, response, 1);
+            equipment.setStatus(enabled ? 1 : 0);
+            equipmentMapper.updateById(equipment);
+            observeTwinResponse(alias, value, response);
+            return response;
+        } catch (RuntimeException gatewayError) {
+            log.warn("Local Modbus gateway output failed; trying direct TCP: alias={}, error={}",
+                    alias, gatewayError.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Retries the exact rail frame through Modbus TCP when MQTT is connected
+     * but the DTU loses or truncates the acknowledgement. Reusing the RTU
+     * frame preserves its slave id and register/coil address, so the fallback
+     * cannot accidentally operate the other motor axis.
+     */
+    private String retryMotorFrameThroughModbus(String alias, String commandCode) {
+        if (modbusTcpTransport == null || !modbusTcpTransport.isFallbackEnabled()) {
+            log.warn("Motor MQTT acknowledgement missing and Modbus fallback is disabled: alias={}", alias);
+            return null;
+        }
+        try {
+            log.warn("Motor MQTT acknowledgement missing; retrying the same frame through Modbus: alias={}", alias);
+            String response = modbusTcpTransport.exchangeRtuFrame(commandCode);
+            if (!isMatchingModbusWriteResponse(commandCode, response)) {
+                log.warn("Modbus motor fallback returned an unrelated frame: alias={}, response={}", alias, response);
+                return null;
+            }
+            return response;
+        } catch (RuntimeException e) {
+            log.error("Modbus motor fallback failed: alias={}, command={}", alias, commandCode, e);
+            return null;
+        }
+    }
+
+    private String sendDirectMotorFallback(String alias, Equipment equipment, String value, boolean automatic) {
+        if (modbusTcpTransport == null || !modbusTcpTransport.isFallbackEnabled() || modbusMotorService == null) {
+            log.warn("MQTT is offline and direct Modbus motor fallback is unavailable: {}", alias);
+            return null;
+        }
+        try {
+            Map<String, Object> result = sendMotorThroughGateway(alias, value);
+            if (result == null) result = sendMotorDirectly(alias, value);
+            result.put("transport", "modbus");
+            result.put("alias", alias);
+            result.put("success", true);
+            String response = JSON.toJSONString(result);
+            controlLogService.log(alias, equipment.getName(), value, automatic ? 1 : 0,
+                    "MODBUS_TCP " + alias + " " + value, response, 1);
+            equipment.setStatus("close".equalsIgnoreCase(value) || "stop".equalsIgnoreCase(value) ? 0 : 1);
+            equipmentMapper.updateById(equipment);
+            observeTwinResponse(alias, value, response);
+            return response;
+        } catch (RuntimeException e) {
+            log.error("Direct Modbus motor fallback failed: alias={}, value={}", alias, value, e);
+            if ("MOTOR_STATE".equalsIgnoreCase(alias)
+                    && !"close".equalsIgnoreCase(value) && !"stop".equalsIgnoreCase(value)) {
+                try {
+                    modbusMotorService.stop();
+                } catch (RuntimeException stopError) {
+                    log.error("Direct Modbus safety stop also failed", stopError);
+                }
+            }
+            controlLogService.log(alias, equipment.getName(), value, automatic ? 1 : 0,
+                    "MODBUS_TCP " + alias + " " + value, e.getMessage(), 0);
+            deviceTwinState.invalidate(alias);
+            return null;
+        }
+    }
+
+    private Map<String, Object> sendMotorThroughGateway(String alias, String value) {
+        if (controlPanelService == null) return null;
+        boolean close = "close".equalsIgnoreCase(value) || "stop".equalsIgnoreCase(value);
+        try {
+            Map<String, Object> result;
+            if ("MOTOR_DIRECTION".equalsIgnoreCase(alias)) {
+                result = controlPanelService.move(close ? "backward" : "forward", true);
+            } else if (close) {
+                result = controlPanelService.stopMotion();
+            } else if (controlPanelService.hasActiveMotion()) {
+                result = controlPanelService.motionStatus();
+            } else {
+                return null;
+            }
+            result.put("fallbackPath", "software-http-modbus");
+            return result;
+        } catch (RuntimeException gatewayError) {
+            log.warn("Local Modbus gateway failed; trying direct TCP: {}", gatewayError.getMessage());
+            return null;
+        }
+    }
+
+    private Map<String, Object> sendMotorDirectly(String alias, String value) {
+        if ("MOTOR_DIRECTION".equalsIgnoreCase(alias)) {
+            boolean close = "close".equalsIgnoreCase(value) || "stop".equalsIgnoreCase(value);
+            return modbusMotorService.prepareRelative(modbusFallbackMotorTarget,
+                    modbusFallbackMotorSpeed, close ? "backward" : "forward");
+        }
+        boolean enabled = !"close".equalsIgnoreCase(value) && !"stop".equalsIgnoreCase(value);
+        return modbusMotorService.run(enabled);
+    }
+
+    /** Updates D20 through MQTT first, then the local gateway/direct Modbus fallback. */
+    public Map<String, Object> setMotorSpeed(int speed, boolean automatic) {
+        if (speed < 1 || speed > 500) {
+            throw new IllegalArgumentException("电机速度范围为 1-500");
+        }
+
+        String command = buildMotorSpeedFrame(modbusMotorUnitId, speed);
+        if (isConnected()) {
+            if (!tryLockSequential()) {
+                log.warn("Motor speed update skipped because the control channel is busy");
+                return null;
+            }
+            String response;
+            try {
+                response = sendHexSync(command, Math.max(250L, Math.min(5000L, motorConfirmationTimeoutMs)), 0);
+            } finally {
+                unlockSequential();
+            }
+            if (response == null) return null;
+            modbusFallbackMotorSpeed = speed;
+            return motorSpeedResult(speed, "mqtt", response);
+        }
+
+        if (modbusTcpTransport == null || !modbusTcpTransport.isFallbackEnabled()) return null;
+        if (controlPanelService != null) {
+            try {
+                Map<String, Object> result = controlPanelService.motorSpeed(speed);
+                result.put("transport", "modbus");
+                result.put("fallbackPath", "software-http-modbus");
+                modbusFallbackMotorSpeed = speed;
+                return result;
+            } catch (RuntimeException gatewayError) {
+                log.warn("Local Modbus gateway speed command failed; trying direct TCP: {}",
+                        gatewayError.getMessage());
+            }
+        }
+        if (modbusMotorService == null) return null;
+        try {
+            Map<String, Object> result = modbusMotorService.setSpeed(speed);
+            result.put("transport", "modbus");
+            result.put("fallbackPath", "direct-modbus");
+            modbusFallbackMotorSpeed = speed;
+            return result;
+        } catch (RuntimeException directError) {
+            log.error("Direct Modbus motor speed command failed: speed={}", speed, directError);
+            return null;
+        }
+    }
+
+    private Map<String, Object> motorSpeedResult(int speed, String transport, String response) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("action", "speed");
+        result.put("speed", speed);
+        result.put("transport", transport);
+        result.put("response", response);
+        result.put("success", true);
+        result.put("sentAt", System.currentTimeMillis());
+        return result;
+    }
+
+    private String buildMotorSpeedFrame(int unitId, int speed) {
+        if (unitId < 0 || unitId > 255) throw new IllegalArgumentException("Modbus 单元地址范围为 0-255");
+        byte[] payload = new byte[]{
+                (byte) unitId, 6, 0, 20, (byte) (speed >>> 8), (byte) speed
+        };
+        int crc = ModbusUtil.calculateCRC16(payload);
+        byte[] frame = Arrays.copyOf(payload, payload.length + 2);
+        frame[frame.length - 2] = (byte) (crc & 0xFF);
+        frame[frame.length - 1] = (byte) ((crc >>> 8) & 0xFF);
+        return ModbusUtil.bytesToHex(frame);
     }
 
     public boolean isConnected() {
         return mqttClient != null && mqttClient.isConnected();
+    }
+
+    /** True when commands can use MQTT or the explicitly configured local fallback. */
+    public boolean hasAvailableTransport() {
+        if (isConnected()) return true;
+        if (controlPanelService != null && controlPanelService.isReachable()) return true;
+        return modbusTcpTransport != null
+                && modbusTcpTransport.isFallbackEnabled() && modbusTcpTransport.isReachable();
+    }
+
+    public long commandTransportEpoch() {
+        return isConnected() ? twinConnectionEpoch()
+                : modbusTcpTransport == null ? twinConnectionEpoch() : modbusTcpTransport.connectionEpoch();
+    }
+
+    private void observeTwinResponse(String alias, String value, String response) {
+        if (response.trim().startsWith("{")) {
+            try {
+                JSONObject result = JSON.parseObject(response);
+                if (Boolean.FALSE.equals(result.getBoolean("success"))
+                        || (result.containsKey("code") && result.getIntValue("code") >= 400)
+                        || result.get("error") != null) return;
+            } catch (RuntimeException invalid) { return; }
+        }
+        deviceTwinState.acknowledge(alias, !"close".equals(value) && !"stop".equals(value));
+    }
+
+    public long twinConnectionEpoch() {
+        return Math.max(lastConnectedAt, lastDisconnectedAt);
     }
 
     /**
@@ -432,6 +711,13 @@ public class MqttService implements DisposableBean {
         sequentialResponseQueue.clear();
     }
 
+    private boolean tryLockSequential() {
+        if (!sequentialLock.tryLock()) return false;
+        sequentialMode = true;
+        sequentialResponseQueue.clear();
+        return true;
+    }
+
     public void unlockSequential() {
         sequentialMode = false;
         sequentialLock.unlock();
@@ -448,8 +734,12 @@ public class MqttService implements DisposableBean {
                 return null;
             }
             if (!isConnected()) {
-                log.warn("MQTT is not connected; command was not sent");
-                return null;
+                if (modbusTcpTransport == null || !modbusTcpTransport.isFallbackEnabled()) {
+                    log.warn("MQTT is not connected and Modbus fallback is disabled");
+                    return null;
+                }
+                log.info("MQTT unavailable; sending RTU frame through Modbus TCP fallback: {}", hexCommand);
+                return modbusTcpTransport.exchangeRtuFrame(hexCommand);
             }
             String commandTopic = mqttProperties.getTopic().getPrefix() + "/"
                     + mqttProperties.getTopic().getCommandSuffix();
@@ -524,16 +814,21 @@ public class MqttService implements DisposableBean {
                 return false;
             }
             if (replyFunction != requestFunction) return false;
-            // A valid Modbus write acknowledgement echoes the address and the
-            // written value/quantity. Requiring all six bytes prevents a
-            // different controller status frame from being reported as a
-            // successful motor command.
-            int prefixLength = 6;
-            if (request.length < prefixLength || reply.length < prefixLength + 2) return false;
-            for (int i = 0; i < prefixLength; i++) {
-                if (request[i] != reply[i]) return false;
-            }
-            return ModbusUtil.verifyCRC(reply);
+            if (request.length < 6 || reply.length < 8) return false;
+            if (request[2] != reply[2] || request[3] != reply[3]) return false;
+            if (!ModbusUtil.verifyCRC(reply)) return false;
+
+            // The deployed rail controller returns a status word (observed
+            // 45 04) for slave 3 / FC05 / coil 1 instead of echoing FF 00.
+            // Scope this compatibility rule to that exact device address;
+            // every other write still requires a full value echo.
+            boolean deployedRailStatusAck = (request[0] & 0xFF) == 3
+                    && requestFunction == 5
+                    && (request[2] & 0xFF) == 0
+                    && (request[3] & 0xFF) == 1;
+            if (deployedRailStatusAck) return true;
+
+            return request[4] == reply[4] && request[5] == reply[5];
         } catch (RuntimeException e) {
             return false;
         }

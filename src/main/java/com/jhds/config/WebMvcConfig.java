@@ -29,6 +29,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${ai.yolo.evaluation-source-path:./LabelImg资料图片/yolo_dataset/camera_test}")
     private String aiYoloEvaluationSourcePath;
 
+    @Value("${patrol.automatic.result-path:./uploads/patrol-results}")
+    private String patrolResultPath;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")
@@ -49,6 +52,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations(directoryLocation(aiYoloEvaluationPath));
         registry.addResourceHandler("/ai-eval-source/**")
                 .addResourceLocations(directoryLocation(aiYoloEvaluationSourcePath));
+        registry.addResourceHandler("/patrol-results/**")
+                .addResourceLocations(directoryLocation(patrolResultPath));
         registry.addResourceHandler("/local-camera/**")
                 .addResourceLocations(directoryLocation(localCameraHlsPath))
                 // Playlists and segments are live resources. A cached m3u8

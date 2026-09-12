@@ -6,8 +6,9 @@
     <title>jhds - 植株历年档案</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
     <link rel="stylesheet" th:href="@{/css/archive.css}">
+    <link rel="stylesheet" th:href="@{/css/forest-theme.css(v='20260912-card-edge-v1')}">
 </head>
 <body>
     <div th:replace="fragments/header::header('archive')"></div>
@@ -58,11 +59,7 @@
         </section>
     </main>
 
-    <div class="ai-float" onclick="location.href='/jhds/ai'" style="cursor:pointer;">
-        <i class="ri-robot-2-line"></i>
-        <span>AI 农业管家</span>
-        <span>点击开始对话</span>
-    </div>
+
 
     <div class="modal-overlay" id="modal-overlay" hidden onclick="if(event.target===this)closeModal()">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -77,7 +74,7 @@
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <script th:src="@{/js/common.js}"></script>
+    <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/archive.js}"></script>
 </body>
 </html>

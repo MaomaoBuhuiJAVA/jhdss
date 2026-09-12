@@ -70,8 +70,18 @@ set JAVA_OPTS=-Dserver.port=9118
 | `CAMERA_LOCAL_HOST/PORT/PATH/TRANSPORT` | `127.0.0.1/554`/`/ch1/main`/`tcp` | 摄像头局域网 RTSP 地址；TCP 可避免 UDP 丢包导致 H.264 花屏；若网络环境确认可靠，也可改为 `udp` |
 | `CAMERA_LOCAL_USERNAME/PASSWORD` | `admin`/空 | RTSP 认证；萤石设备通常使用 `admin` 和设备验证码 |
 | `CAMERA_LOCAL_WIDTH/VIDEO_BITRATE` | `1080`/`4000k` | FFmpeg 输出高度和码率，默认 1920×1080 超清；性能不足时可降为 720/2000k |
+| `CAMERA_LOCAL_PREFER_FALLBACK` | `false` | 优先使用主码流；当前设备主码流约 15 FPS、子码流约 10 FPS，设为 `true` 会牺牲流畅度换取更低带宽 |
+| `CAMERA_LOCAL_FPS` / `CAMERA_LOCAL_LIST_SIZE` | `15` / `6` | 输出帧率及 HLS 抗抖播放列表长度；帧率应匹配摄像头实际输出，不能靠转码生成真实新帧 |
 | `CAMERA_LOCAL_FFMPEG_PATH` | `ffmpeg` | FFmpeg 可执行文件路径，要求在 PATH 中或填写绝对路径 |
-| `CONTROL_PANEL_BASE_URL` | `http://169.254.240.33` | 控制面板 HTTP 服务地址；控制面板由第三台电脑转发时填写第三台电脑在无网路由器网络中的地址和端口 |
+| `AI_YOLO_ENABLED` / `AI_YOLO_MODEL_PATH` | `true` / `./weights/black_longhorn_best.pt` | 启用摄像头实时虫害识别，并指定本次训练得到的 YOLO 权重 |
+| `AI_YOLO_CONFIDENCE` | `0.25` | 单帧候选阈值；候选不会直接触发虫害告警 |
+| `AI_YOLO_VERIFY_WINDOW_FRAMES` / `AI_YOLO_VERIFY_REQUIRED_HITS` | `5` / `3` | 同一空间目标需在最近 5 个采样帧中命中至少 3 帧才可能确认 |
+| `AI_YOLO_VERIFY_MAX_FRAME_GAP` / `AI_YOLO_VERIFY_MINIMUM_IOU` | `1` / `0.25` | 允许漏过 1 个采样帧；相邻检测框 IoU 至少 0.25 才视为同一目标 |
+| `AI_YOLO_VERIFY_MINIMUM_AVERAGE_CONFIDENCE` / `AI_YOLO_VERIFY_MINIMUM_STRONG_CONFIDENCE` | `0.35` / `0.50` | 多帧平均置信度及窗口内至少一次强证据门槛，两者都满足才确认并告警 |
+| `CONTROL_PANEL_BASE_URL` | `http://127.0.0.1:8999` | 本机 HTTP-to-Modbus 控制服务地址；`start-jhds.bat` 默认自动启动 |
+| `MODBUS_GATEWAY_BIND` / `MODBUS_GATEWAY_PORT` | `127.0.0.1` / `8999` | 本地 Modbus 网关监听地址；默认只允许本机访问 |
+| `MODBUS_MOTOR_HOST` / `MODBUS_MOTOR_PORT` | `192.168.1.12` / `502` | 网关连接的 PLC 地址；网关独占并复用该连接 |
+| `MODBUS_MOTOR_UNIT_ID` / `MODBUS_MOTOR_TIMEOUT_MS` | `1` / `1500` | PLC 单元地址和 Modbus 请求超时（毫秒） |
 | `SPRING_DATASOURCE_USERNAME` | `root` | MySQL 登录用户名 |
 | `SPRING_DATASOURCE_PASSWORD` | `a123456` | MySQL 登录密码；必须与目标电脑实际账号密码一致 |
 | `MOTOR_DIRECTION_OPEN_HEX` / `MOTOR_DIRECTION_CLOSE_HEX` | 空 | 巡检电机方向的正转/反转串口帧 |
@@ -89,7 +99,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `dashscope.model` | `kimi-k2.7-code` | 云端模型 |
 | `patrol.capture-path` | `./captures` | 巡逻图片保存目录 |
 | `PATROL_COVERAGE_RATIO` | `0.92` | 垂直（升降）行程安全覆盖率；垂直方向单条扫描线仍需从底部上升到顶部并最终返回安全高度，因此仅保留 92% 标定行程，避免触发上下硬限位 |
-| `PATROL_HORIZONTAL_COVERAGE_RATIO` | `0.80` | 水平（轨道）行程安全覆盖率，同时也是轨道**左侧软限位**：以最右端为 0%、完整右到左行程为 100%，自动巡检与手动"左移"都不会越过 80%，最右端仍可正常到达。该值须与 `PATROL_HORIZONTAL_TRAVEL_MS` 匹配，调小可留出更大冗余缓冲 |
+| `PATROL_HORIZONTAL_COVERAGE_RATIO` | `0.70` | 水平（轨道）行程安全覆盖率，同时也是轨道**左侧软限位**：以最右端为 0%、完整右到左行程为 100%，自动巡检与手动"左移"都不会越过 70%，最右端仍可正常到达。该值须与 `PATROL_HORIZONTAL_TRAVEL_MS` 匹配，调小可留出更大冗余缓冲 |
 | `logging.level.com.jhds` | `debug` | 应用日志级别，生产建议改为 `info` |
 
 可通过 `JAVA_OPTS` 传入任意 Spring 覆盖项，例如 `-Dspring.redis.host=192.168.1.20`、`-Ddevice.mqtt.enabled=false`。

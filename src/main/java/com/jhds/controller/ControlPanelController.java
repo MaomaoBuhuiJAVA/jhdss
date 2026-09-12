@@ -31,6 +31,12 @@ public class ControlPanelController {
         return Result.ok(controlPanelService.move(direction, enabled));
     }
 
+    @ApiOperation("停止控制面板前进/后退")
+    @PostMapping("/stop")
+    public Result<Map<String, Object>> stop() {
+        return Result.ok(controlPanelService.stopMotion());
+    }
+
     @ApiOperation("控制控制面板水泵")
     @PostMapping("/pump")
     public Result<Map<String, Object>> pump(@RequestBody Map<String, Object> body) {

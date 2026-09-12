@@ -61,4 +61,9 @@ public class PageController {
         return "archive";
     }
 
+    @GetMapping("/after-sales")
+    public String afterSales() {
+        return "after-sales";
+    }
+
 }

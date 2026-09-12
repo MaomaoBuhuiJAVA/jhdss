@@ -1,16 +1,19 @@
-(function() {
+﻿(function() {
     'use strict';
 
     var messages = document.getElementById('messages');
     var inputBox = document.getElementById('inputBox');
     var sendBtn = document.getElementById('sendBtn');
-    var uploadBtn = document.getElementById('uploadBtn');
     var imageInput = document.getElementById('imageInput');
     var imagePreview = document.getElementById('imagePreview');
     var previewImg = document.getElementById('previewImg');
     var removeImageBtn = document.getElementById('removeImageBtn');
     var newChatBtn = document.getElementById('newChatBtn');
     var memoryToggle = document.getElementById('memoryToggle');
+    var conversationSearchToggle = document.getElementById('conversationSearchToggle');
+    var conversationSearch = document.getElementById('conversationSearch');
+    var conversationSearchInput = document.getElementById('conversationSearchInput');
+    var conversationSearchClose = document.getElementById('conversationSearchClose');
 
     var isStreaming = false;
     var eventSource = null;
@@ -19,6 +22,7 @@
     var welcomeTimer = null;
 
     var API_BASE = window.location.origin + '/jhds/api/ai';
+    var AI_AVATAR_URL = '/jhds/images/ui/agri-robot.png';
 
     var LOCAL_KNOWLEDGE_FALLBACK = [
         {
@@ -154,13 +158,27 @@
         });
     }
 
+    function createMessageAvatar(isUser) {
+        var avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        if (isUser) {
+            avatar.textContent = '\uD83D\uDC64';
+            return avatar;
+        }
+
+        var image = document.createElement('img');
+        image.src = AI_AVATAR_URL;
+        image.alt = '';
+        image.setAttribute('aria-hidden', 'true');
+        avatar.appendChild(image);
+        return avatar;
+    }
+
     function addMessage(text, isUser, imageBase64) {
         var div = document.createElement('div');
         div.className = 'message' + (isUser ? ' user' : ' ai');
 
-        var avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = isUser ? '\uD83D\uDC64' : '\uD83E\uDD16';
+        var avatar = createMessageAvatar(isUser);
 
         var content = document.createElement('div');
         content.className = 'message-content';
@@ -198,9 +216,7 @@
         div.className = 'message ai';
         div.id = 'streamingMsg';
 
-        var avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = '\uD83E\uDD16';
+        var avatar = createMessageAvatar(false);
 
         var content = document.createElement('div');
         content.className = 'message-content';
@@ -211,11 +227,36 @@
 
         var textDiv = document.createElement('div');
         textDiv.className = 'message-text';
-        textDiv.innerHTML = '<div class="thinking-indicator">'
-            + '<span class="thinking-emoji">\uD83E\uDD14</span>'
-            + '<span class="thinking-text">大模型正在思考中</span>'
-            + '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>'
-            + '</div>';
+        textDiv.innerHTML = '<div class="thinking-indicator ai-thinking-compact" role="status" aria-live="polite">'
+            + '<div class="thinking-radar" aria-hidden="true"><span></span><i></i></div>'
+            + '<div class="compact-thinking-copy">'
+            + '<header><strong>正在分析您的问题</strong><b class="thinking-count">01 / 04</b></header>'
+            + '<span class="thinking-text">正在解析问题意图与关联大棚</span>'
+            + '<ol class="thinking-step-list" aria-label="分析进度">'
+            + '<li class="active">理解问题</li><li>检索知识库</li><li>核对数据</li><li>生成建议</li>'
+            + '</ol></div></div>';
+
+        var phase = textDiv.querySelector('.thinking-text');
+        var count = textDiv.querySelector('.thinking-count');
+        var steps = textDiv.querySelectorAll('.thinking-step-list li');
+        var phases = [
+            '正在解析问题意图与关联大棚',
+            '正在检索农业知识库关键词索引',
+            '正在核对传感器数据与历史记录',
+            '正在整理风险判断与处置建议'
+        ];
+        var phaseIndex = 0;
+        var startedAt = Date.now();
+        var phaseTimer = window.setInterval(function() {
+            phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
+            if (phase) phase.textContent = phases[phaseIndex];
+            if (count) count.textContent = String(phaseIndex + 1).padStart(2, '0') + ' / 04';
+            steps.forEach(function(step, index) {
+                step.classList.toggle('active', index === phaseIndex);
+                step.classList.toggle('complete', index < phaseIndex);
+            });
+            if (phaseIndex === phases.length - 1) window.clearInterval(phaseTimer);
+        }, 1050);
 
         content.appendChild(sender);
         content.appendChild(textDiv);
@@ -224,12 +265,93 @@
         messages.appendChild(div);
         scrollToBottom();
 
-        return { container: textDiv };
+        var controller = {
+            container: textDiv,
+            stopThinking: function() {
+                if (!phaseTimer) return;
+                window.clearInterval(phaseTimer);
+                phaseTimer = null;
+            },
+            reveal: function(text, imageAnalysis, onComplete) {
+                var remaining = Math.max(0, 4400 - (Date.now() - startedAt));
+                window.setTimeout(function() {
+                    controller.stopThinking();
+                    steps.forEach(function(step) {
+                        step.classList.remove('active');
+                        step.classList.add('complete');
+                    });
+                    if (count) count.textContent = '04 / 04';
+                    if (phase) phase.textContent = '检索完成，正在生成回答';
+                    window.setTimeout(function() {
+                        textDiv.textContent = text;
+                        addDiseaseAlert(textDiv, text, imageAnalysis);
+                        scrollToBottom();
+                        if (onComplete) onComplete();
+                    }, 320);
+                }, remaining);
+            },
+            fail: function(text, onComplete) {
+                controller.stopThinking();
+                textDiv.textContent = text;
+                scrollToBottom();
+                if (onComplete) onComplete();
+            }
+        };
+        return controller;
+    }
+
+    function startReferenceAnalysis() {
+        var stage = document.getElementById('referenceThinkingStage');
+        var result = document.getElementById('referenceAnalysisResult');
+        var phase = document.getElementById('referenceThinkingPhase');
+        var count = document.getElementById('referenceThinkingCount');
+        if (!stage || !result || !phase || !count) return;
+
+        var phases = [
+            '正在读取 3号棚环境与视频数据',
+            '正在提取叶片异常纹理与颜色特征',
+            '正在与历史病害样本进行交叉比对',
+            '正在生成风险等级与防治建议'
+        ];
+        var steps = stage.querySelectorAll('ol li');
+        var index = 0;
+
+        function renderProgress() {
+            phase.textContent = phases[index];
+            count.textContent = String(index + 1).padStart(2, '0') + ' / 04';
+            steps.forEach(function(step, stepIndex) {
+                step.classList.toggle('active', stepIndex === index);
+                step.classList.toggle('complete', stepIndex < index);
+            });
+        }
+
+        renderProgress();
+        var timer = window.setInterval(function() {
+            index += 1;
+            if (index < phases.length) {
+                renderProgress();
+                return;
+            }
+            window.clearInterval(timer);
+            steps.forEach(function(step) {
+                step.classList.remove('active');
+                step.classList.add('complete');
+            });
+            count.textContent = '04 / 04';
+            phase.textContent = '分析完成，正在生成识别报告';
+            stage.classList.add('is-complete');
+            window.setTimeout(function() {
+                if (!stage.isConnected || !result.isConnected) return;
+                stage.hidden = true;
+                result.hidden = false;
+                result.classList.add('is-visible');
+            }, 450);
+        }, 900);
     }
 
     function addNoticeMessage(text) {
         var div = document.createElement('div');
-        div.style.cssText = 'text-align:center;padding:10px 16px;margin:4px 0;font-size:12px;color:var(--accent-caution,#f0a040);background:rgba(240,160,64,0.08);border-radius:8px;border:1px solid rgba(240,160,64,0.2);';
+        div.style.cssText = 'text-align:center;padding:10px 16px;margin:4px 0;font-size:12px;color:var(--accent-caution,#faad14);background:rgba(240,160,64,0.08);border-radius:8px;border:1px solid rgba(240,160,64,0.2);';
         div.textContent = '\uD83D\uDD04 ' + text;
         messages.appendChild(div);
         scrollToBottom();
@@ -273,6 +395,56 @@
                 fetch(API_BASE + '/clear', { method: 'POST' });
             }
             clearMessages();
+        });
+    }
+
+    function setConversationSearch(open) {
+        if (!conversationSearch || !conversationSearchToggle) return;
+        conversationSearch.hidden = !open;
+        conversationSearchToggle.setAttribute('aria-expanded', String(open));
+        if (open && conversationSearchInput) conversationSearchInput.focus();
+    }
+
+    if (conversationSearchToggle) {
+        conversationSearchToggle.addEventListener('click', function() {
+            setConversationSearch(conversationSearch.hidden);
+        });
+    }
+
+    if (conversationSearchClose) {
+        conversationSearchClose.addEventListener('click', function() {
+            if (conversationSearchInput) {
+                conversationSearchInput.value = '';
+                conversationSearchInput.dispatchEvent(new Event('input'));
+            }
+            setConversationSearch(false);
+        });
+    }
+
+    if (conversationSearchInput) {
+        conversationSearchInput.addEventListener('input', function() {
+            var keyword = this.value.trim().toLowerCase();
+            document.querySelectorAll('.conversation-group').forEach(function(group) {
+                var visibleCount = 0;
+                group.querySelectorAll('.conversation-item').forEach(function(item) {
+                    var visible = !keyword || item.textContent.toLowerCase().indexOf(keyword) !== -1;
+                    item.hidden = !visible;
+                    if (visible) visibleCount += 1;
+                });
+                group.hidden = visibleCount === 0;
+            });
+        });
+    }
+
+    var conversationList = document.querySelector('.ai-conversations');
+    if (conversationList) {
+        conversationList.addEventListener('click', function(event) {
+            var item = event.target.closest('.conversation-item');
+            if (!item) return;
+            conversationList.querySelectorAll('.conversation-item.active').forEach(function(activeItem) {
+                activeItem.classList.remove('active');
+            });
+            item.classList.add('active');
         });
     }
 
@@ -334,9 +506,7 @@
         var div = document.createElement('div');
         div.className = 'message ai';
 
-        var avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = '\uD83E\uDD16';
+        var avatar = createMessageAvatar(false);
 
         var content = document.createElement('div');
         content.className = 'message-content';
@@ -367,10 +537,6 @@
     }
 
     /* ========== Image Upload ========== */
-
-    uploadBtn.addEventListener('click', function() {
-        imageInput.click();
-    });
 
     imageInput.addEventListener('change', function(e) {
         var file = e.target.files[0];
@@ -470,11 +636,9 @@
 
         var localAnswer = sendImage ? null : findLocalAnswer(text);
         if (localAnswer) {
-            window.setTimeout(function() {
-                streamMsg.container.textContent = localAnswer;
-                scrollToBottom();
+            streamMsg.reveal(localAnswer, false, function() {
                 setStreaming(false);
-            }, 260);
+            });
             return;
         }
 
@@ -502,16 +666,13 @@
 
             var currentEvent = '';
             var noticed = false;
-            var firstChunk = true;
 
             function readNext() {
                 reader.read().then(function(result) {
                     if (result.done) {
-                        if (!noticed) {
-                            streamMsg.container.textContent = fullText;
-                            scrollToBottom();
-                        }
-                        setStreaming(false);
+                        streamMsg.reveal(fullText || '知识库中暂未找到对应内容，请换一种方式描述问题。', hasImage, function() {
+                            setStreaming(false);
+                        });
                         return;
                     }
 
@@ -533,44 +694,51 @@
                             if (currentEvent === 'notice') {
                                 if (!noticed) {
                                     noticed = true;
-                                    streamMsg.container.innerHTML = '';
                                     addNoticeMessage(data);
                                 }
                             } else {
-                                if (firstChunk) {
-                                    firstChunk = false;
-                                    streamMsg.container.innerHTML = '';
-                                }
                                 fullText += data;
                             }
                         }
                     }
 
-                    if (!noticed && streamMsg) {
-                        streamMsg.container.textContent = fullText;
-                    }
                     scrollToBottom();
                     readNext();
                 }).catch(function(err) {
                     console.error('Stream read error:', err);
-                    if (!noticed && streamMsg) {
-                        streamMsg.container.textContent = fullText || '接收数据失败';
-                    }
-                    scrollToBottom();
-                    setStreaming(false);
+                    streamMsg.fail(fullText || '接收数据失败', function() { setStreaming(false); });
                 });
             }
 
             readNext();
         })
         .catch(function(err) {
-            streamMsg.container.textContent = '请求失败: ' + err.message;
-            scrollToBottom();
-            setStreaming(false);
+            streamMsg.fail('请求失败: ' + err.message, function() { setStreaming(false); });
         });
+    }
+
+    function addDiseaseAlert(target, text, imageAnalysis) {
+        if (!target || target.querySelector('.disease-alert')) return;
+        var content = String(text || '');
+        var disease = content.match(/白粉病|褐斑病|叶斑病|根腐病|灰霉病|蚜虫|红蜘蛛|黑天牛/);
+        var hasDetectionLanguage = /识别结果|检测到|发现|确诊|疑似/.test(content);
+        var isNegative = /未(?:识别|检测|发现).{0,8}(?:病|虫)|无明显病虫害|没有病虫害/.test(content);
+        if (!disease || isNegative || (!imageAnalysis && !hasDetectionLanguage)) return;
+
+        var alertBox = document.createElement('div');
+        alertBox.className = 'disease-alert';
+        alertBox.setAttribute('role', 'alert');
+        alertBox.innerHTML = '<i class="ri-error-warning-fill" aria-hidden="true"></i>'
+            + '<span>检测到' + disease[0] + '，建议立即处理</span>';
+        target.insertBefore(alertBox, target.firstChild);
     }
 
     autoResizeTextarea();
     loadKnowledgeCatalogue();
-    addWelcomeMessage();
+    if (messages.children.length) {
+        messages.scrollTop = 0;
+        startReferenceAnalysis();
+    } else {
+        addWelcomeMessage();
+    }
 })();

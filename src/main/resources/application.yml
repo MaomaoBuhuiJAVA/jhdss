@@ -123,15 +123,16 @@ camera:
     password: ${CAMERA_LOCAL_PASSWORD:}
     path: ${CAMERA_LOCAL_PATH:/ch1/main}
     fallback-path: ${CAMERA_LOCAL_FALLBACK_PATH:/ch1/sub}
-    prefer-fallback: ${CAMERA_LOCAL_PREFER_FALLBACK:true}
+    prefer-fallback: ${CAMERA_LOCAL_PREFER_FALLBACK:false}
     transport: ${CAMERA_LOCAL_TRANSPORT:tcp}
     ffmpeg-path: ${CAMERA_LOCAL_FFMPEG_PATH:ffmpeg}
     hls-path: ${CAMERA_LOCAL_HLS_PATH:./work/camera/hls}
     width: ${CAMERA_LOCAL_WIDTH:720}
     video-bitrate: ${CAMERA_LOCAL_VIDEO_BITRATE:2400k}
     video-buffer-size: ${CAMERA_LOCAL_VIDEO_BUFFER_SIZE:3600k}
+    fps: ${CAMERA_LOCAL_FPS:15}
     segment-seconds: ${CAMERA_LOCAL_SEGMENT_SECONDS:1}
-    list-size: ${CAMERA_LOCAL_LIST_SIZE:3}
+    list-size: ${CAMERA_LOCAL_LIST_SIZE:6}
     connect-timeout-ms: ${CAMERA_LOCAL_CONNECT_TIMEOUT_MS:8000}
     startup-timeout-ms: ${CAMERA_LOCAL_STARTUP_TIMEOUT_MS:30000}
     stale-timeout-ms: ${CAMERA_LOCAL_STALE_TIMEOUT_MS:30000}
@@ -176,31 +177,53 @@ patrol:
   capture-path: ./captures
   automatic:
     output-path: ${PATROL_AUTO_OUTPUT_PATH:./LabelImg资料图片/摄像头实际拍摄照片}
+    result-path: ${PATROL_AUTO_RESULT_PATH:./uploads/patrol-results}
+    burst-frames: ${PATROL_AUTO_BURST_FRAMES:5}
+    burst-interval-ms: ${PATROL_AUTO_BURST_INTERVAL_MS:450}
     # 2026-09-07现场标定：右到左有效运动18.422秒，下到上有效运动11.587秒。
     horizontal-travel-ms: ${PATROL_HORIZONTAL_TRAVEL_MS:18422}
     vertical-travel-ms: ${PATROL_VERTICAL_TRAVEL_MS:11587}
-    # 垂直行程使用92%安全比例；水平行程的80%同时是轨道左侧软限位，
+    # 垂直行程使用92%安全比例；水平行程的60%同时是轨道左侧软限位，
     # 自动巡检和手动左右移动都不会越过它，最右侧端点仍可到达。
     coverage-ratio: ${PATROL_COVERAGE_RATIO:0.92}
-    horizontal-coverage-ratio: ${PATROL_HORIZONTAL_COVERAGE_RATIO:0.80}
+    horizontal-coverage-ratio: ${PATROL_HORIZONTAL_COVERAGE_RATIO:0.60}
+    # 每条扫描线到达中点并完成抓拍后，短时开启叶面肥水泵。
+    foliar-spray-ms: ${PATROL_FOLIAR_SPRAY_MS:1500}
     # 云台保持手动设置的默认取景位置，自动巡检不自动调整云台。
+    # 每个拍照点先停止电机，等待机械稳定和自动对焦，再读取等待结束后生成的新视频分片。
     settle-ms: ${PATROL_SETTLE_MS:350}
+    focus-wait-ms: ${PATROL_FOCUS_WAIT_MS:2000}
 
 # Bluetooth PAN irrigation controller. Override on the deployment computer
 # when the controller receives a different link-local address.
 control-panel:
-  base-url: ${CONTROL_PANEL_BASE_URL:http://169.254.240.33}
+  base-url: ${CONTROL_PANEL_BASE_URL:http://127.0.0.1:8999}
   connect-timeout-ms: ${CONTROL_PANEL_CONNECT_TIMEOUT_MS:1200}
   read-timeout-ms: ${CONTROL_PANEL_READ_TIMEOUT_MS:3000}
+
+# Modbus TCP motor controller (PLC shown in the supplied command sheet).
+modbus:
+  motor:
+    host: ${MODBUS_MOTOR_HOST:192.168.1.12}
+    port: ${MODBUS_MOTOR_PORT:502}
+    unit-id: ${MODBUS_MOTOR_UNIT_ID:1}
+    timeout-ms: ${MODBUS_MOTOR_TIMEOUT_MS:1500}
+  fallback:
+    # MQTT remains primary. Direct Modbus is used while MQTT is disconnected or a motor acknowledgement is lost.
+    enabled: ${MODBUS_FALLBACK_ENABLED:true}
+    probe-cache-ms: ${MODBUS_FALLBACK_PROBE_CACHE_MS:3000}
+    motor:
+      relative-target: ${MODBUS_FALLBACK_MOTOR_TARGET:1000}
+      speed: ${MODBUS_FALLBACK_MOTOR_SPEED:60}
 
 archive:
   upload-path: ./uploads/archive
 
 ai:
   yolo:
-    enabled: ${AI_YOLO_ENABLED:false}
+    enabled: ${AI_YOLO_ENABLED:true}
     python-path: ${AI_YOLO_PYTHON_PATH:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}
-    model-path: ${AI_YOLO_MODEL_PATH:./LabelImg资料图片/yolo_runs/black_longhorn_yolo11s/weights/best.pt}
+    model-path: ${AI_YOLO_MODEL_PATH:./weights/black_longhorn_best.pt}
     script-path: ${AI_YOLO_SCRIPT_PATH:./scripts/yolo_infer.py}
     worker-script-path: ${AI_YOLO_WORKER_SCRIPT_PATH:./scripts/yolo_worker.py}
     upload-path: ${AI_YOLO_UPLOAD_PATH:./uploads/ai-inference}
@@ -213,6 +236,13 @@ ai:
     alarm-cooldown-seconds: ${AI_YOLO_ALARM_COOLDOWN_SECONDS:60}
     alarm-enabled: ${AI_YOLO_ALARM_ENABLED:true}
     device: ${AI_YOLO_DEVICE:0}
+    verification:
+      window-frames: ${AI_YOLO_VERIFY_WINDOW_FRAMES:5}
+      required-hits: ${AI_YOLO_VERIFY_REQUIRED_HITS:3}
+      max-frame-gap: ${AI_YOLO_VERIFY_MAX_FRAME_GAP:1}
+      minimum-iou: ${AI_YOLO_VERIFY_MINIMUM_IOU:0.25}
+      minimum-average-confidence: ${AI_YOLO_VERIFY_MINIMUM_AVERAGE_CONFIDENCE:0.35}
+      minimum-strong-confidence: ${AI_YOLO_VERIFY_MINIMUM_STRONG_CONFIDENCE:0.50}
 
 logging:
   level:

@@ -1,47 +1,23 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<header class="header" th:fragment="header(activePage)">
-    <div class="logo">
-        <div class="logo-icon"><i class="ri-plant-line"></i></div>
-        <span>智慧樱桃种植</span>
-    </div>
-    <div class="nav-center">
-        <a class="nav-item" th:classappend="${activePage == 'dashboard'} ? 'active' : ''" th:href="@{/dashboard}">
-            <i class="ri-dashboard-line"></i><span>数据大屏</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'patrol'} ? 'active' : ''" th:href="@{/patrol}">
-            <i class="ri-route-line"></i><span>AI轨道巡检</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'iot'} ? 'active' : ''" th:href="@{/iot}">
-            <i class="ri-smartphone-line"></i><span>物联设备</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'weather'} ? 'active' : ''" th:href="@{/weather}">
-            <i class="ri-cloud-windy-line"></i><span>气象站</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'nutrient'} ? 'active' : ''" th:href="@{/nutrient}">
-            <i class="ri-flask-line"></i><span>营养液配液</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'insect'} ? 'active' : ''" th:href="@{/insect}">
-            <i class="ri-bug-line"></i><span>虫情灯</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'alarm'} ? 'active' : ''" th:href="@{/alarm}">
-            <i class="ri-alarm-warning-line"></i><span>报警中心</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'ai'} ? 'active' : ''" th:href="@{/ai}">
-            <i class="ri-robot-2-line"></i><span>AI农业助手</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'ai-learn'} ? 'active' : ''" th:href="@{/ai-learn}">
-            <i class="ri-graduation-cap-line"></i><span>AI学习</span>
-        </a>
-        <a class="nav-item" th:classappend="${activePage == 'archive'} ? 'active' : ''" th:href="@{/archive}">
-            <i class="ri-archive-line"></i><span>历年档案</span>
-        </a>
-
-    </div>
-    <div class="header-right" id="clock">
-        <span>--/--/-- --:--:--</span>
-    </div>
-</header>
+<th:block th:fragment="header(activePage)">
+    <header class="topbar">
+        <nav class="top-nav" aria-label="主导航">
+            <a class="top-nav-item" th:classappend="${activePage == 'alarm'} ? 'active danger' : ''" th:href="@{/alarm}"><i class="ri-alarm-warning-fill"></i><span>报警中心</span></a>
+            <a class="top-nav-item" th:classappend="${activePage == 'patrol'} ? 'active' : ''" th:href="@{/patrol}"><i class="ri-robot-2-fill"></i><span>AI轨道巡检</span></a>
+            <a class="top-nav-item" th:classappend="${activePage == 'nutrient'} ? 'active' : ''" th:href="@{/nutrient}"><i class="ri-drop-fill"></i><span>营养液配置</span></a>
+        </nav>
+        <a class="brand-mark" th:href="@{/dashboard}" aria-label="返回数据大屏"><span class="brand-cherries" aria-hidden="true">🍒</span><span class="brand-title brand-title-shiny">智慧樱桃种植数字孪生平台</span><span class="brand-scanline" aria-hidden="true"></span></a>
+        <div class="topbar-right-group">
+            <nav class="top-nav top-nav-right" aria-label="智能导航">
+                <a class="top-nav-item" th:classappend="${activePage == 'ai'} ? 'active' : ''" th:href="@{/ai}"><i class="ri-brain-fill"></i><span>AI农业助手</span></a>
+                <a class="top-nav-item" th:classappend="${activePage == 'archive'} ? 'active' : ''" th:href="@{/archive}"><i class="ri-file-list-3-fill"></i><span>历年档案</span></a>
+                <a class="top-nav-item top-nav-after-sales" th:classappend="${activePage == 'after-sales'} ? 'active' : ''" th:href="@{/after-sales}"><i class="ri-customer-service-2-fill"></i><span>采销售后</span></a>
+            </nav>
+            <div class="header-right" id="clock"><span class="header-live"><span class="dot"></span>系统在线</span><span class="header-clock-value">--/--/-- --:--:--</span></div>
+        </div>
+    </header>
+</th:block>
 </body>
 </html>
