@@ -145,8 +145,43 @@ function Find-FFmpegPrograms {
 
 function Test-Python([string]$Path) {
     if (-not (Test-Executable $Path)) { return $false }
-    & $Path -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)" 2>$null
-    return $LASTEXITCODE -eq 0
+    return (Invoke-NativeQuiet $Path @('-c', 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)')) -eq 0
+}
+
+function Invoke-NativeQuiet([string]$FilePath, [string[]]$Arguments) {
+    $previousPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5 converts native stderr into NativeCommandError
+        # when the script preference is Stop. A failed dependency probe is an
+        # expected result and must be handled through the process exit code.
+        $ErrorActionPreference = 'Continue'
+        & $FilePath @Arguments 2>&1 | Out-Null
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
+function Invoke-NativeVisible([string]$FilePath, [string[]]$Arguments) {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $FilePath @Arguments 2>&1 | ForEach-Object { Write-Host ([string]$_) }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
+function Invoke-NativeCapture([string]$FilePath, [string[]]$Arguments) {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $FilePath @Arguments 2>&1)
+        return @{ ExitCode = $LASTEXITCODE; Output = (($output | ForEach-Object { [string]$_ }) -join "`n") }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
 }
 
 function Find-Python {
@@ -174,16 +209,18 @@ function Find-Python {
 }
 
 function Ensure-Yolo([string]$Python) {
-    & $Python -c 'import cv2, numpy, torch, ultralytics' 2>$null
-    if ($LASTEXITCODE -eq 0) { return }
+    if ((Invoke-NativeQuiet $Python @('-c', 'import cv2, numpy, torch, ultralytics')) -eq 0) { return }
     if ($CheckOnly) { throw 'YOLO Python packages are missing (check-only mode)' }
     Write-Host '[SETUP] Installing YOLO dependencies. The first installation can take several minutes...'
-    & $Python -m pip install --disable-pip-version-check --upgrade pip
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to update pip' }
-    & $Python -m pip install --disable-pip-version-check 'ultralytics>=8.3,<9'
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to install YOLO dependencies' }
-    & $Python -c 'import cv2, numpy, torch, ultralytics'
-    if ($LASTEXITCODE -ne 0) { throw 'YOLO dependency validation failed' }
+    if ((Invoke-NativeVisible $Python @('-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip')) -ne 0) {
+        throw 'Unable to update pip'
+    }
+    if ((Invoke-NativeVisible $Python @('-m', 'pip', 'install', '--disable-pip-version-check', 'ultralytics>=8.3,<9')) -ne 0) {
+        throw 'Unable to install YOLO dependencies'
+    }
+    if ((Invoke-NativeQuiet $Python @('-c', 'import cv2, numpy, torch, ultralytics')) -ne 0) {
+        throw 'YOLO dependency validation failed'
+    }
 }
 
 function Test-LocalPort([int]$Port) {
@@ -308,8 +345,9 @@ if ($yoloEnabled) {
         throw "YOLO model is missing: $model. Include weights\black_longhorn_best.pt in the deployment."
     }
     if ([string]::IsNullOrWhiteSpace($device)) {
-        $device = (& $python -c "import torch; print('0' if torch.cuda.is_available() else 'cpu')").Trim()
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($device)) { $device = 'cpu' }
+        $probe = Invoke-NativeCapture $python @('-c', "import torch; print('0' if torch.cuda.is_available() else 'cpu')")
+        $device = $probe.Output.Trim()
+        if ($probe.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($device)) { $device = 'cpu' }
     }
 }
 
