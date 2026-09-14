@@ -161,6 +161,7 @@
                     <nonFilteredFileExtensions>
                         <nonFilteredFileExtension>glb</nonFilteredFileExtension>
                         <nonFilteredFileExtension>wasm</nonFilteredFileExtension>
+                        <nonFilteredFileExtension>mp4</nonFilteredFileExtension>
                     </nonFilteredFileExtensions>
                 </configuration>
             </plugin>

@@ -6,7 +6,7 @@
     <title>jhds - AI轨道巡检</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
-    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260912-auto-spray-return-v1')}">
+    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260914-chlorosis-alert-v1')}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
     <script th:src="@{/js/lib/hls.min.js}"></script>
     <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='1')}">
@@ -37,7 +37,7 @@
                             <canvas id="realtime-detection-canvas" class="realtime-detection-canvas" aria-hidden="true"></canvas>
                             <div class="realtime-alert-banner" id="realtime-alert-banner" role="button" tabindex="0" onclick="openRealtimeDetectionAlert(event)" onkeydown="handleRealtimeAlertKey(event)" hidden>
                                 <i class="ri-alarm-warning-fill"></i>
-                                <div><strong>多帧确认发现黑天牛</strong><span id="realtime-alert-detail">请立即复核现场画面</span></div>
+                                <div><strong>多次复核确认发现桃红颈天牛</strong><span id="realtime-alert-detail">请立即复核现场画面</span></div>
                                 <button type="button" onclick="event.stopPropagation();dismissRealtimeAlert()" aria-label="关闭警告"><i class="ri-close-line"></i></button>
                             </div>
                             <div class="video-placeholder patrol-video-fallback" id="video-placeholder">
@@ -127,7 +127,7 @@
                         </div>
                     </div>
                 </div>
-                <section class="card patrol-task-card"><div class="card-header"><i class="ri-task-line"></i><span>巡检任务</span><small>今日计划</small><button type="button" class="patrol-results-toggle" id="patrol-results-toggle" aria-expanded="false" onclick="togglePatrolResultsView()"><span>查看</span><i class="ri-arrow-down-s-line"></i></button></div><div class="patrol-task-body"><div class="patrol-task-summary"><span>计划巡检<b>4个大棚</b></span><span>已完成<b>2个</b></span></div><strong class="patrol-task-progress">50%<small>完成度</small></strong><div class="patrol-task-list"><div><span>1号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div><span>2号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div class="working"><span>3号大棚</span><b><i class="ri-loader-4-line"></i>巡检中</b></div><div><span>4号大棚</span><em><i class="ri-add-circle-fill"></i>待巡检</em></div></div></div></section>
+                <section class="card patrol-task-card"><div class="card-header"><i class="ri-task-line"></i><span>巡检任务</span><small>今日计划</small><button type="button" class="patrol-results-toggle" id="patrol-results-toggle" aria-expanded="false" onclick="togglePatrolResultsView()"><span>查看</span><i class="ri-arrow-down-s-line"></i></button></div><div class="patrol-task-body" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="patrolTaskDetailOverlay" onclick="openPatrolTaskDetail(this)" onkeydown="handlePatrolTaskDetailKey(event)"><div class="patrol-task-summary"><span>计划巡检<b>4个大棚</b></span><span>已完成<b>2个</b></span></div><strong class="patrol-task-progress">50%<small>完成度</small></strong><div class="patrol-task-list"><div><span>1号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div><span>2号大棚</span><b><i class="ri-checkbox-circle-fill"></i>已完成</b></div><div class="working"><span>3号大棚</span><b><i class="ri-loader-4-line"></i>巡检中</b></div><div><span>4号大棚</span><em><i class="ri-add-circle-fill"></i>待巡检</em></div></div></div></section>
                 <section class="card patrol-results-card">
                     <div class="card-header"><i class="ri-alarm-warning-line"></i><span>害虫警报</span><small id="patrol-results-state"><i></i>待巡检</small></div>
                     <div class="patrol-realtime-results" id="patrol-realtime-results" aria-live="polite">
@@ -138,10 +138,10 @@
                         </div>
                     </div>
                     <div class="patrol-results-detail" id="patrol-results-detail">
-                        <figure class="patrol-result-hero"><img id="patrol-expanded-image" th:src="@{/images/alerts/longhorn-beetle-detection.png}" alt="巡检摄像头识别到的黑天牛害虫截图"><figcaption><i class="ri-camera-lens-line"></i><span id="patrol-expanded-caption">CH-03 巡检识别截图</span><time id="patrol-expanded-time">17:03:58</time></figcaption></figure>
-                        <section class="patrol-detail-section"><h3><i class="ri-focus-3-line"></i>实时检测结果</h3><dl class="patrol-result-facts"><div><dt>目标类别</dt><dd id="patrol-expanded-name">黑天牛</dd></div><div><dt>检测数量</dt><dd><strong id="patrol-expanded-count">1</strong></dd></div><div class="wide"><dt>识别置信度</dt><dd><b id="patrol-expanded-confidence">92.3%</b><span>多帧复核确认</span></dd></div><div class="wide"><dt>推荐措施</dt><dd id="patrol-expanded-advice">立即隔离受害枝条，安排人工捕捉并进行重点复检</dd></div></dl></section>
+                        <figure class="patrol-result-hero"><img id="patrol-expanded-image" th:src="@{/images/alerts/longhorn-beetle-detection.png}" alt="巡检摄像头识别到的桃红颈天牛害虫截图"><figcaption><i class="ri-camera-lens-line"></i><span id="patrol-expanded-caption">CH-03 巡检识别截图</span><time id="patrol-expanded-time">17:03:58</time></figcaption></figure>
+                        <section class="patrol-detail-section"><h3><i class="ri-focus-3-line"></i>实时检测结果</h3><dl class="patrol-result-facts"><div><dt>目标类别</dt><dd id="patrol-expanded-name">桃红颈天牛</dd></div><div><dt>检测数量</dt><dd><strong id="patrol-expanded-count">1</strong></dd></div><div class="wide"><dt>识别置信度</dt><dd><b id="patrol-expanded-confidence">92.3%</b><span>多帧复核确认</span></dd></div><div class="wide"><dt>推荐措施</dt><dd id="patrol-expanded-advice">立即隔离受害枝条，安排人工捕捉并进行重点复检</dd></div></dl></section>
                         <section class="patrol-detail-section"><h3><i class="ri-cpu-line"></i>设备状态</h3><div class="patrol-device-facts"><span><i class="ri-robot-2-line"></i>巡检机器人<b>在线</b></span><span><i class="ri-camera-line"></i>摄像头 ID<b>CH-03</b></span><span><i class="ri-sun-line"></i>光照强度<b>6800 lux</b></span><span><i class="ri-water-percent-line"></i>土壤湿度<b>72%</b></span></div></section>
-                        <section class="patrol-detail-warning"><i class="ri-alarm-warning-fill"></i><div><span>预警信息</span><strong id="patrol-expanded-warning">检测到黑天牛，建议立即处理并复核相邻植株</strong></div></section>
+                        <section class="patrol-detail-warning"><i class="ri-alarm-warning-fill"></i><div><span>预警信息</span><strong id="patrol-expanded-warning">检测到桃红颈天牛，建议立即处理并复核相邻植株</strong></div></section>
                     </div>
                 </section>
                 <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
@@ -180,6 +180,48 @@
                 <div class="record-placeholder"><i class="ri-image-line"></i></div>
                 <div class="record-placeholder"><i class="ri-image-line"></i></div>
                 <div class="record-placeholder"><i class="ri-image-line"></i></div>
+            </div>
+        </section>
+    </div>
+
+    <div class="patrol-task-detail-overlay" id="patrolTaskDetailOverlay" hidden>
+        <section class="patrol-task-detail-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-task-detail-title">
+            <header class="patrol-task-detail-header">
+                <div>
+                    <span>今日计划 · 3号大棚</span>
+                    <h2 id="patrol-task-detail-title"><i class="ri-task-line"></i>巡检任务详情</h2>
+                </div>
+                <button type="button" onclick="closePatrolTaskDetail()" aria-label="关闭巡检任务详情"><i class="ri-close-line"></i></button>
+            </header>
+            <div class="patrol-task-detail-body">
+                <figure class="patrol-task-detail-visual">
+                    <img th:src="@{/images/patrol/cherry-maturity-detection.jpg}" alt="巡检摄像头拍摄的枝头成熟樱桃">
+                    <figcaption><i class="ri-camera-lens-line"></i><span>CH-03 · 果实成熟度识别画面</span><b>实时采集</b></figcaption>
+                </figure>
+                <div class="patrol-task-detail-content">
+                    <section class="patrol-task-info-section">
+                        <h3><i class="ri-focus-3-line"></i>实时检测结果</h3>
+                        <dl class="patrol-task-result-facts">
+                            <div><dt>目标类别</dt><dd>昆仑之巅</dd></div>
+                            <div><dt>检测数量</dt><dd><strong>174</strong></dd></div>
+                            <div class="wide"><dt>成熟度占比</dt><dd class="patrol-maturity-ratio"><b>成熟 84%</b><span>转色期 9%</span><em>未熟 7%</em></dd></div>
+                            <div class="wide"><dt>推荐措施</dt><dd>适时分批采收</dd></div>
+                        </dl>
+                    </section>
+                    <section class="patrol-task-info-section">
+                        <h3><i class="ri-cpu-line"></i>设备状态</h3>
+                        <div class="patrol-task-device-facts">
+                            <span><i class="ri-robot-2-line"></i><small>巡检机器人</small><b>在线</b></span>
+                            <span><i class="ri-camera-line"></i><small>摄像头 ID</small><b>CH-03</b></span>
+                            <span><i class="ri-sun-line"></i><small>光照强度</small><b>6800 lux</b></span>
+                            <span><i class="ri-water-percent-line"></i><small>土壤湿度</small><b>72%</b></span>
+                        </div>
+                    </section>
+                    <section class="patrol-task-detail-warning">
+                        <i class="ri-alarm-warning-fill"></i>
+                        <div><span>预警信息</span><strong>本轮成熟果实占比较高 建议启动采收计划</strong></div>
+                    </section>
+                </div>
             </div>
         </section>
     </div>
@@ -231,7 +273,7 @@
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
     <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
-    <script th:src="@{/js/patrol.js(v='20260912-patrol-progress-v2')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260914-chlorosis-alert-v1')}"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function(){
         var el=document.getElementById('patrol-twin');

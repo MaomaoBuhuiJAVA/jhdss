@@ -240,8 +240,8 @@ public class YoloRealtimeDetectionService implements DisposableBean {
         }
         String resolvedLocation = location == null || location.trim().isEmpty() ? "AI轨道巡检摄像头" : location.trim();
         try {
-            alarmService.createAlarm("多帧复核发现黑天牛",
-                    "视频流连续多帧确认" + detections.size() + "个黑天牛候选，平均置信度最高"
+            alarmService.createAlarm("多帧复核发现桃红颈天牛",
+                    "视频流连续多帧确认" + detections.size() + "个桃红颈天牛候选，平均置信度最高"
                             + percent(maximumAverage) + "%、单帧证据最高" + percent(maximumEvidence)
                             + "% ，请结合现场画面人工确认后处理。",
                     "urgent", "patrol", resolvedLocation);

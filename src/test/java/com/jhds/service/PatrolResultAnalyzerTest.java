@@ -55,7 +55,7 @@ public class PatrolResultAnalyzerTest {
                 Collections.singletonList(group), ignored -> { });
 
         assertEquals(1, results.size());
-        assertEquals("黑天牛", results.get(0).get("name"));
+        assertEquals("桃红颈天牛", results.get(0).get("name"));
         assertEquals("第 5 株盆栽", results.get(0).get("plant"));
         assertEquals(3, results.get(0).get("hits"));
         assertEquals(1, ((List<?>) results.get(0).get("detections")).size());

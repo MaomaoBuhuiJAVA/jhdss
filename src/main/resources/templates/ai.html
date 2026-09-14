@@ -6,7 +6,7 @@
     <title>jhds - AI 农业助手</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
-    <link rel="stylesheet" th:href="@{/css/ai.css(v='20260912-ai-avatar-motion-v3')}">
+    <link rel="stylesheet" th:href="@{/css/ai.css(v='20260913-microscope-cast-v1')}">
 </head>
 <body>
     <div th:replace="fragments/header::header('ai')"></div>
@@ -34,7 +34,13 @@
             </div>
         </aside>
         <section class="ai-workspace card">
-            <header class="ai-workspace-head"><label class="greenhouse-select">关联大棚：<select aria-label="关联大棚"><option>3号大棚</option><option>1号大棚</option><option>2号大棚</option><option>4号大棚</option></select></label></header>
+            <header class="ai-workspace-head">
+                <label class="greenhouse-select">关联大棚：<select aria-label="关联大棚"><option>3号大棚</option><option>1号大棚</option><option>2号大棚</option><option>4号大棚</option></select></label>
+                <div class="microscope-cast-actions" aria-label="镜检投屏">
+                    <button type="button" class="microscope-cast-trigger" data-cast-title="体视镜投屏" th:data-video-src="@{/videos/red-spider-stereoscope.mp4}" aria-haspopup="dialog" aria-controls="microscopeCastOverlay"><i class="ri-camera-lens-line"></i><span>体视镜投屏</span></button>
+                    <button type="button" class="microscope-cast-trigger" data-cast-title="显微镜投屏" th:data-video-src="@{/videos/brown-spot-microscope.mp4}" aria-haspopup="dialog" aria-controls="microscopeCastOverlay"><i class="ri-microscope-line"></i><span>显微镜投屏</span></button>
+                </div>
+            </header>
             <div class="ai-main">
             <div class="messages" id="messages"></div>
 
@@ -124,8 +130,26 @@
         </section>
     </div>
 
+    <div class="microscope-cast-overlay" id="microscopeCastOverlay" hidden>
+        <section class="microscope-cast-player" role="dialog" aria-modal="true" aria-labelledby="microscopeCastTitle">
+            <video id="microscopeCastVideo" preload="auto" autoplay loop muted playsinline></video>
+            <div class="microscope-cast-shade" aria-hidden="true"></div>
+            <header class="microscope-cast-head">
+                <div><i class="ri-live-line"></i><span>实时镜检画面</span><h2 id="microscopeCastTitle">体视镜投屏</h2></div>
+                <button type="button" class="microscope-cast-icon" data-cast-close title="关闭投屏" aria-label="关闭投屏"><i class="ri-close-line"></i></button>
+            </header>
+            <div class="microscope-cast-status" id="microscopeCastStatus" aria-live="polite"><i class="ri-loader-4-line"></i><span>正在连接镜检画面</span></div>
+            <footer class="microscope-cast-controls">
+                <button type="button" class="microscope-cast-icon" id="microscopeCastSound" title="开启声音" aria-label="开启声音" aria-pressed="false"><i class="ri-volume-mute-line"></i></button>
+                <span id="microscopeCastTime">00:00 / 00:00</span>
+                <button type="button" class="microscope-cast-icon" id="microscopeCastFullscreen" title="浏览器全屏" aria-label="浏览器全屏"><i class="ri-fullscreen-line"></i></button>
+            </footer>
+        </section>
+    </div>
+
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/ai.js(v='20260912-ai-avatar-motion-v1')}"></script>
     <script th:src="@{/js/ai-video-modal.js(v='20260912-ai-avatar-motion-v1')}"></script>
+    <script th:src="@{/js/ai-microscope-cast.js(v='20260913-microscope-cast-v1')}"></script>
 </body>
 </html>

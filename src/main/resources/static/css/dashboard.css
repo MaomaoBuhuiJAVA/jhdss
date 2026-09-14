@@ -623,3 +623,46 @@
     font-size: 11px;
     line-height: 1.45;
 }
+
+/* Pinned market evaluation alert and its detail dialog. */
+.alert-item.market-evaluation-alert {
+    border-left-color: #ee9e35;
+    background: linear-gradient(90deg, rgba(224, 132, 28, .25), rgba(224, 132, 28, .055));
+    box-shadow: inset 0 0 18px rgba(238, 158, 53, .045);
+}
+.alert-item.market-evaluation-alert:hover {
+    background: linear-gradient(90deg, rgba(235, 151, 47, .33), rgba(235, 151, 47, .085));
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .25), inset 0 0 18px rgba(238, 158, 53, .07);
+}
+.market-evaluation-title i { color: #ffb149; text-shadow: 0 0 9px rgba(255, 166, 48, .48); }
+.market-evaluation-title span { min-width: 0; color: #ffe6be; line-height: 1.45; }
+.market-evaluation-title strong { margin-left: 2px; color: #ffc15e; font-weight: 800; }
+.market-evaluation-alert .alert-location { color: #efb55e; }
+.market-evaluation-alert .alert-location i { margin-right: 3px; }
+
+.dashboard-modal.is-market-evaluation {
+    width: min(660px, 94vw);
+    border-color: rgba(240, 160, 64, .64);
+    background: linear-gradient(155deg, #241506, #0d0c08 74%);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .66), 0 0 34px rgba(240, 160, 64, .16);
+}
+.dashboard-modal.is-market-evaluation .dashboard-modal-header {
+    border-bottom-color: rgba(240, 160, 64, .36);
+    background: rgba(87, 46, 5, .36);
+}
+.dashboard-modal.is-market-evaluation .dashboard-modal-header h2 {
+    color: #ffd89c;
+    font-size: 18px;
+    font-weight: 700;
+}
+.dashboard-market-evaluation-message {
+    padding: 28px;
+    color: #fff4df;
+    font-size: 15px;
+    line-height: 1.95;
+}
+
+@media (max-width: 520px) {
+    .market-evaluation-title span { font-size: 12px; }
+    .dashboard-market-evaluation-message { padding: 20px; font-size: 14px; }
+}

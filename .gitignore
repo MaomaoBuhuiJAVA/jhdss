@@ -17,6 +17,7 @@ gin_http.log
 LabelImg资料图片/
 
 # Local credentials and machine-specific overrides
+env.local.bat
 .env.local.bat
 .env
 .env.*

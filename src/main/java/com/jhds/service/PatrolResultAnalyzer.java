@@ -208,7 +208,7 @@ public class PatrolResultAnalyzer {
     private String localizedDetectionName(Map<String, Object> detection) {
         String value = String.valueOf(detection.get("class"));
         String normalized = value.toLowerCase().replaceAll("[\\s_-]+", "");
-        return normalized.contains("longhorn") || normalized.contains("blackbeetle") ? "黑天牛" : value;
+        return normalized.contains("longhorn") || normalized.contains("blackbeetle") ? "桃红颈天牛" : value;
     }
 
     private int coordinate(Object value, int minimum, int maximum) {

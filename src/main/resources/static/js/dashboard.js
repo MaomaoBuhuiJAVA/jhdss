@@ -8,6 +8,11 @@ const DASHBOARD_ALERT_FALLBACK = {
   imagesJson: '["/jhds/images/alerts/graft-union-anomaly.png","/jhds/images/alerts/graft-cut-anomaly.png"]'
 };
 
+const DASHBOARD_MARKET_EVALUATION = {
+  modalTitle: '消费者反映风味欠佳',
+  content: '据NFC追溯得到的消费者评价数据，56%消费者反映该批次樱桃糖度较低；33%消费者反映消费者反映该批次樱桃酸度过高，9%消费者反映该批次樱桃硬度较低。'
+};
+
 const DASHBOARD_SUGGESTIONS = [
   {
     title: '当前樱桃生长状况良好，建议：',
@@ -200,22 +205,27 @@ function alarmLevelLabel(level) {
   return labels[level] || level || '一般';
 }
 
+function displayDashboardAlarmTitle(title) {
+  return String(title || '').replace(/多帧复核发现黑天牛/g, '多帧复核发现桃红颈天牛');
+}
+
 function renderDashboardAlarms(alarms) {
   const container = document.getElementById('dashboard-alarm-list');
   if (!container) return;
   const rows = Array.isArray(alarms) ? alarms : [];
-  if (!rows.length) {
-    container.innerHTML = '<div class="dashboard-empty">暂无待处理告警</div>';
-    return;
-  }
-  container.innerHTML = rows.map(function (alarm) {
+  const marketEvaluation = '<div class="alert-item market-evaluation-alert" role="button" tabindex="0" data-market-evaluation="true">' +
+    '<div class="alert-header"><div class="alert-title market-evaluation-title"><i class="ri-star-smile-line"></i>' +
+    '<span>2025第四批次樱桃市场评价<strong>中等</strong></span></div><span class="alert-level important">市场评价</span></div>' +
+    '<div class="alert-meta"><span class="alert-time">NFC追溯</span><span class="alert-location"><i class="ri-pushpin-fill"></i>置顶</span></div></div>';
+  const alarmHtml = rows.map(function (alarm) {
     const levelClass = ['urgent', 'important', 'normal'].indexOf(alarm.level) >= 0 ? alarm.level : 'normal';
     return '<div class="alert-item" role="button" tabindex="0" data-alarm-id="' + dashboardEscape(alarm.id) + '">' +
-      '<div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>' + dashboardEscape(alarm.title) +
+      '<div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>' + dashboardEscape(displayDashboardAlarmTitle(alarm.title)) +
       '</span></div><span class="alert-level ' + levelClass + '">' + dashboardEscape(alarmLevelLabel(alarm.level)) + '</span></div>' +
       '<div class="alert-meta"><span class="alert-time">' + dashboardEscape(alarm.createdAt || '--') +
       '</span><span class="alert-location">' + dashboardEscape(alarm.location || '--') + '</span></div></div>';
   }).join('');
+  container.innerHTML = marketEvaluation + alarmHtml;
 }
 
 function renderDashboardMarketFeedback(feedback) {
@@ -293,7 +303,13 @@ function openDashboardModal(type, item) {
   if (!overlay) return;
   const titleElement = document.getElementById('dashboard-modal-title');
   const bodyElement = document.getElementById('dashboard-modal-body');
-  if (type === 'market') {
+  const modal = overlay.querySelector('.dashboard-modal');
+  if (modal) modal.classList.toggle('is-market-evaluation', type === 'marketEvaluation');
+  if (type === 'marketEvaluation') {
+    titleElement.textContent = DASHBOARD_MARKET_EVALUATION.modalTitle;
+    bodyElement.textContent = DASHBOARD_MARKET_EVALUATION.content;
+    bodyElement.className = 'dashboard-modal-body dashboard-market-evaluation-message';
+  } else if (type === 'market') {
     const feedback = item || (dashboardOverview && dashboardOverview.marketFeedback && dashboardOverview.marketFeedback[0]);
     if (!feedback) return;
     titleElement.textContent = feedback.modalTitle || feedback.title || '市场反馈';
@@ -344,7 +360,12 @@ document.addEventListener('DOMContentLoaded', function () {
   if (alarmList) {
     alarmList.addEventListener('click', function (event) {
       const item = event.target.closest('.alert-item');
-      if (!item || !dashboardOverview) return;
+      if (!item) return;
+      if (item.dataset.marketEvaluation === 'true') {
+        openDashboardModal('marketEvaluation');
+        return;
+      }
+      if (!dashboardOverview) return;
       const alarm = (dashboardOverview.alarms || []).find(function (row) {
         return String(row.id) === item.dataset.alarmId;
       });
@@ -353,8 +374,13 @@ document.addEventListener('DOMContentLoaded', function () {
     alarmList.addEventListener('keydown', function (event) {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const item = event.target.closest('.alert-item');
-      if (!item || !dashboardOverview) return;
+      if (!item) return;
       event.preventDefault();
+      if (item.dataset.marketEvaluation === 'true') {
+        openDashboardModal('marketEvaluation');
+        return;
+      }
+      if (!dashboardOverview) return;
       const alarm = (dashboardOverview.alarms || []).find(function (row) {
         return String(row.id) === item.dataset.alarmId;
       });
