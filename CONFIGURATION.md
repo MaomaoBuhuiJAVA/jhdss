@@ -78,7 +78,7 @@ set JAVA_OPTS=-Dserver.port=9118
 | `CAMERA_LOCAL_PREFER_FALLBACK` | `false` | 优先使用主码流；当前设备主码流约 15 FPS、子码流约 10 FPS，设为 `true` 会牺牲流畅度换取更低带宽 |
 | `CAMERA_LOCAL_FPS` / `CAMERA_LOCAL_LIST_SIZE` | `15` / `6` | 输出帧率及 HLS 抗抖播放列表长度；帧率应匹配摄像头实际输出，不能靠转码生成真实新帧 |
 | `CAMERA_LOCAL_FFMPEG_PATH` | `ffmpeg` | FFmpeg 可执行文件路径，要求在 PATH 中或填写绝对路径 |
-| `AI_YOLO_ENABLED` / `AI_YOLO_MODEL_PATH` | `true` / `./weights/black_longhorn_best.pt` | 启用摄像头实时虫害识别，并指定本次训练得到的 YOLO 权重 |
+| `AI_YOLO_ENABLED` / `AI_YOLO_MODEL_PATH` | `true` / `./weights/best.pt` | 启用摄像头实时虫害识别，并指定当前部署的 YOLO 权重 |
 | `AI_YOLO_CONFIDENCE` | `0.25` | 单帧候选阈值；候选不会直接触发虫害告警 |
 | `AI_YOLO_VERIFY_WINDOW_FRAMES` / `AI_YOLO_VERIFY_REQUIRED_HITS` | `5` / `3` | 同一空间目标需在最近 5 个采样帧中命中至少 3 帧才可能确认 |
 | `AI_YOLO_VERIFY_MAX_FRAME_GAP` / `AI_YOLO_VERIFY_MINIMUM_IOU` | `1` / `0.25` | 允许漏过 1 个采样帧；相邻检测框 IoU 至少 0.25 才视为同一目标 |

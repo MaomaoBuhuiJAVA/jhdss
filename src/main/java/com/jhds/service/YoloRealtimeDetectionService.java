@@ -39,7 +39,7 @@ public class YoloRealtimeDetectionService implements DisposableBean {
 
     @Value("${ai.yolo.enabled:true}") private boolean enabled;
     @Value("${ai.yolo.python-path:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}") private String pythonPath;
-    @Value("${ai.yolo.model-path:./weights/black_longhorn_best.pt}") private String modelPath;
+    @Value("${ai.yolo.model-path:./weights/best.pt}") private String modelPath;
     @Value("${ai.yolo.worker-script-path:./scripts/yolo_worker.py}") private String workerScriptPath;
     @Value("${ai.yolo.device:0}") private String device;
     @Value("${ai.yolo.confidence:0.25}") private double defaultConfidence;

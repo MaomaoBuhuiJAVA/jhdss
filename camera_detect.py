@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_MODEL = PROJECT_ROOT / "weights" / "black_longhorn_best.pt"
+DEFAULT_MODEL = PROJECT_ROOT / "weights" / "best.pt"
 
 
 def parse_args():

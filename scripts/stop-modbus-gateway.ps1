@@ -7,10 +7,19 @@ $project = [IO.Path]::GetFullPath($ProjectRoot)
 $runtime = Join-Path $project '.codex-runtime'
 $pidFile = Join-Path $runtime 'modbus-gateway.pid'
 $softwarePidFile = Join-Path $runtime 'software-server.pid'
+$monitorPidFile = Join-Path $runtime 'software-server-monitor.pid'
 $escapedProject = [regex]::Escape($project.TrimEnd([char]92))
 $legacyPath = [IO.Path]::GetFullPath((Join-Path $project 'software\server.exe'))
 $hotspotPath = [IO.Path]::GetFullPath((Join-Path $project 'software\server-hotspot.exe'))
 $targets = @()
+
+if (Test-Path -LiteralPath $monitorPidFile) {
+    $savedMonitorPid = (Get-Content -LiteralPath $monitorPidFile -Raw).Trim()
+    if ($savedMonitorPid -match '^\d+$') {
+        $monitor = Get-CimInstance Win32_Process -Filter "ProcessId = $savedMonitorPid" -ErrorAction SilentlyContinue
+        if ($null -ne $monitor) { $targets += $monitor }
+    }
+}
 
 if (Test-Path -LiteralPath $pidFile) {
     $savedPid = (Get-Content -LiteralPath $pidFile -Raw).Trim()
@@ -54,6 +63,7 @@ $targets | Sort-Object ProcessId -Unique | ForEach-Object {
 }
 Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $softwarePidFile -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $monitorPidFile -Force -ErrorAction SilentlyContinue
 
 if ($targets.Count -eq 0) {
     Write-Host '[INFO] No project control service process found.'

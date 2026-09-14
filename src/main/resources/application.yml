@@ -226,7 +226,7 @@ ai:
   yolo:
     enabled: ${AI_YOLO_ENABLED:true}
     python-path: ${AI_YOLO_PYTHON_PATH:D:/jhdss-tools/yolo-venv311/Scripts/python.exe}
-    model-path: ${AI_YOLO_MODEL_PATH:./weights/black_longhorn_best.pt}
+    model-path: ${AI_YOLO_MODEL_PATH:./weights/best.pt}
     script-path: ${AI_YOLO_SCRIPT_PATH:./scripts/yolo_infer.py}
     worker-script-path: ${AI_YOLO_WORKER_SCRIPT_PATH:./scripts/yolo_worker.py}
     upload-path: ${AI_YOLO_UPLOAD_PATH:./uploads/ai-inference}

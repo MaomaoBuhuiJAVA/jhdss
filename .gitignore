@@ -11,6 +11,7 @@ artifacts/
 tmp/
 weights/*
 !weights/black_longhorn_best.pt
+!weights/best.pt
 gin_http.log
 
 # Large local training assets and camera photo archive; copy separately per machine

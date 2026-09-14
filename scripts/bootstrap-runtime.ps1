@@ -211,12 +211,21 @@ function Find-Python {
 function Ensure-Yolo([string]$Python) {
     if ((Invoke-NativeQuiet $Python @('-c', 'import cv2, numpy, torch, ultralytics')) -eq 0) { return }
     if ($CheckOnly) { throw 'YOLO Python packages are missing (check-only mode)' }
-    Write-Host '[SETUP] Installing YOLO dependencies. The first installation can take several minutes...'
-    if ((Invoke-NativeVisible $Python @('-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip')) -ne 0) {
+    Write-Host '[SETUP] Checking pip and YOLO dependencies...'
+    if ((Invoke-NativeQuiet $Python @('-m', 'pip', '--version')) -ne 0) {
+        Write-Host '[SETUP] pip is missing; bootstrapping it with ensurepip...'
+        if ((Invoke-NativeVisible $Python @('-m', 'ensurepip', '--upgrade')) -ne 0) {
+            throw 'Unable to bootstrap pip with ensurepip'
+        }
+    }
+    Write-Host '[SETUP] Installing YOLO dependencies from official PyPI. The first installation can take several minutes...'
+    $pipOptions = @('--disable-pip-version-check', '--no-input', '--timeout', '120', '--retries', '5',
+        '--index-url', 'https://pypi.org/simple')
+    if ((Invoke-NativeVisible $Python (@('-m', 'pip', 'install') + $pipOptions + @('--upgrade', 'pip'))) -ne 0) {
         throw 'Unable to update pip'
     }
-    if ((Invoke-NativeVisible $Python @('-m', 'pip', 'install', '--disable-pip-version-check', 'ultralytics>=8.3,<9')) -ne 0) {
-        throw 'Unable to install YOLO dependencies'
+    if ((Invoke-NativeVisible $Python (@('-m', 'pip', 'install') + $pipOptions + @('ultralytics>=8.3,<9'))) -ne 0) {
+        throw 'Unable to install YOLO dependencies from official PyPI'
     }
     if ((Invoke-NativeQuiet $Python @('-c', 'import cv2, numpy, torch, ultralytics')) -ne 0) {
         throw 'YOLO dependency validation failed'
@@ -335,19 +344,26 @@ $mavenHome = Find-MavenHome
 $media = Find-FFmpegPrograms
 $python = $null
 $yoloEnabled = -not ($env:AI_YOLO_ENABLED -and $env:AI_YOLO_ENABLED.Trim().ToLowerInvariant() -eq 'false')
+$yoloSetupFailed = $false
 $device = $env:AI_YOLO_DEVICE
 if ($yoloEnabled) {
-    $python = Find-Python
-    Ensure-Yolo $python
-    $model = if ($env:AI_YOLO_MODEL_PATH) { $env:AI_YOLO_MODEL_PATH } else { '.\weights\black_longhorn_best.pt' }
-    if (-not [IO.Path]::IsPathRooted($model)) { $model = Join-Path $project $model }
-    if (-not (Test-Path -LiteralPath $model -PathType Leaf)) {
-        throw "YOLO model is missing: $model. Include weights\black_longhorn_best.pt in the deployment."
-    }
-    if ([string]::IsNullOrWhiteSpace($device)) {
-        $probe = Invoke-NativeCapture $python @('-c', "import torch; print('0' if torch.cuda.is_available() else 'cpu')")
-        $device = $probe.Output.Trim()
-        if ($probe.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($device)) { $device = 'cpu' }
+    try {
+        $python = Find-Python
+        Ensure-Yolo $python
+        $model = if ($env:AI_YOLO_MODEL_PATH) { $env:AI_YOLO_MODEL_PATH } else { '.\weights\best.pt' }
+        if (-not [IO.Path]::IsPathRooted($model)) { $model = Join-Path $project $model }
+        if (-not (Test-Path -LiteralPath $model -PathType Leaf)) {
+            throw "YOLO model is missing: $model. Include weights\best.pt in the deployment."
+        }
+        if ([string]::IsNullOrWhiteSpace($device)) {
+            $probe = Invoke-NativeCapture $python @('-c', "import torch; print('0' if torch.cuda.is_available() else 'cpu')")
+            $device = $probe.Output.Trim()
+            if ($probe.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($device)) { $device = 'cpu' }
+        }
+    } catch {
+        $yoloSetupFailed = $true
+        $yoloEnabled = $false
+        Write-Warning ("YOLO setup is unavailable; continuing without AI recognition. " + $_.Exception.Message)
     }
 }
 
@@ -364,6 +380,9 @@ $lines = @(
 if ($yoloEnabled) {
     $lines += ('set "AI_YOLO_PYTHON_PATH={0}"' -f (Escape-BatchValue $python))
     $lines += ('set "AI_YOLO_DEVICE={0}"' -f (Escape-BatchValue $device))
+} elseif ($yoloSetupFailed) {
+    # Keep a failed optional AI setup from preventing Spring, MQTT, or Modbus startup.
+    $lines += 'set "AI_YOLO_ENABLED=false"'
 }
 $mysqlClient = Find-MySqlProgram 'mysql.exe'
 if (Test-Executable $mysqlClient) {

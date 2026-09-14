@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$ProjectRoot
+    [string]$ProjectRoot,
+    [switch]$Monitor
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,7 @@ $software = [IO.Path]::GetFullPath((Join-Path $project 'software\server.exe'))
 $stdout = Join-Path $runtime 'software-server.out.log'
 $stderr = Join-Path $runtime 'software-server.err.log'
 $pidFile = Join-Path $runtime 'software-server.pid'
+$monitorPidFile = Join-Path $runtime 'software-server-monitor.pid'
 $gatewayPort = if ($env:MODBUS_GATEWAY_PORT) { [int]$env:MODBUS_GATEWAY_PORT } else { 8999 }
 $escapedProject = [regex]::Escape($project.TrimEnd([char]92))
 
@@ -28,6 +30,76 @@ if (-not (Test-Path -LiteralPath $software)) {
 }
 
 New-Item -ItemType Directory -Path $runtime -Force | Out-Null
+
+function Start-SoftwareAttempt {
+    Set-Content -LiteralPath $stdout -Value '' -Encoding UTF8
+    $process = Start-Process -FilePath $software `
+        -WorkingDirectory (Split-Path $software -Parent) `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr `
+        -PassThru
+    $process.Id | Set-Content -LiteralPath $pidFile -Encoding ASCII
+    return $process
+}
+
+function Start-SoftwareMonitor {
+    Write-Host "[INFO] Software control monitor started; Modbus connection will retry in the background."
+    while ($true) {
+        $running = @(Get-CimInstance Win32_Process -Filter "Name = 'server.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            Test-BundledSoftware $_
+        })
+        if ($running.Count -gt 0) {
+            Start-Sleep -Seconds 3
+            continue
+        }
+
+        $attempt = $null
+        try {
+            $attempt = Start-SoftwareAttempt
+            $ready = $false
+            for ($probe = 0; $probe -lt 30; $probe++) {
+                Start-Sleep -Milliseconds 500
+                if ($attempt.HasExited) { break }
+                $ready = @(Get-ControlListener | Where-Object { $_.OwningProcess -eq $attempt.Id }).Count -gt 0
+                if ($ready) { break }
+            }
+            if ($ready) {
+                Write-Host "[OK] Bundled software control service is listening on port $gatewayPort."
+                Start-Sleep -Seconds 5
+                continue
+            }
+
+            $exitCode = if ($attempt.HasExited) { $attempt.ExitCode } else { 'not-ready' }
+            Add-Content -LiteralPath $stderr -Value "[RETRY] Modbus/software connection is not ready (result=$exitCode). Retrying in 10 seconds."
+        } catch {
+            Add-Content -LiteralPath $stderr -Value "[RETRY] Unable to start bundled software: $($_.Exception.Message). Retrying in 10 seconds."
+        }
+        Start-Sleep -Seconds 10
+    }
+}
+
+if ($Monitor) {
+    Start-SoftwareMonitor
+    exit 0
+}
+
+$existingMonitor = $null
+if (Test-Path -LiteralPath $monitorPidFile) {
+    $savedMonitorPid = (Get-Content -LiteralPath $monitorPidFile -Raw).Trim()
+    if ($savedMonitorPid -match '^\d+$') {
+        $candidateMonitor = Get-CimInstance Win32_Process -Filter "ProcessId = $savedMonitorPid" -ErrorAction SilentlyContinue
+        if (($null -ne $candidateMonitor) -and
+                (([string]$candidateMonitor.CommandLine) -match 'start-modbus-gateway\.ps1') -and
+                (([string]$candidateMonitor.CommandLine) -match [regex]::Escape($project))) {
+            $existingMonitor = $candidateMonitor
+        }
+    }
+}
+if ($null -ne $existingMonitor) {
+    Write-Host "[OK] Bundled software control monitor is already running (PID $($existingMonitor.Id))."
+    exit 0
+}
 
 $listeners = Get-ControlListener
 foreach ($listener in $listeners) {
@@ -68,31 +140,11 @@ foreach ($stale in $staleSoftware) {
 }
 if ($staleSoftware.Count -gt 0) { Start-Sleep -Seconds 1 }
 
-Set-Content -LiteralPath $stdout -Value '' -Encoding UTF8
-Set-Content -LiteralPath $stderr -Value '' -Encoding UTF8
-$process = Start-Process -FilePath $software `
-    -WorkingDirectory (Split-Path $software -Parent) `
+$monitorProcess = Start-Process -FilePath 'powershell.exe' `
+    -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $PSCommandPath), '-ProjectRoot', ('"{0}"' -f $project), '-Monitor') `
+    -WorkingDirectory $project `
     -WindowStyle Hidden `
-    -RedirectStandardOutput $stdout `
-    -RedirectStandardError $stderr `
     -PassThru
-$process.Id | Set-Content -LiteralPath $pidFile -Encoding ASCII
-
-for ($attempt = 0; $attempt -lt 30; $attempt++) {
-    Start-Sleep -Milliseconds 500
-    if ($process.HasExited) {
-        $detail = if (Test-Path -LiteralPath $stderr) { (Get-Content -LiteralPath $stderr -Raw).Trim() } else { '' }
-        Write-Error "Bundled software control service exited with code $($process.ExitCode). $detail"
-        exit 1
-    }
-
-    $ownsPort = @(Get-ControlListener | Where-Object { $_.OwningProcess -eq $process.Id }).Count -gt 0
-    $logText = if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr -Raw } else { '' }
-    if ($ownsPort -and $logText -match 'Modbus.*\d{1,3}(?:\.\d{1,3}){3}:\d+') {
-        Write-Host "[OK] Bundled software control service is listening on port $gatewayPort and connected to Modbus."
-        exit 0
-    }
-}
-
-Write-Error "Bundled software control service did not become ready. See $stderr"
-exit 1
+$monitorProcess.Id | Set-Content -LiteralPath $monitorPidFile -Encoding ASCII
+Write-Host "[OK] Bundled software control monitor is running (PID $($monitorProcess.Id)); Modbus will connect automatically when available."
+exit 0
