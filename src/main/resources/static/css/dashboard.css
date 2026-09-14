@@ -361,6 +361,23 @@
 }
 .dashboard-modal-close:hover { color: var(--accent-warn); }
 .dashboard-modal-body { padding: 20px; overflow-y: auto; }
+.dashboard-modal.is-triggered-alert {
+    width: min(860px, 94vw);
+    border-color: rgba(255,77,79,.62);
+    background: linear-gradient(155deg, #20050b, #070b15 72%);
+    box-shadow: 0 24px 70px rgba(0,0,0,.66), 0 0 38px rgba(255,77,79,.16);
+}
+.dashboard-modal.is-triggered-alert .dashboard-modal-header {
+    border-bottom-color: rgba(255,77,79,.34);
+    background: rgba(92,12,25,.34);
+}
+.dashboard-modal.is-triggered-alert .dashboard-modal-header h2 { color:#ff9aaa; }
+.dashboard-triggered-alert-detail { display:grid;gap:18px; }
+.dashboard-triggered-alert-detail img {
+    display:block;width:100%;max-height:62vh;object-fit:contain;
+    border:1px solid rgba(255,77,79,.3);border-radius:8px;background:#05090d;
+}
+.dashboard-alert-message { margin:0;color:#f4dedf;font-size:15px;line-height:1.8; }
 
 /* ----- 天气缩略 ----- */
 .wt-grid {
@@ -526,6 +543,8 @@
 .alert-item:last-child { margin-bottom:11px; }
 .alert-item:hover { background:linear-gradient(90deg,rgba(254,252,232,.21),rgba(254,252,232,.06));box-shadow:0 6px 15px rgba(0,0,0,.24);transform:translateX(2px); }
 .alert-item:has(.alert-level.urgent) { border-left-color:#f04452;background:linear-gradient(90deg,rgba(235,51,73,.18),rgba(235,51,73,.035)); }
+.alert-item.triggered-alert-item { animation:dashboardAlertReveal .42s cubic-bezier(.2,.8,.25,1) both; }
+@keyframes dashboardAlertReveal { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
 .alert-header { display:flex;align-items:center;justify-content:space-between;gap:8px; }
 .alert-meta { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px; }
 .alert-location { color:#c5a34b;font-size:10px; }

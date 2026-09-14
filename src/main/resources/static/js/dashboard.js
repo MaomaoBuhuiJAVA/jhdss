@@ -13,6 +13,32 @@ const DASHBOARD_MARKET_EVALUATION = {
   content: '据NFC追溯得到的消费者评价数据，56%消费者反映该批次樱桃糖度较低；33%消费者反映消费者反映该批次樱桃酸度过高，9%消费者反映该批次樱桃硬度较低。'
 };
 
+const DASHBOARD_TRIGGERED_ALERTS = {
+  1: {
+    id: 'triggered-leaf-disease',
+    title: '发现病叶',
+    modalTitle: '发现病叶',
+    description: '二号种植区叶尖卷曲、变褐干枯，怀疑植株缺钙，建议补充螯合钙。',
+    imageUrl: '/jhds/images/alerts/leaf-tip-calcium-deficiency.jpg',
+    imageAlt: '二号种植区叶尖卷曲、变褐干枯检测图',
+    level: 'urgent',
+    levelLabel: '紧急',
+    location: '二号种植区'
+  },
+  3: {
+    id: 'triggered-chlorotic-spots',
+    title: '发现失绿斑',
+    modalTitle: '发现失绿斑',
+    description: '部分叶片有失绿斑，且有部分红色斑点，疑似红蜘蛛。',
+    imageUrl: '/jhds/images/alerts/chlorotic-red-spots.jpg',
+    imageAlt: '叶片失绿斑和红色斑点检测图',
+    level: 'urgent',
+    levelLabel: '紧急',
+    location: '种植区'
+  }
+};
+const dashboardTriggeredAlertIds = [];
+
 const DASHBOARD_SUGGESTIONS = [
   {
     title: '当前樱桃生长状况良好，建议：',
@@ -217,6 +243,16 @@ function renderDashboardAlarms(alarms) {
     '<div class="alert-header"><div class="alert-title market-evaluation-title"><i class="ri-star-smile-line"></i>' +
     '<span>2025第四批次樱桃市场评价<strong>中等</strong></span></div><span class="alert-level important">市场评价</span></div>' +
     '<div class="alert-meta"><span class="alert-time">NFC追溯</span><span class="alert-location"><i class="ri-pushpin-fill"></i>置顶</span></div></div>';
+  const triggeredAlertHtml = Object.keys(DASHBOARD_TRIGGERED_ALERTS).map(function (key) {
+      return DASHBOARD_TRIGGERED_ALERTS[key];
+    }).filter(function (alert) {
+      return dashboardTriggeredAlertIds.indexOf(alert.id) >= 0;
+    }).map(function (alert) {
+    return '<div class="alert-item triggered-alert-item" role="button" tabindex="0" data-triggered-alert-id="' + dashboardEscape(alert.id) + '">' +
+      '<div class="alert-header"><div class="alert-title"><i class="ri-error-warning-line"></i><span>' + dashboardEscape(alert.title) +
+      '</span></div><span class="alert-level urgent">' + dashboardEscape(alert.levelLabel) + '</span></div>' +
+      '<div class="alert-meta"><span class="alert-time">刚刚发现</span><span class="alert-location">' + dashboardEscape(alert.location) + '</span></div></div>';
+  }).join('');
   const alarmHtml = rows.map(function (alarm) {
     const levelClass = ['urgent', 'important', 'normal'].indexOf(alarm.level) >= 0 ? alarm.level : 'normal';
     return '<div class="alert-item" role="button" tabindex="0" data-alarm-id="' + dashboardEscape(alarm.id) + '">' +
@@ -225,7 +261,24 @@ function renderDashboardAlarms(alarms) {
       '<div class="alert-meta"><span class="alert-time">' + dashboardEscape(alarm.createdAt || '--') +
       '</span><span class="alert-location">' + dashboardEscape(alarm.location || '--') + '</span></div></div>';
   }).join('');
-  container.innerHTML = marketEvaluation + alarmHtml;
+  container.innerHTML = marketEvaluation + alarmHtml + triggeredAlertHtml;
+}
+
+function findDashboardTriggeredAlert(id) {
+  return Object.keys(DASHBOARD_TRIGGERED_ALERTS).map(function (key) {
+    return DASHBOARD_TRIGGERED_ALERTS[key];
+  }).find(function (alert) {
+    return alert.id === id;
+  });
+}
+
+function triggerDashboardAlert(key) {
+  const alert = DASHBOARD_TRIGGERED_ALERTS[key];
+  if (!alert || dashboardTriggeredAlertIds.indexOf(alert.id) >= 0) return;
+  dashboardTriggeredAlertIds.push(alert.id);
+  renderDashboardAlarms(dashboardOverview && dashboardOverview.alarms);
+  const item = document.querySelector('[data-triggered-alert-id="' + alert.id + '"]');
+  if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderDashboardMarketFeedback(feedback) {
@@ -287,6 +340,11 @@ function dashboardAlertHtml(content) {
     '</div><p class="dashboard-alert-message">' + dashboardEscape(description) + '</p>';
 }
 
+function dashboardTriggeredAlertHtml(alert) {
+  return '<div class="dashboard-triggered-alert-detail"><img src="' + dashboardEscape(alert.imageUrl) + '" alt="' +
+    dashboardEscape(alert.imageAlt) + '"><p class="dashboard-alert-message">' + dashboardEscape(alert.description) + '</p></div>';
+}
+
 async function loadDashboardPageAlert() {
   const res = await apiGet('/page-alerts/dashboard-graft');
   if (res && res.data) {
@@ -304,7 +362,10 @@ function openDashboardModal(type, item) {
   const titleElement = document.getElementById('dashboard-modal-title');
   const bodyElement = document.getElementById('dashboard-modal-body');
   const modal = overlay.querySelector('.dashboard-modal');
-  if (modal) modal.classList.toggle('is-market-evaluation', type === 'marketEvaluation');
+  if (modal) {
+    modal.classList.toggle('is-market-evaluation', type === 'marketEvaluation');
+    modal.classList.toggle('is-triggered-alert', type === 'triggeredAlert');
+  }
   if (type === 'marketEvaluation') {
     titleElement.textContent = DASHBOARD_MARKET_EVALUATION.modalTitle;
     bodyElement.textContent = DASHBOARD_MARKET_EVALUATION.content;
@@ -315,6 +376,11 @@ function openDashboardModal(type, item) {
     titleElement.textContent = feedback.modalTitle || feedback.title || '市场反馈';
     bodyElement.textContent = feedback.content || feedback.summary || '';
     bodyElement.className = 'dashboard-modal-body dashboard-market-message';
+  } else if (type === 'triggeredAlert') {
+    if (!item) return;
+    titleElement.textContent = item.modalTitle || item.title;
+    bodyElement.className = 'dashboard-modal-body';
+    bodyElement.innerHTML = dashboardTriggeredAlertHtml(item);
   } else {
     const content = dashboardPageAlert || DASHBOARD_ALERT_FALLBACK;
     titleElement.textContent = content.modalTitle || content.title || DASHBOARD_ALERT_FALLBACK.modalTitle;
@@ -365,6 +431,10 @@ document.addEventListener('DOMContentLoaded', function () {
         openDashboardModal('marketEvaluation');
         return;
       }
+      if (item.dataset.triggeredAlertId) {
+        openDashboardModal('triggeredAlert', findDashboardTriggeredAlert(item.dataset.triggeredAlertId));
+        return;
+      }
       if (!dashboardOverview) return;
       const alarm = (dashboardOverview.alarms || []).find(function (row) {
         return String(row.id) === item.dataset.alarmId;
@@ -378,6 +448,10 @@ document.addEventListener('DOMContentLoaded', function () {
       event.preventDefault();
       if (item.dataset.marketEvaluation === 'true') {
         openDashboardModal('marketEvaluation');
+        return;
+      }
+      if (item.dataset.triggeredAlertId) {
+        openDashboardModal('triggeredAlert', findDashboardTriggeredAlert(item.dataset.triggeredAlertId));
         return;
       }
       if (!dashboardOverview) return;
@@ -406,8 +480,7 @@ document.addEventListener('keydown', function (event) {
     closeDashboardModal();
     return;
   }
-  if (event.key === '1' && !isTypingTarget(event.target)) {
-    const alertCard = document.getElementById('dashboard-alert-card');
-    if (alertCard && (!dashboardPageAlert || Number(dashboardPageAlert.enabled) !== 0)) alertCard.hidden = false;
+  if ((event.key === '1' || event.key === '3') && !event.repeat && !isTypingTarget(event.target)) {
+    triggerDashboardAlert(event.key);
   }
 });
