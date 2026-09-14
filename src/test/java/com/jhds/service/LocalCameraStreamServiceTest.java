@@ -18,6 +18,18 @@ public class LocalCameraStreamServiceTest {
     }
 
     @Test
+    public void defaultsToFourKAtStartup() throws Exception {
+        Path directory = Files.createTempDirectory("camera-default-quality-test");
+        LocalCameraStreamService service = service(directory);
+        try {
+            assertEquals("4k", service.status().get("quality"));
+            assertEquals(2160, service.status().get("targetHeight"));
+        } finally {
+            Files.delete(directory);
+        }
+    }
+
+    @Test
     public void directoryHasOnlyOneOwnerAndCanBeReacquired() throws Exception {
         Path directory = Files.createTempDirectory("camera-lock-test");
         LocalCameraStreamService first = service(directory), second = service(directory);

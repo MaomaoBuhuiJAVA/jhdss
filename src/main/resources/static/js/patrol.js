@@ -2219,7 +2219,7 @@ function applyCameraQualityStatus(data) {
     var select = document.getElementById('camera-quality');
     var status = document.getElementById('camera-quality-status');
     var patrolQuality = document.getElementById('auto-patrol-quality');
-    var quality = String(data.quality || (select && select.value) || 'hd').toLowerCase();
+    var quality = String(data.quality || (select && select.value) || '4k').toLowerCase();
     var width = Number(data.actualWidth || 0);
     var height = Number(data.actualHeight || 0);
     var verified = data.qualityVerified === true;
@@ -2261,7 +2261,7 @@ async function loadCameraQuality() {
 async function changeCameraQuality(quality) {
     const select = document.getElementById('camera-quality');
     if (!select || select.disabled) return;
-    const previous = select.dataset.current || 'hd';
+    const previous = select.dataset.current || '4k';
     select.disabled = true;
     destroyCameraPlayer();
     setCameraStatus('loading', quality === '4k' ? '正在切换 4K 主码流' : '正在切换视频清晰度');

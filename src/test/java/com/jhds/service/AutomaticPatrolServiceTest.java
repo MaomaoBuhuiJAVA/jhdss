@@ -12,6 +12,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -117,32 +118,25 @@ public class AutomaticPatrolServiceTest {
     }
 
     @Test
-    public void patrolCameraFallsBackToVerifiedHdWhenFourKIsUnavailable() {
+    public void patrolCameraStopsWhenFourKIsUnavailable() {
         AutomaticPatrolService service = new AutomaticPatrolService();
         LocalCameraStreamService camera = mock(LocalCameraStreamService.class);
-        Map<String, Object> hdStatus = new LinkedHashMap<>();
-        hdStatus.put("qualityVerified", true);
-        hdStatus.put("actualWidth", 1280);
-        hdStatus.put("actualHeight", 720);
         when(camera.awaitReady(60000L)).thenReturn(true);
-        when(camera.awaitReady(30000L)).thenReturn(true);
         when(camera.verifyCurrentQuality())
-                .thenThrow(new IllegalStateException("截图分辨率未就绪：当前 1280x720，期望高度 2160"))
-                .thenReturn(hdStatus);
+                .thenThrow(new IllegalStateException("截图分辨率未就绪：当前 1280x720，期望高度 2160"));
         ReflectionTestUtils.setField(service, "localCameraStreamService", camera);
 
-        ReflectionTestUtils.invokeMethod(service, "preparePatrolCamera");
+        try {
+            ReflectionTestUtils.invokeMethod(service, "preparePatrolCamera");
+            fail("Expected patrol preparation to reject a non-4K camera stream");
+        } catch (IllegalStateException expected) {
+            assertEquals("截图分辨率未就绪：当前 1280x720，期望高度 2160", expected.getMessage());
+        }
 
         InOrder calls = inOrder(camera);
         calls.verify(camera).changeQuality("4k");
         calls.verify(camera).awaitReady(60000L);
         calls.verify(camera).verifyCurrentQuality();
-        calls.verify(camera).changeQuality("hd");
-        calls.verify(camera).awaitReady(30000L);
-        calls.verify(camera).verifyCurrentQuality();
-        assertEquals("READY", ReflectionTestUtils.getField(service, "state"));
-        assertEquals("1280x720 高清画面与控制设备已就绪", ReflectionTestUtils.getField(service, "phase"));
-        assertEquals("摄像头未提供真实4K，已自动使用 1280x720 高清画面继续巡检",
-                ReflectionTestUtils.getField(service, "warning"));
+        verify(camera, never()).changeQuality("hd");
     }
 }

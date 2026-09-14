@@ -103,7 +103,7 @@ public class AutomaticPatrolService {
     private volatile String warning;
     private volatile String capturePrefix;
     private volatile boolean outputPathFallbackLogged;
-    private volatile String previewQualityBeforePatrol = "hd";
+    private volatile String previewQualityBeforePatrol = "4k";
     private final List<PatrolCaptureGroup> captureGroups = new ArrayList<>();
     private volatile List<Map<String, Object>> analysisResults = Collections.emptyList();
     private volatile String analysisState = "IDLE";
@@ -425,7 +425,7 @@ public class AutomaticPatrolService {
 
     private String currentPreviewQuality() {
         Object value = localCameraStreamService.status().get("quality");
-        String quality = value == null ? "hd" : String.valueOf(value).toLowerCase();
+        String quality = value == null ? "4k" : String.valueOf(value).toLowerCase();
         return "smooth".equals(quality) || "4k".equals(quality) ? quality : "hd";
     }
 
@@ -499,46 +499,23 @@ public class AutomaticPatrolService {
     }
 
     private void preparePatrolCamera() {
-        String fourKFailure;
-        try {
-            localCameraStreamService.changeQuality("4k");
-            if (!localCameraStreamService.awaitReady(60000L)) {
-                throw new IllegalStateException("4K本地视频流未就绪");
-            }
-            Map<String, Object> camera = localCameraStreamService.verifyCurrentQuality();
-            if (!Boolean.TRUE.equals(camera.get("qualityVerified"))
-                    || !Integer.valueOf(3840).equals(camera.get("actualWidth"))
-                    || !Integer.valueOf(2160).equals(camera.get("actualHeight"))) {
-                throw new IllegalStateException("4K真实分辨率校验失败：当前 " + resolution(camera));
-            }
-            updateState("READY", "4K真实分辨率与控制设备已就绪", 5);
-            return;
-        } catch (RuntimeException e) {
-            fourKFailure = e.getMessage();
-            log.warn("4K patrol stream unavailable; falling back to verified HD: {}", fourKFailure);
-        }
-
-        localCameraStreamService.changeQuality("hd");
-        if (!localCameraStreamService.awaitReady(30000L)) {
-            throw new IllegalStateException("4K不可用，高清备用视频流也未就绪");
+        localCameraStreamService.changeQuality("4k");
+        if (!localCameraStreamService.awaitReady(60000L)) {
+            throw new IllegalStateException("4K本地视频流未就绪，自动巡检已中止");
         }
         Map<String, Object> camera = localCameraStreamService.verifyCurrentQuality();
         if (!Boolean.TRUE.equals(camera.get("qualityVerified"))
-                || integerValue(camera.get("actualHeight")) < 720) {
-            throw new IllegalStateException("高清备用视频流校验失败：当前 " + resolution(camera));
+                || !Integer.valueOf(3840).equals(camera.get("actualWidth"))
+                || !Integer.valueOf(2160).equals(camera.get("actualHeight"))) {
+            throw new IllegalStateException("未检测到真实4K画面（当前 " + resolution(camera) + "），自动巡检已中止");
         }
-        warning = "摄像头未提供真实4K，已自动使用 " + resolution(camera) + " 高清画面继续巡检";
-        updateState("READY", resolution(camera) + " 高清画面与控制设备已就绪", 5);
+        updateState("READY", "4K真实分辨率与控制设备已就绪", 5);
     }
 
     private String resolution(Map<String, Object> camera) {
         Object width = camera.get("actualWidth");
         Object height = camera.get("actualHeight");
         return (width == null ? "--" : width) + "x" + (height == null ? "--" : height);
-    }
-
-    private int integerValue(Object value) {
-        return value instanceof Number ? ((Number) value).intValue() : 0;
     }
 
     private boolean awaitControlPanel() {

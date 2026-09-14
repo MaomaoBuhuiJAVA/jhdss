@@ -47,7 +47,7 @@ public class LocalCameraStreamService {
     private volatile int restartCount;
     private volatile long nextRetryAt;
     private volatile long playlistBaselineModifiedAt;
-    private volatile StreamQuality streamQuality = StreamQuality.HD;
+    private volatile StreamQuality streamQuality = StreamQuality.UHD_4K;
     private FileChannel ownershipChannel;
     private FileLock ownershipLock;
     private volatile String segmentPrefix = "segment-unstarted-";

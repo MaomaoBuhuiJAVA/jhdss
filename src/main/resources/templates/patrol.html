@@ -51,8 +51,8 @@
                                 <i class="ri-hd-line" aria-hidden="true"></i>
                                 <select id="camera-quality" aria-label="视频清晰度" onchange="changeCameraQuality(this.value)">
                                     <option value="smooth">流畅 480p</option>
-                                    <option value="hd" selected>高清 720p</option>
-                                    <option value="4k">超清 4K</option>
+                                    <option value="hd">高清 720p</option>
+                                    <option value="4k" selected>超清 4K</option>
                                 </select>
                             </label>
                             <span class="camera-quality-status" id="camera-quality-status" aria-live="polite">画质待校验</span>
@@ -295,7 +295,7 @@
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
     <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
-    <script th:src="@{/js/patrol.js(v='20260914-patrol-alert-row-v2')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260914-default-4k-v1')}"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function(){
         var el=document.getElementById('patrol-twin');
