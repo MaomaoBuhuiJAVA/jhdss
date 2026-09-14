@@ -6,12 +6,15 @@ import com.jhds.entity.PatrolRecord;
 import com.jhds.entity.PatrolTask;
 import com.jhds.service.PatrolService;
 import com.jhds.service.AutomaticPatrolService;
+import com.jhds.service.PatrolReportService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -34,6 +37,8 @@ public class PatrolController {
     private PatrolService patrolService;
     @Autowired
     private AutomaticPatrolService automaticPatrolService;
+    @Autowired
+    private PatrolReportService patrolReportService;
     @Autowired
     private com.jhds.service.YoloRealtimeDetectionService yoloRealtimeDetectionService;
 
@@ -193,6 +198,22 @@ public class PatrolController {
         } catch (IllegalStateException e) {
             return Result.error(409, e.getMessage());
         }
+    }
+
+    @ApiOperation("下载最近一次自动巡检Word报告")
+    @GetMapping("/auto/report")
+    public ResponseEntity<byte[]> downloadAutomaticPatrolReport() throws IOException {
+        Map<String, Object> status = automaticPatrolService.status();
+        if (!"COMPLETED".equals(status.get("analysisState"))) {
+            return ResponseEntity.status(409).body(new byte[0]);
+        }
+        byte[] report = patrolReportService.createReport(status);
+        String filename = "patrol-report-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date()) + ".docx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .contentLength(report.length)
+                .body(report);
     }
 
     @ApiOperation("删除巡逻任务")

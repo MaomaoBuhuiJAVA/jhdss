@@ -64,8 +64,7 @@ let realtimeDetectionSnapshot = '';
 let patrolTaskResults = [];
 let patrolResultSignature = '';
 let patrolTaskDetailTrigger = null;
-let patrolLeafAlertVisible = false;
-let patrolChlorosisAlertVisible = false;
+let patrolResultDetailTrigger = null;
 
 function setTwinAxisMotion(axis, direction) {
     if (window.greenhouseTwin && typeof window.greenhouseTwin.setAxisMotion === 'function') {
@@ -1456,70 +1455,46 @@ function renderAutomaticPatrolResults(data) {
         return;
     }
     if (!results.length) {
-        if (badge) {
-            badge.className = 'completed';
-            badge.innerHTML = '<i></i>已生成';
-        }
-        if (patrolLeafAlertVisible) appendPatrolLeafAlert(container);
-        if (patrolChlorosisAlertVisible) appendPatrolChlorosisAlert(container);
-        if (!patrolLeafAlertVisible && !patrolChlorosisAlertVisible) {
-            appendPatrolResultEmpty(container, 'ri-image-search-line', '未发现明确虫害',
-                    '所有采集点均已通过多帧复核');
+        if (analysisState === 'COMPLETED') {
+            if (badge) {
+                badge.className = 'completed';
+                badge.innerHTML = '<i></i>已生成';
+            }
+            appendPatrolResultEmpty(container, 'ri-checkbox-circle-line', '本轮巡检无异常',
+                    '未发现明确的未成熟果实或害虫');
+        } else {
+            appendPatrolResultEmpty(container, 'ri-image-search-line', '等待巡检任务',
+                    '任务结束后将对照片进行多帧复核');
         }
         return;
     }
-    updateExpandedPatrolResult(results[0]);
     results.forEach(function(result, index) {
         var item = document.createElement('button');
         item.type = 'button';
         item.className = 'patrol-result-item confirmed';
-        item.setAttribute('aria-label', '查看' + result.plant + result.name + '巡检结果');
+        item.setAttribute('aria-label', '查看' + result.plant + result.name + '报警详情');
         item.addEventListener('click', function() { openPatrolTaskResult(index); });
-
-        var image = document.createElement('img');
-        image.src = result.focusImage || result.image;
-        image.alt = result.plant + result.name + '标注图片';
 
         var copy = document.createElement('div');
         var title = document.createElement('strong');
-        title.textContent = result.name + (Number(result.count || 0) > 1 ? ' ×' + result.count : '');
+        title.textContent = '发现' + (result.category || '害虫') + '：' + result.name
+                + (Number(result.count || 0) > 1 ? ' ×' + result.count : '');
         var plant = document.createElement('span');
-        plant.textContent = result.plant;
+        plant.textContent = (result.plant || '未知植株') + ' · ' + (result.location || '未知区域');
         var evidence = document.createElement('span');
         evidence.textContent = Number(result.hits || 0) + '/' + Number(result.frames || 0)
-                + '帧确认 · ' + (Number(result.confidence || 0) * 100).toFixed(1) + '%';
+                + '帧复核 · ' + (Number(result.confidence || 0) * 100).toFixed(1) + '%';
         copy.append(title, plant, evidence);
 
-        var location = document.createElement('time');
-        location.textContent = result.location || result.capturedAt || '';
-        var level = document.createElement('b');
-        level.textContent = '已确认';
-        item.append(image, copy, location, level);
-        container.appendChild(item);
-    });
-}
+        var image = document.createElement('img');
+        image.src = result.focusImage || result.image;
+        image.alt = result.plant + result.name + '识别缩略图';
 
-function updateExpandedPatrolResult(result) {
-    if (!result) return;
-    var name = String(result.name || '未知害虫');
-    var image = document.getElementById('patrol-expanded-image');
-    var source = result.focusImage || result.image;
-    if (image && source) {
-        image.src = source;
-        image.alt = '巡检识别到的' + name + '害虫截图';
-    }
-    var values = {
-        'patrol-expanded-name': name,
-        'patrol-expanded-count': String(Number(result.count || 1)),
-        'patrol-expanded-confidence': (Number(result.confidence || 0) * 100).toFixed(1) + '%',
-        'patrol-expanded-caption': String(result.plant || '巡检摄像头') + ' · ' + String(result.location || '识别截图'),
-        'patrol-expanded-time': String(result.capturedAt || '').split(' ').pop() || '刚刚',
-        'patrol-expanded-advice': '立即隔离受害枝条，安排人工捕捉，并对相邻植株进行重点复检',
-        'patrol-expanded-warning': '检测到' + name + '，建议立即处理并复核相邻植株'
-    };
-    Object.keys(values).forEach(function(id) {
-        var element = document.getElementById(id);
-        if (element) element.textContent = values[id];
+        var arrow = document.createElement('i');
+        arrow.className = 'ri-arrow-right-s-line';
+        arrow.setAttribute('aria-hidden', 'true');
+        item.append(copy, image, arrow);
+        container.appendChild(item);
     });
 }
 
@@ -1562,152 +1537,54 @@ function appendPatrolResultEmpty(container, icon, title, detail) {
         container.appendChild(empty);
 }
 
-function appendPatrolLeafAlert(container) {
-    if (!container || container.querySelector('[data-patrol-alert="leaf"]')) return;
-    var alert = document.createElement('button');
-    alert.type = 'button';
-    alert.className = 'patrol-leaf-alert';
-    alert.dataset.patrolAlert = 'leaf';
-    alert.setAttribute('aria-label', '查看二号种植区病叶告警');
-    alert.innerHTML = '<i class="ri-alarm-warning-fill"></i>'
-            + '<span><strong>发现病叶</strong><small>二号种植区 · 叶尖卷曲、变褐干枯</small></span>'
-            + '<b>需处理</b><i class="ri-arrow-right-s-line"></i>';
-    alert.addEventListener('click', openPatrolLeafAlert);
-    var chlorosisAlert = container.querySelector('[data-patrol-alert="chlorosis"]');
-    if (chlorosisAlert) container.insertBefore(alert, chlorosisAlert);
-    else container.appendChild(alert);
-}
-
-function showPatrolLeafAlert() {
-    patrolLeafAlertVisible = true;
-    var container = document.getElementById('patrol-realtime-results');
-    if (!container) return;
-    var empty = container.querySelector('.patrol-results-empty');
-    if (empty) empty.remove();
-    container.classList.add('has-results');
-    appendPatrolLeafAlert(container);
-    var alert = container.querySelector('[data-patrol-alert="leaf"]');
-    if (alert) alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function appendPatrolChlorosisAlert(container) {
-    if (!container || container.querySelector('[data-patrol-alert="chlorosis"]')) return;
-    var alert = document.createElement('button');
-    alert.type = 'button';
-    alert.className = 'patrol-leaf-alert patrol-chlorosis-alert';
-    alert.dataset.patrolAlert = 'chlorosis';
-    alert.setAttribute('aria-label', '查看失绿斑红蜘蛛告警');
-    alert.innerHTML = '<i class="ri-alarm-warning-fill"></i>'
-            + '<span><strong>发现失绿斑</strong><small>部分叶片 · 失绿斑及红色斑点</small></span>'
-            + '<b>需处理</b><i class="ri-arrow-right-s-line"></i>';
-    alert.addEventListener('click', openPatrolChlorosisAlert);
-    container.appendChild(alert);
-}
-
-function showPatrolChlorosisAlert() {
-    patrolChlorosisAlertVisible = true;
-    var container = document.getElementById('patrol-realtime-results');
-    if (!container) return;
-    var empty = container.querySelector('.patrol-results-empty');
-    if (empty) empty.remove();
-    container.classList.add('has-results');
-    appendPatrolChlorosisAlert(container);
-    var alert = container.querySelector('[data-patrol-alert="chlorosis"]');
-    if (alert) alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function openPatrolLeafAlert() {
-    var title = document.getElementById('patrol-warning-modal-title');
-    var gallery = document.getElementById('patrol-warning-images');
-    if (title) title.textContent = '发现病叶';
-    if (gallery) {
-        gallery.classList.add('leaf-alert-detail');
-        gallery.replaceChildren();
-
-        var figure = document.createElement('figure');
-        figure.className = 'patrol-leaf-detection';
-        var image = document.createElement('img');
-        image.src = '/jhds/images/patrol/cherry-leaf-calcium-deficiency.png';
-        image.alt = '二号种植区卷曲、变褐干枯的樱桃叶片识别画面';
-        var firstBox = document.createElement('span');
-        firstBox.className = 'patrol-leaf-detection-box primary';
-        firstBox.textContent = '病叶 0.96';
-        var secondBox = document.createElement('span');
-        secondBox.className = 'patrol-leaf-detection-box secondary';
-        secondBox.textContent = '病叶 0.91';
-        var caption = document.createElement('figcaption');
-        caption.innerHTML = '<i class="ri-focus-3-line"></i><span>二号种植区 · AI 病叶识别画面</span>';
-        figure.append(image, firstBox, secondBox, caption);
-
-        var detail = document.createElement('div');
-        detail.className = 'patrol-leaf-alert-copy';
-        detail.innerHTML = '<span><i class="ri-map-pin-2-line"></i>二号种植区</span>'
-                + '<strong>叶片异常诊断</strong>'
-                + '<p>二号种植区叶尖卷曲、变褐干枯，怀疑植株缺钙，建议补充螯合钙。</p>';
-        gallery.append(figure, detail);
-    }
-    openPatrolWarning();
-}
-
-function openPatrolChlorosisAlert() {
-    var title = document.getElementById('patrol-warning-modal-title');
-    var gallery = document.getElementById('patrol-warning-images');
-    if (title) title.textContent = '发现失绿斑';
-    if (gallery) {
-        gallery.classList.add('leaf-alert-detail');
-        gallery.replaceChildren();
-
-        var figure = document.createElement('figure');
-        figure.className = 'patrol-leaf-detection patrol-chlorosis-detection';
-        var image = document.createElement('img');
-        image.src = '/jhds/images/patrol/cherry-leaf-red-spider.jpg';
-        image.alt = '叶片失绿斑和红色斑点的红蜘蛛识别画面';
-        var caption = document.createElement('figcaption');
-        caption.innerHTML = '<i class="ri-focus-3-line"></i><span>AI 红蜘蛛识别画面</span>';
-        figure.append(image, caption);
-
-        var detail = document.createElement('div');
-        detail.className = 'patrol-leaf-alert-copy';
-        detail.innerHTML = '<span><i class="ri-bug-line"></i>虫害疑似告警</span>'
-                + '<strong>叶片异常诊断</strong>'
-                + '<p>部分叶片有失绿斑，且有部分红色斑点，疑似红蜘蛛。</p>';
-        gallery.append(figure, detail);
-    }
-    openPatrolWarning();
-}
-
 function openPatrolTaskResult(index) {
     var result = patrolTaskResults[index];
     if (!result) return;
-    var title = document.getElementById('patrol-warning-modal-title');
-    var warningText = document.getElementById('patrol-warning-text');
-    var gallery = document.getElementById('patrol-warning-images');
-    if (title) title.textContent = result.name + ' · ' + result.plant + ' · ' + result.location;
-    if (warningText) warningText.textContent = '巡检任务多帧复核确认发现' + result.name;
-    if (gallery) {
-        gallery.classList.remove('leaf-alert-detail');
-        gallery.replaceChildren();
-        var appendResultImage = function(src, alt, caption) {
-            if (!src) return;
-            var figure = document.createElement('figure');
-            var image = document.createElement('img');
-            image.src = src;
-            image.alt = alt;
-            figure.appendChild(image);
-            if (caption) {
-                var figcaption = document.createElement('figcaption');
-                figcaption.textContent = caption;
-                figure.appendChild(figcaption);
-            }
-            gallery.appendChild(figure);
-        };
-        appendResultImage(result.focusImage || result.image,
-                result.plant + result.name + '虫体聚焦标注图片', '虫体聚焦图');
-        if (result.image && result.image !== result.focusImage) {
-            appendResultImage(result.image, result.plant + result.name + '完整标注图片', '完整巡检画面');
-        }
+    patrolResultDetailTrigger = document.activeElement;
+    var overlay = document.getElementById('patrolResultOverlay');
+    var image = document.getElementById('patrol-result-modal-image');
+    var name = String(result.name || '未知目标');
+    var totalPests = patrolTaskResults.reduce(function(total, item) {
+        return total + (String(item.category || '害虫') === '害虫' ? Number(item.count || 0) : 0);
+    }, 0);
+    if (image) {
+        image.src = result.image || result.focusImage || '';
+        image.alt = result.plant + name + '巡检标注图';
     }
-    openPatrolWarning();
+    var values = {
+        'patrol-result-modal-title': name + '报警详情',
+        'patrol-result-modal-caption': String(result.plant || '未知植株') + ' · ' + String(result.location || '未知区域'),
+        'patrol-result-modal-time': String(result.capturedAt || ''),
+        'patrol-result-modal-category': String(result.category || '害虫'),
+        'patrol-result-modal-name': name,
+        'patrol-result-modal-count': String(Number(result.count || 0)),
+        'patrol-result-modal-total': String(totalPests),
+        'patrol-result-modal-plant': String(result.plant || '未知植株'),
+        'patrol-result-modal-location': String(result.location || '未知区域'),
+        'patrol-result-modal-confidence': (Number(result.confidence || 0) * 100).toFixed(1) + '%',
+        'patrol-result-modal-evidence': Number(result.hits || 0) + '/' + Number(result.frames || 0) + ' 帧确认',
+        'patrol-result-modal-advice': String(result.advice || '安排人工复核并持续观察。')
+    };
+    Object.keys(values).forEach(function(id) {
+        var element = document.getElementById(id);
+        if (element) element.textContent = values[id];
+    });
+    if (overlay) {
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+        var close = overlay.querySelector('button');
+        if (close) close.focus();
+    }
+}
+
+function closePatrolTaskResult() {
+    var overlay = document.getElementById('patrolResultOverlay');
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    if (patrolResultDetailTrigger && typeof patrolResultDetailTrigger.focus === 'function') {
+        patrolResultDetailTrigger.focus();
+    }
 }
 
 function openRealtimeDetectionAlert(event) {
@@ -2489,6 +2366,12 @@ window.addEventListener('DOMContentLoaded', function() {
             if (event.target === taskDetailOverlay) closePatrolTaskDetail();
         });
     }
+    var resultOverlay = document.getElementById('patrolResultOverlay');
+    if (resultOverlay) {
+        resultOverlay.addEventListener('click', function(event) {
+            if (event.target === resultOverlay) closePatrolTaskResult();
+        });
+    }
 });
 
 document.addEventListener('keydown', function(event) {
@@ -2496,19 +2379,12 @@ document.addEventListener('keydown', function(event) {
         closePatrolWarning();
         closePatrolRecords();
         closePatrolTaskDetail();
+        closePatrolTaskResult();
         return;
     }
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
         var warning = document.getElementById('patrol-warning');
         if (warning && (!patrolPageAlert || Number(patrolPageAlert.enabled) !== 0)) warning.hidden = false;
-    }
-    if (event.key === '1' && !event.ctrlKey && !event.altKey && !event.metaKey
-            && !patrolKeyTargetIsEditable(event.target)) {
-        showPatrolLeafAlert();
-    }
-    if (event.key === '3' && !event.ctrlKey && !event.altKey && !event.metaKey
-            && !patrolKeyTargetIsEditable(event.target)) {
-        showPatrolChlorosisAlert();
     }
 });
 

@@ -56,11 +56,33 @@ public class PatrolResultAnalyzerTest {
 
         assertEquals(1, results.size());
         assertEquals("桃红颈天牛", results.get(0).get("name"));
+        assertEquals("害虫", results.get(0).get("category"));
         assertEquals("第 5 株盆栽", results.get(0).get("plant"));
         assertEquals(3, results.get(0).get("hits"));
         assertEquals(1, ((List<?>) results.get(0).get("detections")).size());
         assertTrue(String.valueOf(results.get(0).get("image")).startsWith("/jhds/patrol-results/"));
         assertTrue(String.valueOf(results.get(0).get("focusImage")).startsWith("/jhds/patrol-results/"));
+    }
+
+    @Test
+    public void classifiesImmatureFruitForAlarmList() throws Exception {
+        Path frame = temporaryFolder.newFile("unripe.jpg").toPath();
+        ImageIO.write(new BufferedImage(160, 100, BufferedImage.TYPE_INT_RGB), "jpg", frame.toFile());
+        PatrolCaptureGroup group = new PatrolCaptureGroup(1, "top", "顶部");
+        group.addFrame(frame);
+        Map<String, Object> inference = confirmedInference();
+        ((Map<String, Object>) ((List<?>) inference.get("detections")).get(0)).put("class", "unripe_fruit");
+        YoloRealtimeDetectionService yolo = mock(YoloRealtimeDetectionService.class);
+        when(yolo.detectFile(any(Path.class), isNull(), anyString())).thenReturn(inference);
+        PatrolResultAnalyzer analyzer = new PatrolResultAnalyzer();
+        ReflectionTestUtils.setField(analyzer, "yoloService", yolo);
+        ReflectionTestUtils.setField(analyzer, "resultPath", temporaryFolder.newFolder("fruit-results").getAbsolutePath());
+
+        List<Map<String, Object>> results = analyzer.analyze("patrol_fruit", Collections.singletonList(group), ignored -> { });
+
+        assertEquals("未成熟果实", results.get(0).get("category"));
+        assertEquals("未成熟果实", results.get(0).get("name"));
+        assertTrue(String.valueOf(results.get(0).get("advice")).contains("暂缓采收"));
     }
 
     @Test

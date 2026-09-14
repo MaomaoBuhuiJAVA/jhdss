@@ -95,7 +95,10 @@ public class PatrolResultAnalyzer {
             hits = Math.max(hits, (int) number(detection.get("hits"), 0.0));
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", localizedName(detections));
+        String name = localizedName(detections);
+        boolean immatureFruit = isImmatureFruit(detections);
+        result.put("name", name);
+        result.put("category", immatureFruit ? "未成熟果实" : "害虫");
         result.put("confidence", confidence);
         result.put("count", detections.size());
         result.put("detections", detections);
@@ -104,6 +107,10 @@ public class PatrolResultAnalyzer {
         result.put("focusImage", "/jhds/patrol-results/" + focusFilename);
         result.put("location", "第" + group.getRow() + "条扫描线 · " + group.getPointLabel());
         result.put("plant", inferredPlant(group));
+        result.put("area", "第" + group.getRow() + "条扫描线");
+        result.put("advice", immatureFruit
+                ? "继续观察果实转色与膨大情况，暂缓采收并在下一轮巡检重点复查"
+                : "立即隔离受害枝条，安排人工捕捉，并对相邻植株进行重点复检");
         result.put("hits", hits);
         result.put("frames", frames);
         result.put("capturedAt", LocalDateTime.now().format(DISPLAY_TIME));
@@ -208,7 +215,19 @@ public class PatrolResultAnalyzer {
     private String localizedDetectionName(Map<String, Object> detection) {
         String value = String.valueOf(detection.get("class"));
         String normalized = value.toLowerCase().replaceAll("[\\s_-]+", "");
-        return normalized.contains("longhorn") || normalized.contains("blackbeetle") ? "桃红颈天牛" : value;
+        if (normalized.contains("longhorn") || normalized.contains("blackbeetle")) return "桃红颈天牛";
+        if (normalized.contains("unripe") || normalized.contains("immature")
+                || normalized.contains("greenfruit") || normalized.contains("weishuguo")) return "未成熟果实";
+        return value;
+    }
+
+    private boolean isImmatureFruit(List<Map<String, Object>> detections) {
+        if (detections.isEmpty()) return false;
+        String value = String.valueOf(detections.get(0).get("class"));
+        String normalized = value.toLowerCase().replaceAll("[\\s_-]+", "");
+        return normalized.contains("unripe") || normalized.contains("immature")
+                || normalized.contains("greenfruit") || normalized.contains("weishuguo")
+                || value.contains("未成熟");
     }
 
     private int coordinate(Object value, int minimum, int maximum) {

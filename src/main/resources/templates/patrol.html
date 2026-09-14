@@ -6,7 +6,7 @@
     <title>jhds - AI轨道巡检</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
-    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260914-leaf-key-alert-v1')}">
+    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260914-patrol-alert-row-v2')}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
     <script th:src="@{/js/lib/hls.min.js}"></script>
     <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='1')}">
@@ -137,12 +137,6 @@
                             <span>任务结束后将对照片进行多帧复核</span>
                         </div>
                     </div>
-                    <div class="patrol-results-detail" id="patrol-results-detail">
-                        <figure class="patrol-result-hero"><img id="patrol-expanded-image" th:src="@{/images/alerts/longhorn-beetle-detection.png}" alt="巡检摄像头识别到的桃红颈天牛害虫截图"><figcaption><i class="ri-camera-lens-line"></i><span id="patrol-expanded-caption">CH-03 巡检识别截图</span><time id="patrol-expanded-time">17:03:58</time></figcaption></figure>
-                        <section class="patrol-detail-section"><h3><i class="ri-focus-3-line"></i>实时检测结果</h3><dl class="patrol-result-facts"><div><dt>目标类别</dt><dd id="patrol-expanded-name">桃红颈天牛</dd></div><div><dt>检测数量</dt><dd><strong id="patrol-expanded-count">1</strong></dd></div><div class="wide"><dt>识别置信度</dt><dd><b id="patrol-expanded-confidence">92.3%</b><span>多帧复核确认</span></dd></div><div class="wide"><dt>推荐措施</dt><dd id="patrol-expanded-advice">立即隔离受害枝条，安排人工捕捉并进行重点复检</dd></div></dl></section>
-                        <section class="patrol-detail-section"><h3><i class="ri-cpu-line"></i>设备状态</h3><div class="patrol-device-facts"><span><i class="ri-robot-2-line"></i>巡检机器人<b>在线</b></span><span><i class="ri-camera-line"></i>摄像头 ID<b>CH-03</b></span><span><i class="ri-sun-line"></i>光照强度<b>6800 lux</b></span><span><i class="ri-water-percent-line"></i>土壤湿度<b>72%</b></span></div></section>
-                        <section class="patrol-detail-warning"><i class="ri-alarm-warning-fill"></i><div><span>预警信息</span><strong id="patrol-expanded-warning">检测到桃红颈天牛，建议立即处理并复核相邻植株</strong></div></section>
-                    </div>
                 </section>
                 <button class="patrol-warning" id="patrol-warning" type="button" onclick="openPatrolWarning()" hidden>
                     <i class="ri-alarm-warning-line"></i>
@@ -226,6 +220,34 @@
         </section>
     </div>
 
+    <div class="patrol-result-overlay" id="patrolResultOverlay" hidden>
+        <section class="patrol-result-modal" role="dialog" aria-modal="true" aria-labelledby="patrol-result-modal-title">
+            <header class="patrol-result-modal-header">
+                <div><span>自动巡检 · 多帧复核</span><h2 id="patrol-result-modal-title"><i class="ri-alarm-warning-line"></i>异常详情</h2></div>
+                <button type="button" onclick="closePatrolTaskResult()" aria-label="关闭异常详情"><i class="ri-close-line"></i></button>
+            </header>
+            <div class="patrol-result-modal-body">
+                <figure class="patrol-result-modal-visual">
+                    <img id="patrol-result-modal-image" alt="巡检异常识别标注图">
+                    <figcaption><i class="ri-camera-lens-line"></i><span id="patrol-result-modal-caption">巡检识别画面</span><time id="patrol-result-modal-time"></time></figcaption>
+                </figure>
+                <div class="patrol-result-modal-content">
+                    <section><h3><i class="ri-focus-3-line"></i>识别结果</h3><dl>
+                        <div><dt>异常类别</dt><dd id="patrol-result-modal-category">害虫</dd></div>
+                        <div><dt>识别目标</dt><dd id="patrol-result-modal-name">未知</dd></div>
+                        <div><dt>本处数量</dt><dd><strong id="patrol-result-modal-count">0</strong></dd></div>
+                        <div><dt>本轮害虫总数</dt><dd><strong id="patrol-result-modal-total">0</strong></dd></div>
+                        <div><dt>所在植株</dt><dd id="patrol-result-modal-plant">未知</dd></div>
+                        <div><dt>所在区域</dt><dd id="patrol-result-modal-location">未知</dd></div>
+                        <div class="wide"><dt>识别置信度</dt><dd><b id="patrol-result-modal-confidence">0%</b><span id="patrol-result-modal-evidence">多帧复核</span></dd></div>
+                    </dl></section>
+                    <section><h3><i class="ri-first-aid-kit-line"></i>处置建议</h3><p id="patrol-result-modal-advice">安排人工复核并持续观察。</p></section>
+                    <a class="patrol-report-download" th:href="@{/api/patrol/auto/report}" download><i class="ri-file-word-2-line"></i><span>下载完整 Word 巡检报告</span><i class="ri-download-2-line"></i></a>
+                </div>
+            </div>
+        </section>
+    </div>
+
     <!-- AI拍照识别结果弹窗 -->
     <div class="ai-capture-overlay" id="aiCaptureOverlay" style="display:none;">
         <div class="ai-capture-modal">
@@ -273,7 +295,7 @@
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
     <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
-    <script th:src="@{/js/patrol.js(v='20260914-leaf-key-alert-v1')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260914-patrol-alert-row-v2')}"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function(){
         var el=document.getElementById('patrol-twin');

@@ -107,6 +107,16 @@ public class AutomaticPatrolServiceTest {
     }
 
     @Test
+    public void patrolBurstIsLimitedToThreeStableFrames() {
+        AutomaticPatrolService service = new AutomaticPatrolService();
+        ReflectionTestUtils.setField(service, "burstFrames", 7);
+
+        int frames = ReflectionTestUtils.invokeMethod(service, "safeBurstFrames");
+
+        assertEquals(3, frames);
+    }
+
+    @Test
     public void patrolCameraFallsBackToVerifiedHdWhenFourKIsUnavailable() {
         AutomaticPatrolService service = new AutomaticPatrolService();
         LocalCameraStreamService camera = mock(LocalCameraStreamService.class);

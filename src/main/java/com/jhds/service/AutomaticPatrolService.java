@@ -74,7 +74,7 @@ public class AutomaticPatrolService {
     private long focusWaitMs;
     @Value("${patrol.automatic.foliar-spray-ms:1500}")
     private long foliarSprayMs;
-    @Value("${patrol.automatic.burst-frames:5}")
+    @Value("${patrol.automatic.burst-frames:3}")
     private int burstFrames;
     @Value("${patrol.automatic.burst-interval-ms:450}")
     private long burstIntervalMs;
@@ -254,6 +254,7 @@ public class AutomaticPatrolService {
         result.put("analysisState", analysisState);
         result.put("analysisProgress", analysisProgress);
         result.put("analysisResults", new ArrayList<>(analysisResults));
+        result.put("reportAvailable", "COMPLETED".equals(analysisState));
         return result;
     }
 
@@ -616,7 +617,7 @@ public class AutomaticPatrolService {
     }
 
     private int safeBurstFrames() {
-        return Math.max(3, Math.min(7, burstFrames));
+        return 3;
     }
 
     private void moveHorizontal(String direction, long durationMs) {
