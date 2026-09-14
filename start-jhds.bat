@@ -79,10 +79,23 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [INFO] Checking Maven repository connectivity...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\configure-maven-repository.ps1" -ProjectRoot "%CD%" -MavenHome "%MAVEN_HOME%"
+if errorlevel 1 goto :failed
+if not exist ".jhds-runtime\maven-runtime.bat" (
+    echo [ERROR] Maven runtime configuration was not generated.
+    goto :failed
+)
+call ".jhds-runtime\maven-runtime.bat"
+
 echo [INFO] Java:
 java -version
 echo [INFO] Maven:
-call mvn -version
+if defined JHDS_MAVEN_SETTINGS (
+    call mvn -s "!JHDS_MAVEN_SETTINGS!" -gs "!JHDS_MAVEN_SETTINGS!" -version
+) else (
+    call mvn -version
+)
 echo.
 
 set "MYSQL_SERVICE="
@@ -158,9 +171,17 @@ echo [INFO] URL: http://localhost:9117/jhds/
 echo.
 if defined JAVA_OPTS (
     echo [INFO] JVM options: !JAVA_OPTS!
-    call mvn spring-boot:run "-Dspring-boot.run.jvmArguments=!JAVA_OPTS!"
+    if defined JHDS_MAVEN_SETTINGS (
+        call mvn -s "!JHDS_MAVEN_SETTINGS!" -gs "!JHDS_MAVEN_SETTINGS!" spring-boot:run "-Dspring-boot.run.jvmArguments=!JAVA_OPTS!"
+    ) else (
+        call mvn spring-boot:run "-Dspring-boot.run.jvmArguments=!JAVA_OPTS!"
+    )
 ) else (
-    call mvn spring-boot:run
+    if defined JHDS_MAVEN_SETTINGS (
+        call mvn -s "!JHDS_MAVEN_SETTINGS!" -gs "!JHDS_MAVEN_SETTINGS!" spring-boot:run
+    ) else (
+        call mvn spring-boot:run
+    )
 )
 set "APP_EXIT=%ERRORLEVEL%"
 echo.

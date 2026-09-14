@@ -46,7 +46,7 @@ set "MOTOR_STATE_CLOSE_HEX="
 start-jhds.bat
 ```
 
-脚本会自动切换到项目目录、加载本地变量、检查 Java、Maven、MySQL 和 Redis，并通过 `mvn spring-boot:run` 启动当前源码。若需要生成可部署 JAR，请单独执行 `mvn -DskipTests package`。
+脚本会自动切换到项目目录、加载本地变量、检查 Java、Maven、MySQL 和 Redis，并通过 `mvn spring-boot:run` 启动当前源码。若 Maven 配置的镜像无法访问但 Maven Central 可用，脚本会自动生成项目私有配置 `.jhds-runtime\maven-settings.xml` 并仅在本次启动中使用，不会修改电脑原有的 Maven 配置。若需要生成可部署 JAR，请单独执行 `mvn -DskipTests package`。
 
 ## 两台电脑加控制面板电脑
 
