@@ -64,6 +64,7 @@ let realtimeDetectionSnapshot = '';
 let patrolTaskResults = [];
 let patrolResultSignature = '';
 let patrolTaskDetailTrigger = null;
+let patrolLeafAlertVisible = false;
 let patrolChlorosisAlertVisible = false;
 
 function setTwinAxisMotion(axis, direction) {
@@ -1459,8 +1460,12 @@ function renderAutomaticPatrolResults(data) {
             badge.className = 'completed';
             badge.innerHTML = '<i></i>已生成';
         }
-        appendPatrolLeafAlert(container);
+        if (patrolLeafAlertVisible) appendPatrolLeafAlert(container);
         if (patrolChlorosisAlertVisible) appendPatrolChlorosisAlert(container);
+        if (!patrolLeafAlertVisible && !patrolChlorosisAlertVisible) {
+            appendPatrolResultEmpty(container, 'ri-image-search-line', '未发现明确虫害',
+                    '所有采集点均已通过多帧复核');
+        }
         return;
     }
     updateExpandedPatrolResult(results[0]);
@@ -1558,15 +1563,31 @@ function appendPatrolResultEmpty(container, icon, title, detail) {
 }
 
 function appendPatrolLeafAlert(container) {
+    if (!container || container.querySelector('[data-patrol-alert="leaf"]')) return;
     var alert = document.createElement('button');
     alert.type = 'button';
     alert.className = 'patrol-leaf-alert';
+    alert.dataset.patrolAlert = 'leaf';
     alert.setAttribute('aria-label', '查看二号种植区病叶告警');
     alert.innerHTML = '<i class="ri-alarm-warning-fill"></i>'
             + '<span><strong>发现病叶</strong><small>二号种植区 · 叶尖卷曲、变褐干枯</small></span>'
             + '<b>需处理</b><i class="ri-arrow-right-s-line"></i>';
     alert.addEventListener('click', openPatrolLeafAlert);
-    container.appendChild(alert);
+    var chlorosisAlert = container.querySelector('[data-patrol-alert="chlorosis"]');
+    if (chlorosisAlert) container.insertBefore(alert, chlorosisAlert);
+    else container.appendChild(alert);
+}
+
+function showPatrolLeafAlert() {
+    patrolLeafAlertVisible = true;
+    var container = document.getElementById('patrol-realtime-results');
+    if (!container) return;
+    var empty = container.querySelector('.patrol-results-empty');
+    if (empty) empty.remove();
+    container.classList.add('has-results');
+    appendPatrolLeafAlert(container);
+    var alert = container.querySelector('[data-patrol-alert="leaf"]');
+    if (alert) alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function appendPatrolChlorosisAlert(container) {
@@ -1606,7 +1627,7 @@ function openPatrolLeafAlert() {
         var figure = document.createElement('figure');
         figure.className = 'patrol-leaf-detection';
         var image = document.createElement('img');
-        image.src = '/jhds/images/patrol/cherry-leaf-disease.jpg';
+        image.src = '/jhds/images/patrol/cherry-leaf-calcium-deficiency.png';
         image.alt = '二号种植区卷曲、变褐干枯的樱桃叶片识别画面';
         var firstBox = document.createElement('span');
         firstBox.className = 'patrol-leaf-detection-box primary';
@@ -2480,6 +2501,10 @@ document.addEventListener('keydown', function(event) {
     if (event.key === '2' && !patrolKeyTargetIsEditable(event.target)) {
         var warning = document.getElementById('patrol-warning');
         if (warning && (!patrolPageAlert || Number(patrolPageAlert.enabled) !== 0)) warning.hidden = false;
+    }
+    if (event.key === '1' && !event.ctrlKey && !event.altKey && !event.metaKey
+            && !patrolKeyTargetIsEditable(event.target)) {
+        showPatrolLeafAlert();
     }
     if (event.key === '3' && !event.ctrlKey && !event.altKey && !event.metaKey
             && !patrolKeyTargetIsEditable(event.target)) {
