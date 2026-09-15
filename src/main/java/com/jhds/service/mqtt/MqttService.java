@@ -276,13 +276,26 @@ public class MqttService implements DisposableBean {
     }
 
     public String sendCommand(String alias, String value, boolean automatic) {
+        return sendCommand(alias, value, automatic, true);
+    }
+
+    /** Sends a command through MQTT only, without any Modbus replay or fallback. */
+    public String sendMqttOnlyCommand(String alias, String value, boolean automatic) {
+        return sendCommand(alias, value, automatic, false);
+    }
+
+    private String sendCommand(String alias, String value, boolean automatic, boolean allowModbusFallback) {
+        if (!allowModbusFallback && !isConnected()) {
+            log.warn("MQTT-only command rejected while MQTT is offline: alias={}, value={}", alias, value);
+            return null;
+        }
         deviceTwinState.invalidate(alias);
         Equipment equipment = equipmentMapper.selectByAlias(alias);
         if (equipment == null) {
             log.warn("Equipment not found: {}", alias);
             return null;
         }
-        if (!isConnected()) {
+        if (!isConnected() && allowModbusFallback) {
             if (isDirectMotorSignal(alias)) {
                 return sendDirectMotorFallback(alias, equipment, value, automatic);
             }
@@ -309,7 +322,7 @@ public class MqttService implements DisposableBean {
         }
 
         if (commandCode.matches("^[0-9A-Fa-f ]+$")) {
-            return sendHexCommand(alias, equipment, commandCode, value, automatic);
+            return sendHexCommand(alias, equipment, commandCode, value, automatic, allowModbusFallback);
         }
 
         String requestId = UUID.randomUUID().toString().replace("-", "");
@@ -351,7 +364,8 @@ public class MqttService implements DisposableBean {
         }
     }
 
-    private String sendHexCommand(String alias, Equipment equipment, String commandCode, String value, boolean automatic) {
+    private String sendHexCommand(String alias, Equipment equipment, String commandCode, String value,
+                                  boolean automatic, boolean allowModbusFallback) {
         try {
             lockSequential();
             // A transparent MQTT write should be acknowledged immediately by
@@ -375,8 +389,8 @@ public class MqttService implements DisposableBean {
             boolean allowRailDirectionSuffix = "MOTOR_DIRECTION".equalsIgnoreCase(alias);
             String response = sendHexSync(commandCode, timeoutMs,
                     momentaryMotorCommand ? 0 : safeQos(mqttProperties.getCommandQos()),
-                    allowRailDirectionSuffix);
-            if (response == null && momentaryMotorCommand) {
+                    allowRailDirectionSuffix, allowModbusFallback);
+            if (response == null && momentaryMotorCommand && allowModbusFallback) {
                 response = retryMotorFrameThroughModbus(alias, commandCode);
             }
             boolean success = response != null;
@@ -737,18 +751,19 @@ public class MqttService implements DisposableBean {
     }
 
     private String sendHexSync(String hexCommand, long timeoutMs, int qos) {
-        return sendHexSync(hexCommand, timeoutMs, qos, false);
+        return sendHexSync(hexCommand, timeoutMs, qos, false, true);
     }
 
     private String sendHexSync(String hexCommand, long timeoutMs, int qos,
-                               boolean allowRailDirectionSuffix) {
+                               boolean allowRailDirectionSuffix, boolean allowModbusFallback) {
         try {
             if (!isHexCommand(hexCommand)) {
                 log.warn("Invalid hexadecimal serial frame: {}", hexCommand);
                 return null;
             }
             if (!isConnected()) {
-                if (modbusTcpTransport == null || !modbusTcpTransport.isFallbackEnabled()) {
+                if (!allowModbusFallback || modbusTcpTransport == null
+                        || !modbusTcpTransport.isFallbackEnabled()) {
                     log.warn("MQTT is not connected and Modbus fallback is disabled");
                     return null;
                 }

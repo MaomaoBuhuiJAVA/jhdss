@@ -4,12 +4,16 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -37,24 +41,6 @@ public class AutomaticPatrolServiceTest {
                     expected.getMessage());
         }
         verifyZeroInteractions(patrol);
-    }
-
-    @Test
-    public void middleSprayAlwaysClosesPumpAndCountsCompletedSpray() {
-        AutomaticPatrolService service = new AutomaticPatrolService();
-        ControlPanelService panel = mock(ControlPanelService.class);
-        when(panel.pump(true)).thenReturn(new LinkedHashMap<String, Object>());
-        when(panel.pump(false)).thenReturn(new LinkedHashMap<String, Object>());
-        ReflectionTestUtils.setField(service, "controlPanelService", panel);
-        ReflectionTestUtils.setField(service, "foliarSprayMs", 0L);
-
-        ReflectionTestUtils.invokeMethod(service, "sprayFoliarAtMiddle", 2, 50);
-
-        InOrder commands = inOrder(panel);
-        commands.verify(panel).pump(true);
-        commands.verify(panel).pump(false);
-        assertEquals(1, ReflectionTestUtils.getField(service, "sprayCount"));
-        assertFalse((Boolean) ReflectionTestUtils.getField(service, "foliarPumpActive"));
     }
 
     @Test
@@ -138,5 +124,86 @@ public class AutomaticPatrolServiceTest {
         calls.verify(camera).awaitReady(60000L);
         calls.verify(camera).verifyCurrentQuality();
         verify(camera, never()).changeQuality("hd");
+    }
+
+    @Test
+    public void transientCaptureFailureRestartsCameraAndRetriesSameFrame() {
+        AutomaticPatrolService service = captureService();
+        LocalCameraStreamService camera = (LocalCameraStreamService) ReflectionTestUtils.getField(
+                service, "localCameraStreamService");
+        when(camera.captureLatestFrameAfter(any(Path.class), anyLong()))
+                .thenThrow(new IllegalStateException("等待视频分片超时"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(camera.restartAndAwaitReady(1000L)).thenReturn(true);
+
+        Path captured = ReflectionTestUtils.invokeMethod(service, "captureFrame",
+                2, "middle", 1, 123L);
+
+        assertTrue(captured.getFileName().toString().contains("_line02_middle_f01_"));
+        assertEquals(1, ReflectionTestUtils.getField(service, "captureCount"));
+        verify(camera, times(2)).captureLatestFrameAfter(any(Path.class), anyLong());
+        verify(camera).restartAndAwaitReady(1000L);
+    }
+
+    @Test
+    public void exhaustedCaptureRetriesReportLocationAndCameraStatus() {
+        AutomaticPatrolService service = captureService();
+        LocalCameraStreamService camera = (LocalCameraStreamService) ReflectionTestUtils.getField(
+                service, "localCameraStreamService");
+        when(camera.captureLatestFrameAfter(any(Path.class), anyLong()))
+                .thenThrow(new IllegalStateException("RTSP连接已重置"));
+        when(camera.restartAndAwaitReady(1000L)).thenReturn(false);
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("running", false);
+        status.put("hlsReady", false);
+        status.put("quality", "4k");
+        status.put("lastError", "连接失败");
+        when(camera.status()).thenReturn(status);
+
+        try {
+            ReflectionTestUtils.invokeMethod(service, "captureFrame", 3, "top", 2, 123L);
+            fail("Expected repeated camera capture failures to abort the patrol");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().contains("第3条扫描线顶部第2张抓拍在3次尝试后仍失败"));
+            assertTrue(expected.getMessage().contains("hlsReady=false"));
+            assertTrue(expected.getMessage().contains("lastError=连接失败"));
+        }
+
+        verify(camera, times(3)).captureLatestFrameAfter(any(Path.class), anyLong());
+        verify(camera, times(2)).restartAndAwaitReady(1000L);
+    }
+
+    @Test
+    public void cancellationDuringCameraRecoveryPreventsAnotherCaptureAttempt() {
+        final AutomaticPatrolService service = captureService();
+        LocalCameraStreamService camera = (LocalCameraStreamService) ReflectionTestUtils.getField(
+                service, "localCameraStreamService");
+        when(camera.captureLatestFrameAfter(any(Path.class), anyLong()))
+                .thenThrow(new IllegalStateException("等待视频分片超时"));
+        when(camera.restartAndAwaitReady(1000L)).thenAnswer(invocation -> {
+            ReflectionTestUtils.setField(service, "cancelRequested", true);
+            return true;
+        });
+
+        try {
+            ReflectionTestUtils.invokeMethod(service, "captureFrame", 1, "bottom", 1, 123L);
+            fail("Expected cancellation to stop camera retry");
+        } catch (RuntimeException expected) {
+            assertEquals("PatrolCancelledException", expected.getClass().getSimpleName());
+        }
+
+        verify(camera).captureLatestFrameAfter(any(Path.class), anyLong());
+        verify(camera).restartAndAwaitReady(1000L);
+    }
+
+    private AutomaticPatrolService captureService() {
+        AutomaticPatrolService service = new AutomaticPatrolService();
+        ReflectionTestUtils.setField(service, "localCameraStreamService", mock(LocalCameraStreamService.class));
+        ReflectionTestUtils.setField(service, "capturePrefix", "patrol_test");
+        ReflectionTestUtils.setField(service, "outputPath",
+                Paths.get("target", "patrol-capture-test").toString());
+        ReflectionTestUtils.setField(service, "cameraCaptureAttempts", 3);
+        ReflectionTestUtils.setField(service, "cameraRecoveryTimeoutMs", 1L);
+        return service;
     }
 }

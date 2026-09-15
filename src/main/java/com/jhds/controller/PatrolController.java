@@ -85,7 +85,7 @@ public class PatrolController {
                     && Boolean.parseBoolean(String.valueOf(body.get("motionConfirmed")));
             String result = patrolService.control(dir, motionConfirmed);
             if (result == null) {
-                return Result.error(503, "MQTT 与 Modbus 控制链路均不可用，或电机指令尚未配置");
+                return Result.error(503, "MQTT轨道控制链路不可用，或电机指令尚未配置");
             }
             return Result.ok(result);
         } catch (IllegalArgumentException e) {

@@ -33,6 +33,7 @@ let motorRequestId = 0;
 let motorCommandChain = Promise.resolve();
 const manualHoldReleases = new Set();
 let railResetPending = false;
+let railMqttConnected = false;
 let panelMotionDir = null;
 let panelMotionRequestId = 0;
 let panelMotionChain = Promise.resolve();
@@ -306,7 +307,7 @@ function applyRailLimitStatus(data) {
     }
     const leftButton = document.querySelector('[data-motor-direction="left"]');
     if (leftButton) {
-        leftButton.disabled = railAtLeftLimit;
+        leftButton.disabled = railAtLeftLimit || !railMqttConnected || automaticPatrolRunning;
         leftButton.classList.toggle('soft-limited', railAtLeftLimit);
         leftButton.title = railAtLeftLimit
             ? '已到达左侧 ' + railLeftLimitPercent + '% 软限位，只能向右移动'
@@ -317,6 +318,16 @@ function applyRailLimitStatus(data) {
         status.className = 'motor-control-status error';
         status.textContent = '已达到左侧 ' + railLeftLimitPercent + '% 软限位，只能向右移动';
     }
+}
+
+function applyRailMqttStatus(connected) {
+    railMqttConnected = connected === true;
+    const connection = document.getElementById('rail-mqtt-connection');
+    if (connection) {
+        connection.textContent = railMqttConnected ? 'MQTT在线' : 'MQTT离线';
+        connection.className = 'rail-mqtt-connection ' + (railMqttConnected ? 'online' : 'offline');
+    }
+    updateAutomaticPatrolActions();
 }
 
 function updateMotorButtonState(dir, pending) {
@@ -406,7 +417,6 @@ async function setPatrolDir(dir) {
             status.className = 'motor-control-status error';
             status.textContent = (res && res.msg) || '轨道电机控制链路失败';
         }
-        window.alert((res && res.msg) || '电机控制失败，请检查 MQTT 和串口指令配置');
     } else {
         setTwinAxisMotion('x', dir);
         refreshTwinState();
@@ -579,7 +589,7 @@ async function loadControlPanelStatus() {
     const res = await apiGet('/control-panel/status');
     const data = res && res.code === 200 ? res.data : null;
     const online = !!(data && data.reachable);
-    connection.textContent = online ? '局域网已连接' : '局域网未连接';
+    connection.textContent = online ? '纵向在线' : '纵向离线';
     connection.className = 'panel-motion-connection ' + (online ? 'online' : 'offline');
     if (online && panelMotionDir === null && data) {
         panelMotionDir = data.forwardActive ? 'forward' : (data.backwardActive ? 'backward' : null);
@@ -751,7 +761,8 @@ function updateAutomaticPatrolActions() {
     if (stop) stop.disabled = !automaticPatrolRunning;
     document.querySelectorAll('[data-motor-direction], [data-panel-direction], [data-ptz-direction], [data-ptz-stop]').forEach(function(button) {
         const atRailLimit = button.dataset.motorDirection === 'left' && railAtLeftLimit;
-        button.disabled = automaticPatrolRunning || atRailLimit;
+        const mqttUnavailable = button.dataset.motorDirection !== undefined && !railMqttConnected;
+        button.disabled = automaticPatrolRunning || atRailLimit || mqttUnavailable;
     });
     document.querySelectorAll('input[name="auto-patrol-plan"]').forEach(function(input) {
         input.disabled = patrolBusy;
@@ -867,7 +878,6 @@ function showAutomaticPatrolCompletion(data, failed) {
     const confirm = document.getElementById('patrol-completion-confirm');
     const lines = document.getElementById('patrol-completion-lines');
     const captures = document.getElementById('patrol-completion-captures');
-    const sprays = document.getElementById('patrol-completion-sprays');
     if (modal) modal.classList.toggle('is-error', !!failed);
     if (icon) icon.innerHTML = failed ? '<i class="ri-error-warning-line"></i>' : '<i class="ri-check-line"></i>';
     if (kicker) kicker.textContent = failed ? 'AUTOMATIC PATROL INTERRUPTED' : 'AUTOMATIC PATROL COMPLETE';
@@ -875,7 +885,7 @@ function showAutomaticPatrolCompletion(data, failed) {
     if (description) {
         description.textContent = failed
             ? ((data.lastError || '巡检任务未能继续执行') + '。系统已尝试发送紧急停止，请确认设备完全停止，并将摄像头回到最右下机械原点后再重新巡检。')
-            : '设备已自动回到最下最右初始位置，叶面肥水泵已关闭。';
+            : '设备已自动回到最下最右初始位置，巡检影像已完成采集。';
     }
     if (confirm) {
         confirm.innerHTML = failed
@@ -884,7 +894,6 @@ function showAutomaticPatrolCompletion(data, failed) {
     }
     if (lines) lines.textContent = Number(data.totalRows || 0);
     if (captures) captures.textContent = Number(data.captureCount || 0);
-    if (sprays) sprays.textContent = Number(data.sprayCount || 0);
     overlay.hidden = false;
     const button = overlay.querySelector('button');
     if (button) button.focus();
@@ -931,6 +940,7 @@ async function loadAutomaticPatrolStatus() {
     const res = await apiGet('/patrol/auto/status');
     if (!res || res.code !== 200 || !res.data) return;
     const data = res.data;
+    applyRailMqttStatus(data.mqttConnected === true);
     renderAutomaticPatrolResults(data);
     automaticPatrolRunning = !!data.running;
     automaticPatrolAnalysisRunning = data.analysisState === 'ANALYZING';

@@ -72,12 +72,14 @@ public class AutomaticPatrolService {
     private long settleMs;
     @Value("${patrol.automatic.focus-wait-ms:2000}")
     private long focusWaitMs;
-    @Value("${patrol.automatic.foliar-spray-ms:1500}")
-    private long foliarSprayMs;
     @Value("${patrol.automatic.burst-frames:3}")
     private int burstFrames;
     @Value("${patrol.automatic.burst-interval-ms:450}")
     private long burstIntervalMs;
+    @Value("${patrol.automatic.camera-capture-attempts:3}")
+    private int cameraCaptureAttempts;
+    @Value("${patrol.automatic.camera-recovery-timeout-ms:45000}")
+    private long cameraRecoveryTimeoutMs;
 
     private final Object stateLock = new Object();
     private final ExecutorService patrolExecutor = Executors.newSingleThreadExecutor(daemonFactory("auto-patrol"));
@@ -85,6 +87,7 @@ public class AutomaticPatrolService {
     private final AtomicInteger fileSequence = new AtomicInteger();
 
     private volatile Future<?> activeFuture;
+    private volatile Thread activePatrolThread;
     private volatile boolean running;
     private volatile boolean cancelRequested;
     private volatile String state = "IDLE";
@@ -95,8 +98,6 @@ public class AutomaticPatrolService {
     private volatile int currentRow;
     private volatile int totalRows;
     private volatile int captureCount;
-    private volatile int sprayCount;
-    private volatile boolean foliarPumpActive;
     private volatile long startedAt;
     private volatile long endedAt;
     private volatile String lastError;
@@ -142,8 +143,6 @@ public class AutomaticPatrolService {
             currentRow = 0;
             progress = 0;
             captureCount = 0;
-            sprayCount = 0;
-            foliarPumpActive = false;
             fileSequence.set(0);
             startedAt = System.currentTimeMillis();
             endedAt = 0L;
@@ -170,6 +169,8 @@ public class AutomaticPatrolService {
         if (running && !isTerminalState()) {
             state = "STOPPING";
             phase = "正在停止全部设备";
+            Thread thread = activePatrolThread;
+            if (thread != null) thread.interrupt();
         }
         // Always issue stop commands, even when the in-memory patrol state is
         // IDLE. The physical controller may still be moving after a device or
@@ -212,7 +213,7 @@ public class AutomaticPatrolService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("running", running);
         result.put("mqttConnected", mqttService.isConnected());
-        result.put("commandTransportAvailable", mqttService.hasAvailableTransport());
+        result.put("commandTransportAvailable", mqttService.isConnected());
         result.put("state", state);
         result.put("phase", phase);
         result.put("planId", planId);
@@ -222,9 +223,9 @@ public class AutomaticPatrolService {
         result.put("totalRows", totalRows);
         result.put("captureCount", captureCount);
         result.put("burstFrames", safeBurstFrames());
-        result.put("sprayCount", sprayCount);
-        result.put("foliarPumpActive", foliarPumpActive);
-        result.put("foliarSprayMs", Math.max(0L, foliarSprayMs));
+        result.put("sprayCount", 0);
+        result.put("foliarPumpActive", false);
+        result.put("foliarSprayMs", 0);
         Map<String, Object> camera = localCameraStreamService.status();
         result.put("quality", camera.get("quality"));
         result.put("actualWidth", camera.get("actualWidth"));
@@ -259,6 +260,7 @@ public class AutomaticPatrolService {
     }
 
     private void executePatrol() {
+        activePatrolThread = Thread.currentThread();
         boolean completed = false;
         try {
             updateState("PREFLIGHT", "检查视频、MQTT和控制面板", 2);
@@ -286,7 +288,6 @@ public class AutomaticPatrolService {
                     updateState("SCANNING", "第" + currentRow + "条扫描线上移至中点", scanProgress(row, 35));
                     moveVertical("forward", verticalMidMs);
                     focusAndCapture(row + 1, "middle", "中点", scanProgress(row, 48));
-                    sprayFoliarAtMiddle(row + 1, scanProgress(row, 58));
                     checkCancelled();
                     updateState("SCANNING", "第" + currentRow + "条扫描线上移至顶部", scanProgress(row, 70));
                     moveVertical("forward", verticalTopMs);
@@ -298,7 +299,6 @@ public class AutomaticPatrolService {
                     updateState("SCANNING", "第" + currentRow + "条扫描线下移至中点", scanProgress(row, 35));
                     moveVertical("backward", verticalTopMs);
                     focusAndCapture(row + 1, "middle", "中点", scanProgress(row, 48));
-                    sprayFoliarAtMiddle(row + 1, scanProgress(row, 58));
                     checkCancelled();
                     updateState("SCANNING", "第" + currentRow + "条扫描线下移至底部", scanProgress(row, 70));
                     moveVertical("backward", verticalMidMs);
@@ -323,6 +323,7 @@ public class AutomaticPatrolService {
             restorePreviewQuality();
             endedAt = System.currentTimeMillis();
             running = false;
+            activePatrolThread = null;
         }
         if (completed) {
             analyzeCompletedPatrol();
@@ -439,31 +440,6 @@ public class AutomaticPatrolService {
         }
     }
 
-    private void sprayFoliarAtMiddle(int row, int nextProgress) {
-        checkCancelled();
-        updateState("SPRAYING", "第" + row + "条扫描线中点喷淋叶面肥 1.5 秒", nextProgress);
-        controlPanelService.pump(true);
-        foliarPumpActive = true;
-        RuntimeException closeFailure = null;
-        try {
-            waitInterruptibly(Math.max(0L, foliarSprayMs));
-        } finally {
-            try {
-                controlPanelService.pump(false);
-            } catch (RuntimeException e) {
-                closeFailure = e;
-                warning = "叶面肥关闭指令失败：" + e.getMessage();
-            } finally {
-                foliarPumpActive = false;
-            }
-        }
-        if (closeFailure != null) {
-            throw new IllegalStateException("叶面肥喷淋后未能确认关闭", closeFailure);
-        }
-        sprayCount++;
-        updateState("SPRAYING", "第" + row + "条扫描线中点喷淋完成，叶面肥已关闭", nextProgress);
-    }
-
     private void returnToRightBottomOrigin(boolean endedAtTop, long verticalMs) {
         if (endedAtTop) {
             updateState("RETURNING", "巡检结束，正在下移返回底部", 94);
@@ -481,8 +457,8 @@ public class AutomaticPatrolService {
     }
 
     private void preflight() throws Exception {
-        if (!mqttService.hasAvailableTransport()) {
-            throw new IllegalStateException("MQTT与Modbus备用链路均未连接");
+        if (!mqttService.isConnected()) {
+            throw new IllegalStateException("MQTT网关未连接，轨道左右移动仅使用MQTT链路");
         }
         if (!awaitControlPanel()) {
             throw new IllegalStateException("蓝牙控制面板未连接");
@@ -582,15 +558,62 @@ public class AutomaticPatrolService {
     }
 
     private Path captureFrame(int row, String point, int burstIndex, long notBeforeEpochMs) {
-        checkCancelled();
         int sequence = fileSequence.incrementAndGet();
         Path file = outputDirectory().resolve(capturePrefix + "_line" + String.format("%02d", row)
                 + "_" + point + "_f" + String.format("%02d", burstIndex)
                 + "_" + String.format("%06d", sequence) + ".jpg");
-        localCameraStreamService.captureLatestFrameAfter(file, notBeforeEpochMs);
-        captureCount++;
-        warning = null;
-        return file;
+        RuntimeException lastFailure = null;
+        long freshFrameAfter = notBeforeEpochMs;
+        int attempts = Math.max(1, Math.min(5, cameraCaptureAttempts));
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            checkCancelled();
+            try {
+                localCameraStreamService.captureLatestFrameAfter(file, freshFrameAfter);
+                captureCount++;
+                warning = null;
+                return file;
+            } catch (RuntimeException failure) {
+                lastFailure = failure;
+                checkCancelled();
+                if (attempt >= attempts) break;
+
+                String location = "第" + row + "条扫描线" + pointLabel(point)
+                        + "第" + burstIndex + "张";
+                warning = location + "抓拍失败，正在恢复摄像头（第" + attempt + "/"
+                        + attempts + "次）";
+                updateState("CAMERA_RECOVERING", warning, progress);
+                log.warn("Camera capture failed at row={}, point={}, burst={}, attempt={}/{}: {}",
+                        row, point, burstIndex, attempt, attempts, failure.getMessage());
+                try {
+                    boolean ready = localCameraStreamService.restartAndAwaitReady(
+                            Math.max(1000L, cameraRecoveryTimeoutMs));
+                    if (!ready) {
+                        lastFailure = new IllegalStateException("摄像头视频流恢复等待超时", failure);
+                    }
+                } catch (RuntimeException recoveryFailure) {
+                    lastFailure = recoveryFailure;
+                    log.warn("Camera recovery failed at row={}, point={}, burst={}, attempt={}/{}: {}",
+                            row, point, burstIndex, attempt, attempts, recoveryFailure.getMessage());
+                }
+                checkCancelled();
+                freshFrameAfter = System.currentTimeMillis();
+            }
+        }
+
+        Map<String, Object> camera = localCameraStreamService.status();
+        String detail = lastFailure == null || lastFailure.getMessage() == null
+                ? "未知摄像头错误" : lastFailure.getMessage();
+        throw new IllegalStateException("第" + row + "条扫描线" + pointLabel(point)
+                + "第" + burstIndex + "张抓拍在" + attempts + "次尝试后仍失败：" + detail
+                + "；摄像头状态=" + cameraStatus(camera), lastFailure);
+    }
+
+    private String cameraStatus(Map<String, Object> camera) {
+        return "running=" + camera.get("running")
+                + ", hlsReady=" + camera.get("hlsReady")
+                + ", quality=" + camera.get("quality")
+                + ", resolution=" + resolution(camera)
+                + ", lastError=" + camera.get("lastError");
     }
 
     private int safeBurstFrames() {
@@ -649,7 +672,6 @@ public class AutomaticPatrolService {
                 try { controlPanelService.move("forward", false); } catch (RuntimeException ignored) { }
                 try { controlPanelService.move("backward", false); } catch (RuntimeException ignored) { }
                 try { controlPanelService.pump(false); } catch (RuntimeException ignored) { }
-                foliarPumpActive = false;
             }
         }));
         stops.add(stopExecutor.submit(new Runnable() {

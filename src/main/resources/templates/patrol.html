@@ -6,7 +6,7 @@
     <title>jhds - AI轨道巡检</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/common.css(v='20260912-card-edge-v1')}">
-    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260914-patrol-alert-row-v2')}">
+    <link rel="stylesheet" th:href="@{/css/patrol.css(v='20260915-rail-mqtt-only-v1')}">
     <script th:src="@{/js/lib/flv.min.js}"></script>
     <script th:src="@{/js/lib/hls.min.js}"></script>
     <link rel="stylesheet" th:href="@{/css/greenhouse-twin.css(v='1')}">
@@ -91,7 +91,7 @@
                             <button type="button" class="auto-patrol-stop" id="auto-patrol-stop" onclick="stopAutomaticPatrol()" disabled><i class="ri-stop-fill"></i>紧急停止</button>
                         </section>
                         <section class="patrol-control-card motor-control-card" aria-label="轨道电机控制">
-                            <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><button type="button" class="rail-limit-reset" id="rail-limit-reset" onclick="resetRailSoftLimit()" title="在最右端原点重置软限位" aria-label="重置轨道软限位"><i class="ri-restart-line"></i></button><span class="panel-motion-connection" id="panel-motion-connection">设备链路检查中</span></div>
+                            <div class="control-card-heading"><i class="ri-route-line"></i><span>轨道电机</span><button type="button" class="rail-limit-reset" id="rail-limit-reset" onclick="resetRailSoftLimit()" title="在最右端原点重置软限位" aria-label="重置轨道软限位"><i class="ri-restart-line"></i></button><span class="rail-mqtt-connection" id="rail-mqtt-connection">MQTT检查中</span><span class="panel-motion-connection" id="panel-motion-connection">纵向检查中</span></div>
                             <div class="motor-direction-grid">
                                 <button type="button" class="ctrl-btn" id="btn-left" data-motor-direction="left" aria-pressed="false" aria-label="按住向左移动，松开停止"><i class="ri-arrow-left-line"></i><span>左移</span></button>
                                 <button type="button" class="ctrl-btn" id="btn-right" data-motor-direction="right" aria-pressed="false" aria-label="按住向右移动，松开停止"><i class="ri-arrow-right-line"></i><span>右移</span></button>
@@ -154,11 +154,10 @@
             <div class="patrol-completion-icon" id="patrol-completion-icon" aria-hidden="true"><i class="ri-check-line"></i></div>
             <span class="patrol-completion-kicker" id="patrol-completion-kicker">AUTOMATIC PATROL COMPLETE</span>
             <h2 id="patrol-completion-title">自动巡检已完成</h2>
-            <p id="patrol-completion-description">设备已自动回到最下最右初始位置，叶面肥水泵已关闭。</p>
+            <p id="patrol-completion-description">设备已自动回到最下最右初始位置，巡检影像已完成采集。</p>
             <div class="patrol-completion-stats">
                 <span><b id="patrol-completion-lines">0</b><small>扫描线</small></span>
                 <span><b id="patrol-completion-captures">0</b><small>巡检抓拍</small></span>
-                <span><b id="patrol-completion-sprays">0</b><small>中点喷淋</small></span>
             </div>
             <button type="button" id="patrol-completion-confirm" onclick="closeAutomaticPatrolCompletion()"><i class="ri-checkbox-circle-line"></i><span>确认完成</span></button>
         </section>
@@ -295,7 +294,7 @@
     <script th:src="@{/js/common.js(v='20260912-page-motion')}"></script>
     <script th:src="@{/js/greenhouse-twin-state.js(v='20260912-motor-sync-v2')}"></script>
     <script th:src="@{/js/device-twin-viewer.js(v='20260912-motor-sync-v2')}"></script>
-    <script th:src="@{/js/patrol.js(v='20260914-default-4k-v1')}"></script>
+    <script th:src="@{/js/patrol.js(v='20260915-rail-mqtt-only-v1')}"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function(){
         var el=document.getElementById('patrol-twin');

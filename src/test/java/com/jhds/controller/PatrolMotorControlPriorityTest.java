@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -42,6 +43,41 @@ public class PatrolMotorControlPriorityTest {
     }
 
     @Test
+    public void failedDirectionControlReportsMqttOnlyWithoutMentioningModbus() {
+        PatrolController controller = new PatrolController();
+        PatrolService patrolService = mock(PatrolService.class);
+        ReflectionTestUtils.setField(controller, "patrolService", patrolService);
+        when(patrolService.control("right", true)).thenReturn(null);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("dir", "right");
+        body.put("motionConfirmed", true);
+
+        Result<String> result = controller.control(body);
+
+        assertEquals(503, result.getCode());
+        assertEquals("MQTT轨道控制链路不可用，或电机指令尚未配置", result.getMsg());
+        assertFalse(result.getMsg().contains("Modbus"));
+    }
+
+    @Test
+    public void railStopEndsPositionTrackingAndUsesMqttOnly() {
+        PatrolService patrolService = new PatrolService();
+        MqttService mqttService = mock(MqttService.class);
+        RailPositionService railPositionService = mock(RailPositionService.class);
+        ReflectionTestUtils.setField(patrolService, "mqttService", mqttService);
+        ReflectionTestUtils.setField(patrolService, "railPositionService", railPositionService);
+        when(mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false)).thenReturn("stopped");
+
+        assertEquals("stopped", patrolService.control("stop", false));
+
+        org.mockito.InOrder order = inOrder(railPositionService, mqttService);
+        order.verify(railPositionService).endMove();
+        order.verify(mqttService).sendMqttOnlyCommand("MOTOR_STATE", "close", false);
+        verifyNoMoreInteractions(mqttService);
+    }
+
+    @Test
     public void railMovementUsesTheVerifiedDirectionFrameWithoutAnUnconfiguredStartSignal() {
         PatrolService patrolService = new PatrolService();
         MqttService mqttService = mock(MqttService.class);
@@ -50,13 +86,13 @@ public class PatrolMotorControlPriorityTest {
         ReflectionTestUtils.setField(patrolService, "railPositionService", railPositionService);
         when(railPositionService.remainingLeftMs()).thenReturn(5000L);
         when(railPositionService.beginMove("left", Long.MAX_VALUE)).thenReturn(5000L);
-        when(mqttService.sendCommand("MOTOR_DIRECTION", "open", false)).thenReturn("ack");
+        when(mqttService.sendMqttOnlyCommand("MOTOR_DIRECTION", "open", false)).thenReturn("ack");
 
         assertEquals("ack", patrolService.control("left", true));
 
         org.mockito.InOrder order = inOrder(railPositionService, mqttService);
         order.verify(railPositionService).beginMove("left", Long.MAX_VALUE);
-        order.verify(mqttService).sendCommand("MOTOR_DIRECTION", "open", false);
+        order.verify(mqttService).sendMqttOnlyCommand("MOTOR_DIRECTION", "open", false);
         verifyNoMoreInteractions(mqttService);
     }
 
@@ -69,15 +105,15 @@ public class PatrolMotorControlPriorityTest {
         ReflectionTestUtils.setField(patrolService, "railPositionService", railPositionService);
         when(railPositionService.remainingLeftMs()).thenReturn(5000L);
         when(railPositionService.beginMove("left", Long.MAX_VALUE)).thenReturn(5000L);
-        when(mqttService.sendCommand("MOTOR_DIRECTION", "open", false)).thenReturn(null);
-        when(mqttService.sendCommand("MOTOR_STATE", "close", false)).thenReturn("stopped");
+        when(mqttService.sendMqttOnlyCommand("MOTOR_DIRECTION", "open", false)).thenReturn(null);
+        when(mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false)).thenReturn("stopped");
 
         assertNull(patrolService.control("left", true));
 
         org.mockito.InOrder order = inOrder(railPositionService, mqttService);
         order.verify(railPositionService).beginMove("left", Long.MAX_VALUE);
-        order.verify(mqttService).sendCommand("MOTOR_DIRECTION", "open", false);
-        order.verify(mqttService).sendCommand("MOTOR_STATE", "close", false);
+        order.verify(mqttService).sendMqttOnlyCommand("MOTOR_DIRECTION", "open", false);
+        order.verify(mqttService).sendMqttOnlyCommand("MOTOR_STATE", "close", false);
         order.verify(railPositionService).endMove();
     }
 
@@ -88,12 +124,12 @@ public class PatrolMotorControlPriorityTest {
         RailPositionService railPositionService = mock(RailPositionService.class);
         ReflectionTestUtils.setField(patrolService, "mqttService", mqttService);
         ReflectionTestUtils.setField(patrolService, "railPositionService", railPositionService);
-        when(mqttService.sendCommand("MOTOR_DIRECTION", "close", false)).thenReturn(null);
-        when(mqttService.sendCommand("MOTOR_STATE", "close", false)).thenReturn("stopped");
+        when(mqttService.sendMqttOnlyCommand("MOTOR_DIRECTION", "close", false)).thenReturn(null);
+        when(mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false)).thenReturn("stopped");
 
         assertNull(patrolService.control("right", true));
 
-        verify(mqttService).sendCommand("MOTOR_STATE", "close", false);
+        verify(mqttService).sendMqttOnlyCommand("MOTOR_STATE", "close", false);
         verify(railPositionService, never()).beginMove("right", Long.MAX_VALUE);
         verify(railPositionService, never()).endMove();
     }

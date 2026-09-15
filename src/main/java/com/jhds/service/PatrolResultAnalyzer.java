@@ -97,8 +97,9 @@ public class PatrolResultAnalyzer {
         Map<String, Object> result = new LinkedHashMap<>();
         String name = localizedName(detections);
         boolean immatureFruit = isImmatureFruit(detections);
+        boolean ripeFruit = isRipeFruit(detections);
         result.put("name", name);
-        result.put("category", immatureFruit ? "未成熟果实" : "害虫");
+        result.put("category", immatureFruit ? "未成熟果实" : (ripeFruit ? "成熟果实" : "害虫"));
         result.put("confidence", confidence);
         result.put("count", detections.size());
         result.put("detections", detections);
@@ -110,7 +111,9 @@ public class PatrolResultAnalyzer {
         result.put("area", "第" + group.getRow() + "条扫描线");
         result.put("advice", immatureFruit
                 ? "继续观察果实转色与膨大情况，暂缓采收并在下一轮巡检重点复查"
-                : "立即隔离受害枝条，安排人工捕捉，并对相邻植株进行重点复检");
+                : (ripeFruit
+                ? "果实已成熟，建议结合品质要求安排采收并做好分级记录"
+                : "立即隔离受害枝条，安排人工捕捉，并对相邻植株进行重点复检"));
         result.put("hits", hits);
         result.put("frames", frames);
         result.put("capturedAt", LocalDateTime.now().format(DISPLAY_TIME));
@@ -218,6 +221,8 @@ public class PatrolResultAnalyzer {
         if (normalized.contains("longhorn") || normalized.contains("blackbeetle")) return "桃红颈天牛";
         if (normalized.contains("unripe") || normalized.contains("immature")
                 || normalized.contains("greenfruit") || normalized.contains("weishuguo")) return "未成熟果实";
+        if (normalized.contains("ripe") || normalized.contains("mature")
+                || normalized.contains("redfruit") || normalized.contains("chengshuguo")) return "成熟果实";
         return value;
     }
 
@@ -228,6 +233,15 @@ public class PatrolResultAnalyzer {
         return normalized.contains("unripe") || normalized.contains("immature")
                 || normalized.contains("greenfruit") || normalized.contains("weishuguo")
                 || value.contains("未成熟");
+    }
+
+    private boolean isRipeFruit(List<Map<String, Object>> detections) {
+        if (detections.isEmpty()) return false;
+        String value = String.valueOf(detections.get(0).get("class"));
+        String normalized = value.toLowerCase().replaceAll("[\\s_-]+", "");
+        return !isImmatureFruit(detections) && (normalized.contains("ripe")
+                || normalized.contains("mature") || normalized.contains("redfruit")
+                || normalized.contains("chengshuguo") || value.contains("成熟果实"));
     }
 
     private int coordinate(Object value, int minimum, int maximum) {

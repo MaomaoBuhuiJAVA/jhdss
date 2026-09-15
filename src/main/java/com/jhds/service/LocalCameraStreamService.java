@@ -230,6 +230,16 @@ public class LocalCameraStreamService {
         }
     }
 
+    /** Rebuilds the RTSP/HLS bridge after a capture failure and waits for fresh output. */
+    public boolean restartAndAwaitReady(long timeoutMs) {
+        synchronized (processLock) {
+            nextRetryAt = 0L;
+            stopProcessLocked();
+            ensureRunning();
+        }
+        return awaitReady(timeoutMs);
+    }
+
     private List<String> buildCommand(Path output, String inputPath) {
         List<String> command = new ArrayList<>();
         command.add(properties.getFfmpegPath());

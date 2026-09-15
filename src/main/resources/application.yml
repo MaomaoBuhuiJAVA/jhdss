@@ -183,6 +183,9 @@ patrol:
     result-path: ${PATROL_AUTO_RESULT_PATH:./uploads/patrol-results}
     burst-frames: ${PATROL_AUTO_BURST_FRAMES:3}
     burst-interval-ms: ${PATROL_AUTO_BURST_INTERVAL_MS:450}
+    # 摄像头短暂断流时，原地重建 RTSP/HLS 桥接并重试抓拍，不继续移动设备。
+    camera-capture-attempts: ${PATROL_CAMERA_CAPTURE_ATTEMPTS:3}
+    camera-recovery-timeout-ms: ${PATROL_CAMERA_RECOVERY_TIMEOUT_MS:45000}
     # 2026-09-07现场标定：右到左有效运动18.422秒，下到上有效运动11.587秒。
     horizontal-travel-ms: ${PATROL_HORIZONTAL_TRAVEL_MS:18422}
     vertical-travel-ms: ${PATROL_VERTICAL_TRAVEL_MS:11587}
@@ -190,8 +193,6 @@ patrol:
     # 自动巡检和手动左右移动都不会越过它，最右侧端点仍可到达。
     coverage-ratio: ${PATROL_COVERAGE_RATIO:0.92}
     horizontal-coverage-ratio: ${PATROL_HORIZONTAL_COVERAGE_RATIO:0.60}
-    # 每条扫描线到达中点并完成抓拍后，短时开启叶面肥水泵。
-    foliar-spray-ms: ${PATROL_FOLIAR_SPRAY_MS:1500}
     # 云台保持手动设置的默认取景位置，自动巡检不自动调整云台。
     # 每个拍照点先停止电机，等待机械稳定和自动对焦，再读取等待结束后生成的新视频分片。
     settle-ms: ${PATROL_SETTLE_MS:350}

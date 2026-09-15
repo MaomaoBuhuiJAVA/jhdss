@@ -85,7 +85,7 @@ public class PatrolService {
 
     private void stopForSoftLimit() {
         try {
-            String response = mqttService.sendCommand("MOTOR_STATE", "close", false);
+            String response = mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false);
             log.info("Rail soft-limit stop issued; MOTOR_STATE response={}", response);
         } catch (RuntimeException e) {
             log.error("Failed to issue rail soft-limit stop", e);
@@ -182,7 +182,7 @@ public class PatrolService {
 
         if ("stop".equals(dir)) {
             railPositionService.endMove();
-            return mqttService.sendCommand("MOTOR_STATE", "close", false);
+            return mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false);
         }
 
         // Only the leftward direction has a soft limit. The rightmost end stays
@@ -244,12 +244,12 @@ public class PatrolService {
             }
             trackingStarted = true;
         }
-        String response = mqttService.sendCommand(alias, value, false);
+        String response = mqttService.sendMqttOnlyCommand(alias, value, false);
         if (response == null) {
             // The motor may have acted on the write even if its acknowledgement
             // was lost. Stop first, then bank all potentially travelled time.
             try {
-                mqttService.sendCommand("MOTOR_STATE", "close", false);
+                mqttService.sendMqttOnlyCommand("MOTOR_STATE", "close", false);
             } finally {
                 if (trackingStarted) railPositionService.endMove();
             }
